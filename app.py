@@ -34,7 +34,6 @@ init_extensions(app)
 
 app.register_blueprint(auth_bp)
 
-
 # def scheduler_loop():
 
 #     print("Scheduler Started")
