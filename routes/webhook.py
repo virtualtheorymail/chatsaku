@@ -3593,3 +3593,15 @@ _Kelola keuangan lebih mudah, lebih cerdas, dan lebih praktis bersama ChatSaku._
     return jsonify({
         "status": True
     })
+
+@app.route("/webhook-test", methods=["GET", "POST"])
+def webhook_test():
+    print("========== WEBHOOK TEST MASUK ==========")
+    print("METHOD:", request.method)
+    print("DATA:", request.get_data(as_text=True))
+    print("=========================================")
+
+    return jsonify({
+        "status": True,
+        "message": "Railway B webhook test OK"
+    })
