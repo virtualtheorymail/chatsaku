@@ -2752,6 +2752,18 @@ def test_wa():
     return {"status": True}
 
 
+@app.route("/webhook-test", methods=["GET", "POST"])
+def webhook_test():
+    print("========== WEBHOOK TEST MASUK ==========")
+    print("METHOD:", request.method)
+    print("DATA:", request.get_data(as_text=True))
+    print("=========================================")
+
+    return jsonify({
+        "status": True,
+        "message": "Railway B webhook test OK"
+    })
+
 @app.route("/debug-token")
 def debug_token():
     token = os.getenv("FONTE_TOKEN")
