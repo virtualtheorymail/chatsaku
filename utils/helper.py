@@ -24,7 +24,7 @@ serializer = URLSafeTimedSerializer(SECRET_KEY)
 
 BASE_URL = os.getenv(
     "BASE_URL",
-    "https://web-production-c01b5.up.railway.app"
+    "https://web-production-9a550.up.railway.app"
 )
 
 KATEGORI = {
