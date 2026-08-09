@@ -197,24 +197,67 @@ def webhook():
     # AMBIL DATA
     # ======================================
 
+    # sender = normalize_wa(
+    #     payload.get("sender")
+    #     or payload.get("pengirim")
+    #     or payload.get("from")
+    #     or ""
+    # )
+
+    # message = str(
+    #     payload.get("message")
+    #     or payload.get("pesan")
+    #     or ""
+    # ).strip()
+
+    # msg_id = (
+    #     payload.get("id")
+    #     or payload.get("inboxid")
+    #     or f"{sender}:{int(time.time())}"
+    # )
+
+    # ======================================
+    # AMBIL DATA BABLAST
+    # ======================================
+
+    data = payload.get("data") or {}
+
     sender = normalize_wa(
-        payload.get("sender")
+        data.get("from_phone")
+        or data.get("from")
+        or payload.get("sender")
         or payload.get("pengirim")
         or payload.get("from")
         or ""
     )
 
     message = str(
-        payload.get("message")
+        data.get("content")
+        or data.get("message")
+        or payload.get("message")
         or payload.get("pesan")
         or ""
     ).strip()
 
     msg_id = (
-        payload.get("id")
+        data.get("message_id")
+        or payload.get("id")
         or payload.get("inboxid")
         or f"{sender}:{int(time.time())}"
     )
+
+    pushname = str(
+        data.get("from_name")
+        or payload.get("pushname")
+        or ""
+    ).strip()
+
+    print("========================================")
+    print("📱 SENDER :", sender)
+    print("👤 NAME   :", pushname)
+    print("💬 MESSAGE:", message)
+    print("🆔 MSG ID :", msg_id)
+    print("========================================")
 
     if not sender:
         return jsonify(status=True)
@@ -227,7 +270,7 @@ def webhook():
     print("Sender :", sender)
     print("Message:", message)
 
-    pushname = str(payload.get("pushname") or "").strip()
+    # pushname = str(payload.get("pushname") or "").strip()
 
     # ======================================
     # ANTI LOOP
