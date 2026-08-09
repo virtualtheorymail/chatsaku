@@ -169,7 +169,9 @@ def refresh_summary_after_transaction(tanggal_transaksi):
 # =========================
 @webhook_bp.route("/webhook", methods=["POST"])
 def webhook():
-
+    print("========== WEBHOOK ASLI MASUK ==========")
+    print("METHOD:", request.method)
+    print("HEADERS:", dict(request.headers))
     payload = request.get_json(silent=True) or {}
 
     print("=" * 80)
