@@ -27,6 +27,7 @@ BASE_URL = os.getenv(
     "https://web-production-9a550.up.railway.app"
 )
 
+
 KATEGORI = {
 
     "makanan": [
