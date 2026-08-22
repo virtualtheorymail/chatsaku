@@ -465,13 +465,70 @@ https://www.chatsaku.com
 
         return jsonify(status=True)
 
+    # ==========================================
+    # NLP CHATSAKU
+    # ==========================================
+
     nlp = parse_message(message)
 
-    intent = nlp["intent"]
+    intent = nlp.get("intent")
+
+    print("========================================")
+    print("🤖 NLP RESULT")
+    print(f"TEXT   : {message}")
+    print(f"INTENT : {intent}")
+    print(f"DATA   : {nlp}")
+    print("========================================")
+
+    if intent:
+        if intent == "saldo":
+            cmd = "saldo"
+
+        elif intent == "hari_ini":
+            cmd = "hari ini"
+
+        elif intent == "dashboard":
+            cmd = "dashboard"
+
+        elif intent == "insight":
+            cmd = "insight"
+
+        elif intent == "budget":
+            cmd = "budget"
+
+        elif intent == "reminder":
+            cmd = "reminder"
+
+        elif intent == "hapusreminder":
+            cmd = "hapusreminder"
+
+        elif intent == "hutang":
+            cmd = "hutang"
+
+        elif intent == "piutang":
+            cmd = "piutang"
+
+        elif intent == "bayarhutang":
+            cmd = "bayarhutang"
+
+        elif intent == "bayarpiutang":
+            cmd = "bayarpiutang"
+
+        elif intent == "target":
+            cmd = "target"
+
+        elif intent == "tabung":
+            cmd = "tabung"
+
+        elif intent == "help":
+            cmd = "help"
+
     # =====================================================
     # HANYA RESPON COMMAND YANG DIKENAL
     # =====================================================
     valid_command = (
+        intent is not None
+        or
         cmd == "saldo"
         or cmd == "hari ini"
         or cmd == "insight"
