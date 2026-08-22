@@ -1447,7 +1447,7 @@ def parse_deadline_finance(text):
 
 
 # ============================================================
-# HELPER: BERSIHKAN NAMA TARGET
+# CLEAN TARGET NAME
 # ============================================================
 
 def clean_target_name(text):
@@ -1457,32 +1457,32 @@ def clean_target_name(text):
 
     nama = str(text).strip()
 
-    # --------------------------------------------------------
-    # HAPUS TANGGAL
-    # --------------------------------------------------------
+    # ========================================================
+    # HAPUS DEADLINE
+    # ========================================================
 
     nama = re.sub(
         r'\b\d{1,2}[-/.]\d{1,2}[-/.]\d{4}\b',
         '',
-        nama
+        nama,
+        flags=re.IGNORECASE
     )
 
-    # --------------------------------------------------------
+    # ========================================================
     # HAPUS NOMINAL SATUAN
-    # --------------------------------------------------------
+    # ========================================================
 
     nama = re.sub(
-        r'\b(?:rp\s*)?'
-        r'\d+(?:[.,]\d+)?\s*'
+        r'\b\d+(?:[.,]\d+)?\s*'
         r'(?:juta|jt|ribu|rb|miliar|milyar)\b',
         '',
         nama,
         flags=re.IGNORECASE
     )
 
-    # --------------------------------------------------------
-    # HAPUS NOMINAL ANGKA
-    # --------------------------------------------------------
+    # ========================================================
+    # HAPUS NOMINAL ANGKA BIASA
+    # ========================================================
 
     nama = re.sub(
         r'(?:rp\s*)?[\d.,]+',
@@ -1491,66 +1491,114 @@ def clean_target_name(text):
         flags=re.IGNORECASE
     )
 
-    # --------------------------------------------------------
-    # KATA PEMBUKA
-    # --------------------------------------------------------
+    # ========================================================
+    # HAPUS KATA PEMBUKA
+    # URUTAN DARI PALING PANJANG
+    # ========================================================
 
     pola_hapus = [
 
-        r'^saya\s+punya\s+',
-        r'^saya\s+memiliki\s+',
+        # saya ingin membuat target laptop
+        r'^saya\s+ingin\s+membuat\s+target\s+',
 
-        r'^saya\s+ingin\s+menabung\s+untuk\s+',
-        r'^saya\s+mau\s+menabung\s+untuk\s+',
+        # saya mau membuat target laptop
+        r'^saya\s+mau\s+membuat\s+target\s+',
 
-        r'^saya\s+ingin\s+menabung\s+',
-        r'^saya\s+mau\s+menabung\s+',
+        # saya ingin buat target laptop
+        r'^saya\s+ingin\s+buat\s+target\s+',
 
-        r'^ingin\s+menabung\s+untuk\s+',
-        r'^mau\s+menabung\s+untuk\s+',
+        # saya mau buat target laptop
+        r'^saya\s+mau\s+buat\s+target\s+',
 
-        r'^ingin\s+menabung\s+',
-        r'^mau\s+menabung\s+',
+        # ingin membuat target laptop
+        r'^ingin\s+membuat\s+target\s+',
 
-        r'^menabung\s+untuk\s+',
-        r'^nabung\s+untuk\s+',
+        # mau membuat target laptop
+        r'^mau\s+membuat\s+target\s+',
 
-        r'^saya\s+ingin\s+beli\s+',
-        r'^saya\s+mau\s+beli\s+',
-
-        r'^ingin\s+beli\s+',
-        r'^mau\s+beli\s+',
-
+        # buatkan target tabungan laptop
         r'^buatkan\s+target\s+tabungan\s+',
+
+        # buatkan target laptop
         r'^buatkan\s+target\s+',
 
+        # buat target tabungan laptop
         r'^buat\s+target\s+tabungan\s+',
+
+        # buat target laptop
         r'^buat\s+target\s+',
 
+        # bikin target tabungan laptop
         r'^bikin\s+target\s+tabungan\s+',
+
+        # bikin target laptop
         r'^bikin\s+target\s+',
 
-        r'^target\s+tabungan\s+',
-        r'^target\s+menabung\s+',
+        # saya ingin menabung untuk laptop
+        r'^saya\s+ingin\s+menabung\s+untuk\s+',
+
+        # saya mau menabung untuk laptop
+        r'^saya\s+mau\s+menabung\s+untuk\s+',
+
+        # saya ingin menabung laptop
+        r'^saya\s+ingin\s+menabung\s+',
+
+        # saya mau menabung laptop
+        r'^saya\s+mau\s+menabung\s+',
+
+        # ingin menabung untuk laptop
+        r'^ingin\s+menabung\s+untuk\s+',
+
+        # mau menabung untuk laptop
+        r'^mau\s+menabung\s+untuk\s+',
+
+        # ingin menabung laptop
+        r'^ingin\s+menabung\s+',
+
+        # mau menabung laptop
+        r'^mau\s+menabung\s+',
+
+        # menabung untuk laptop
+        r'^menabung\s+untuk\s+',
+
+        # nabung untuk laptop
+        r'^nabung\s+untuk\s+',
+
+        # saya ingin beli laptop
+        r'^saya\s+ingin\s+beli\s+',
+
+        # saya mau beli laptop
+        r'^saya\s+mau\s+beli\s+',
+
+        # ingin beli laptop
+        r'^ingin\s+beli\s+',
+
+        # mau beli laptop
+        r'^mau\s+beli\s+',
+
+        # target untuk beli laptop
         r'^target\s+untuk\s+beli\s+',
+
+        # target beli laptop
         r'^target\s+beli\s+',
+
+        # target tabungan laptop
+        r'^target\s+tabungan\s+',
+
+        # target menabung laptop
+        r'^target\s+menabung\s+',
+
+        # target laptop
         r'^target\s+',
 
-        r'^detail\s+target\s+',
-        r'^detail\s+',
-
-        r'^lihat\s+target\s+',
-        r'^cek\s+target\s+',
-
+        # tabung laptop
         r'^tabung\s+',
+
+        # nabung laptop
         r'^nabung\s+',
-        r'^menabung\s+',
 
-        r'^saya\s+tabung\s+',
-        r'^saya\s+nabung\s+',
-
-        r'^untuk\s+',
-        r'^buat\s+'
+        # menabung laptop
+        r'^menabung\s+'
     ]
 
     for pola in pola_hapus:
@@ -1559,29 +1607,38 @@ def clean_target_name(text):
             pola,
             '',
             nama,
+            count=1,
             flags=re.IGNORECASE
         )
 
-    # --------------------------------------------------------
+    # ========================================================
     # HAPUS KATA PENGHUBUNG
-    # --------------------------------------------------------
+    # ========================================================
 
     nama = re.sub(
-        r'\b(sampai|hingga|tanggal|tgl|sebesar|dengan|sebelum)\b',
+        r'\b(sampai|hingga|tanggal|tgl|sebesar|dengan)\b',
         '',
         nama,
         flags=re.IGNORECASE
     )
 
-    # --------------------------------------------------------
-    # RAPATKAN SPASI
-    # --------------------------------------------------------
+    # ========================================================
+    # NORMALISASI SPASI
+    # ========================================================
 
     nama = re.sub(
         r'\s+',
         ' ',
         nama
     ).strip()
+
+    # ========================================================
+    # HAPUS PUNCTUATION DI AWAL / AKHIR
+    # ========================================================
+
+    nama = nama.strip(
+        " ,.-:;|"
+    )
 
     return nama or None
 
