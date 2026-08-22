@@ -8718,17 +8718,577 @@ _ChatSaku Finance Assistant_
 
 
 
-    # =========================
-    # HUTANG LIHAT
-    # =========================
+    # ============================================================
+# NLP HUTANG
+# ============================================================
 
-    if cmd == "hutang":
+def deteksi_hutang_nlp(message, data=None):
 
-        if not has_feature(sender, "hutang"):
+    if not message:
+        return None
 
-            kirim_wa(sender,
-    """
-    🔒 Fitur hutang hanya tersedia pada paket PREMIUM.
+    text = str(message).strip()
+
+    text_lower = re.sub(
+        r'\s+',
+        ' ',
+        text.lower()
+    ).strip()
+
+    if data is None:
+        data = {}
+
+    # ========================================================
+    # NORMALISASI TYPO / VARIASI UMUM
+    # ========================================================
+
+    text_normal = text_lower
+
+    text_normal = re.sub(
+        r'\bhutang2\b',
+        'hutang',
+        text_normal
+    )
+
+    text_normal = re.sub(
+        r'\bhutangnya\b',
+        'hutang',
+        text_normal
+    )
+
+    # ========================================================
+    # ACTION LIST HUTANG
+    # ========================================================
+
+    pola_list = [
+
+        r'^hutang$',
+
+        r'^list hutang$',
+        r'^daftar hutang$',
+        r'^lihat hutang$',
+        r'^lihat semua hutang$',
+        r'^cek hutang$',
+        r'^cek semua hutang$',
+
+        r'^hutang saya$',
+        r'^hutang saya apa$',
+        r'^hutang saya apa saja$',
+
+        r'^apa hutang saya$',
+        r'^apa saja hutang saya$',
+
+        r'^saya punya hutang$',
+        r'^saya punya hutang apa$',
+        r'^saya punya hutang apa saja$',
+
+        r'^saya punya list hutang$',
+        r'^saya punya daftar hutang$',
+
+        r'^punya hutang apa$',
+        r'^punya hutang apa saja$',
+
+        r'^berapa hutang saya$',
+        r'^total hutang saya$'
+    ]
+
+    for pola in pola_list:
+
+        if re.search(
+            pola,
+            text_normal,
+            re.IGNORECASE
+        ):
+
+            return {
+                "intent": "hutang",
+                "action": "list",
+                "nama": None,
+                "nominal": None,
+                "keterangan": None
+            }
+
+    # ========================================================
+    # ACTION DELETE
+    #
+    # Disiapkan supaya nantinya bisa:
+    #
+    # hapus hutang budi
+    # hapus hutang ke budi
+    # ========================================================
+
+    pola_delete = [
+
+        r'^hapus\s+hutang\s+(.+)$',
+
+        r'^hapuskan\s+hutang\s+(.+)$',
+
+        r'^hapus\s+hutang\s+ke\s+(.+)$',
+
+        r'^hapus\s+hutang\s+\.?\s*(.+)$'
+    ]
+
+    for pola in pola_delete:
+
+        match = re.search(
+            pola,
+            text_normal,
+            re.IGNORECASE
+        )
+
+        if match:
+
+            nama = match.group(1).strip()
+
+            nama = re.sub(
+                r'^ke\s+',
+                '',
+                nama,
+                flags=re.IGNORECASE
+            ).strip()
+
+            if nama:
+
+                return {
+                    "intent": "hutang",
+                    "action": "delete",
+                    "nama": nama,
+                    "nominal": None,
+                    "keterangan": None
+                }
+
+    # ========================================================
+    # ACTION DETAIL
+    #
+    # contoh:
+    # detail hutang budi
+    # cek hutang budi
+    # lihat hutang budi
+    # ========================================================
+
+    pola_detail = [
+
+        r'^detail\s+hutang\s+(.+)$',
+
+        r'^cek\s+hutang\s+(.+)$',
+
+        r'^lihat\s+hutang\s+(.+)$',
+
+        r'^hutang\s+ke\s+(.+)$'
+    ]
+
+    for pola in pola_detail:
+
+        match = re.search(
+            pola,
+            text_normal,
+            re.IGNORECASE
+        )
+
+        if match:
+
+            nama = match.group(1).strip()
+
+            # Jika ternyata ada nominal,
+            # jangan anggap detail.
+            nominal_test = parse_nominal_finance(
+                nama
+            )
+
+            if nominal_test:
+                continue
+
+            nama = re.sub(
+                r'\s+',
+                ' ',
+                nama
+            ).strip()
+
+            if nama:
+
+                return {
+                    "intent": "hutang",
+                    "action": "detail",
+                    "nama": nama,
+                    "nominal": None,
+                    "keterangan": None
+                }
+
+    # ========================================================
+    # NOMINAL
+    # ========================================================
+
+    nominal = parse_nominal_finance(
+        text
+    )
+
+    # ========================================================
+    # DETEKSI APAKAH INI PERINTAH HUTANG
+    # ========================================================
+
+    pola_hutang = [
+
+        r'\bhutang\b',
+
+        r'\bberhutang\b',
+
+        r'\bngutang\b',
+
+        r'\butang\b'
+    ]
+
+    ada_hutang = any(
+        re.search(
+            pola,
+            text_normal,
+            re.IGNORECASE
+        )
+        for pola in pola_hutang
+    )
+
+    # ========================================================
+    # NLP UTAMA MENGATAKAN HUTANG
+    # ========================================================
+
+    if data.get("intent") == "hutang":
+
+        ada_hutang = True
+
+    if not ada_hutang:
+
+        return None
+
+    # ========================================================
+    # JIKA TIDAK ADA NOMINAL
+    #
+    # Contoh:
+    #
+    # saya punya hutang budi
+    #
+    # kemungkinan detail
+    # ========================================================
+
+    if not nominal:
+
+        # Jangan salah menganggap kalimat list
+        # sebagai nama hutang.
+
+        if any(
+            kata in text_normal
+            for kata in [
+                "hutang saya",
+                "punya hutang",
+                "list hutang",
+                "daftar hutang",
+                "lihat hutang",
+                "cek hutang",
+                "hutang apa",
+                "hutang apa saja"
+            ]
+        ):
+
+            return {
+                "intent": "hutang",
+                "action": "list",
+                "nama": None,
+                "nominal": None,
+                "keterangan": None
+            }
+
+    # ========================================================
+    # CREATE HUTANG
+    # ========================================================
+
+    if nominal:
+
+        nama_text = text
+
+        # ====================================================
+        # HAPUS NOMINAL DARI NAMA
+        # ====================================================
+
+        nama_text = re.sub(
+            r'\b(?:rp\s*)?'
+            r'\d+(?:[.,]\d+)?\s*'
+            r'(?:juta|jt|ribu|rb|miliar|milyar)\b',
+            '',
+            nama_text,
+            flags=re.IGNORECASE
+        )
+
+        nama_text = re.sub(
+            r'(?:rp\s*)?[\d.,]+',
+            '',
+            nama_text,
+            flags=re.IGNORECASE
+        )
+
+        # ====================================================
+        # BERSIHKAN KATA PEMBUKA
+        # ====================================================
+
+        pola_hapus = [
+
+            r'^hutang\s+',
+
+            r'^hutang\s+ke\s+',
+
+            r'^berhutang\s+',
+
+            r'^berhutang\s+ke\s+',
+
+            r'^ngutang\s+',
+
+            r'^ngutang\s+ke\s+',
+
+            r'^utang\s+',
+
+            r'^utang\s+ke\s+',
+
+            r'^saya\s+hutang\s+',
+
+            r'^saya\s+hutang\s+ke\s+',
+
+            r'^saya\s+berhutang\s+',
+
+            r'^saya\s+berhutang\s+ke\s+',
+
+            r'^saya\s+ngutang\s+',
+
+            r'^saya\s+ngutang\s+ke\s+',
+
+            r'^saya\s+punya\s+hutang\s+',
+
+            r'^saya\s+punya\s+hutang\s+ke\s+',
+
+            r'^catat\s+hutang\s+',
+
+            r'^catat\s+hutang\s+ke\s+',
+
+            r'^buat\s+hutang\s+',
+
+            r'^buatkan\s+hutang\s+',
+
+            r'^tambah\s+hutang\s+',
+
+            r'^tambahkan\s+hutang\s+'
+        ]
+
+        for pola in pola_hapus:
+
+            nama_text = re.sub(
+                pola,
+                '',
+                nama_text,
+                flags=re.IGNORECASE
+            )
+
+        # ====================================================
+        # PISAHKAN KETERANGAN
+        #
+        # Contoh:
+        #
+        # hutang budi 500 ribu pinjam uang
+        #
+        # nama = budi
+        # keterangan = pinjam uang
+        # ====================================================
+
+        keterangan = ""
+
+        match_keterangan = re.search(
+            r'\b(?:karena|untuk|keterangan|catatan|sebab)\b\s+(.+)$',
+            nama_text,
+            flags=re.IGNORECASE
+        )
+
+        if match_keterangan:
+
+            keterangan = (
+                match_keterangan
+                .group(1)
+                .strip()
+            )
+
+            nama_text = (
+                nama_text[
+                    :match_keterangan.start()
+                ]
+                .strip()
+            )
+
+        # ====================================================
+        # BERSIHKAN KATA "KE"
+        # ====================================================
+
+        nama_text = re.sub(
+            r'\bke\b',
+            '',
+            nama_text,
+            flags=re.IGNORECASE
+        )
+
+        # ====================================================
+        # BERSIHKAN KATA UMUM
+        # ====================================================
+
+        nama_text = re.sub(
+            r'\b(?:sebesar|nominalnya|sejumlah)\b',
+            '',
+            nama_text,
+            flags=re.IGNORECASE
+        )
+
+        nama_text = re.sub(
+            r'\s+',
+            ' ',
+            nama_text
+        ).strip()
+
+        # ====================================================
+        # Jika NLP utama punya keterangan
+        # ====================================================
+
+        if not keterangan:
+
+            keterangan = (
+                data.get("keterangan")
+                or ""
+            )
+
+        # ====================================================
+        # VALIDASI NAMA
+        # ====================================================
+
+        if not nama_text:
+
+            return {
+                "intent": "hutang",
+                "action": "create",
+                "nama": None,
+                "nominal": nominal,
+                "keterangan": keterangan or None
+            }
+
+        return {
+            "intent": "hutang",
+            "action": "create",
+            "nama": nama_text,
+            "nominal": nominal,
+            "keterangan": keterangan or None
+        }
+
+    # ========================================================
+    # FALLBACK NLP
+    # ========================================================
+
+    if data.get("intent") == "hutang":
+
+        keterangan = str(
+            data.get("keterangan") or ""
+        ).strip()
+
+        nama = str(
+            data.get("nama")
+            or data.get("keterangan")
+            or ""
+        ).strip()
+
+        if nominal:
+
+            return {
+                "intent": "hutang",
+                "action": "create",
+                "nama": nama or None,
+                "nominal": nominal,
+                "keterangan": keterangan or None
+            }
+
+        if nama:
+
+            return {
+                "intent": "hutang",
+                "action": "detail",
+                "nama": nama,
+                "nominal": None,
+                "keterangan": None
+            }
+
+    return None
+
+
+    # ============================================================
+    # NORMALISASI INTENT HUTANG
+    # ============================================================
+
+    hutang_nlp = deteksi_hutang_nlp(
+        message,
+        nlp
+    )
+
+    print("========================================")
+    print("💳 HUTANG NLP")
+    print("MESSAGE :", message)
+    print("RESULT  :", hutang_nlp)
+    print("========================================")
+
+
+    if hutang_nlp:
+
+        nlp["intent"] = "hutang"
+
+        nlp["action"] = hutang_nlp.get(
+            "action"
+        )
+
+        nlp["nama"] = hutang_nlp.get(
+            "nama"
+        )
+
+        nlp["nominal"] = hutang_nlp.get(
+            "nominal"
+        )
+
+        nlp["keterangan"] = hutang_nlp.get(
+            "keterangan"
+        )
+
+        intent = "hutang"
+
+
+    # ============================================================
+    # DEBUG INTENT FINAL
+    # ============================================================
+
+    print("========================================")
+    print("🧠 INTENT FINAL")
+    print("MESSAGE    :", message)
+    print("INTENT     :", intent)
+    print("ACTION     :", nlp.get("action"))
+    print("NAMA       :", nlp.get("nama"))
+    print("NOMINAL    :", nlp.get("nominal"))
+    print("KETERANGAN :", nlp.get("keterangan"))
+    print("========================================")
+
+
+    # ============================================================
+    # HUTANG
+    # ============================================================
+
+    if intent == "hutang":
+
+        # ========================================================
+        # CEK FITUR
+        # ========================================================
+
+        if not has_feature(
+            sender,
+            "hutang"
+        ):
+
+            kirim_wa(
+                sender,
+                """🔒 *Fitur Hutang hanya tersedia pada paket PREMIUM.*
 
     Upgrade sekarang agar dapat:
 
@@ -8739,186 +9299,693 @@ _ChatSaku Finance Assistant_
     ✅ AI Insight
     ✅ Dashboard Lengkap
 
-            """)
+    🌐 www.chatsaku.com
 
-            return jsonify(status=True)
+    _ChatSaku Finance Assistant_"""
+            )
 
-        daftar = HutangPiutang.query.filter(
-            HutangPiutang.nomor_wa == sender,
-            HutangPiutang.tipe == "HUTANG"
-        ).order_by(
-            HutangPiutang.tanggal.desc()
-        ).all()
+            return jsonify(
+                status=True
+            )
 
+        # ========================================================
+        # ACTION
+        # ========================================================
 
-        if not daftar:
+        action = nlp.get(
+            "action"
+        )
 
-            kirim_wa(
-                sender,
-                """💳 *Daftar Hutang*
+        # ========================================================
+        # OWNER
+        # ========================================================
+
+        nomor_owner = get_owner_number(
+            sender
+        )
+
+        # ========================================================
+        # LIST HUTANG
+        # ========================================================
+
+        if action == "list":
+
+            daftar = HutangPiutang.query.filter(
+                HutangPiutang.nomor_wa == nomor_owner,
+                HutangPiutang.tipe == "HUTANG"
+            ).order_by(
+                HutangPiutang.tanggal.desc()
+            ).all()
+
+            if not daftar:
+
+                kirim_wa(
+                    sender,
+                    """💳 *Daftar Hutang*
 
     Belum ada data hutang.
 
-    🤖 ChatSaku Finance"""
+    Contoh:
+
+    *hutang budi 500 ribu*
+
+    _ChatSaku Finance Assistant_"""
+                )
+
+                return jsonify({
+                    "status": True,
+                    "intent": "hutang",
+                    "action": "list"
+                })
+
+            total = 0
+
+            pesan = (
+                "💳 *DAFTAR HUTANG*\n\n"
             )
 
-            return jsonify(status=True)
+            if nomor_owner != sender:
 
+                pesan += (
+                    "👁 *Mode Viewer*\n"
+                    "Data milik owner akun.\n\n"
+                )
 
+            for i, h in enumerate(
+                daftar,
+                1
+            ):
 
-        total = 0
+                nominal_hutang = (
+                    h.nominal or 0
+                )
 
-        pesan = """💳 *Daftar Hutang*
+                status_text = (
+                    "✅ LUNAS"
+                    if h.status == "LUNAS"
+                    else "⏳ BELUM LUNAS"
+                )
+
+                if h.status != "LUNAS":
+
+                    total += nominal_hutang
+
+                pesan += f"""*{i}. {h.nama}*
+
+    💰 Rp {nominal_hutang:,.0f}
+
+    📌 {status_text}
+
+    📝 {h.keterangan or "-"}
+
+    ━━━━━━━━━━━━━━━━━━
 
     """
 
+            pesan += (
+                f"💵 *Total Hutang Aktif*\n"
+                f"Rp {total:,.0f}\n\n"
+                "_ChatSaku Finance Assistant_"
+            )
 
-        for i, h in enumerate(daftar,1):
+            kirim_wa(
+                sender,
+                pesan
+            )
 
-            status = (
+            return jsonify({
+                "status": True,
+                "intent": "hutang",
+                "action": "list"
+            })
+
+        # ========================================================
+        # DETAIL HUTANG
+        # ========================================================
+
+        if action == "detail":
+
+            nama = nlp.get(
+                "nama"
+            )
+
+            if not nama:
+
+                kirim_wa(
+                    sender,
+                    """❌ *Nama hutang belum ditemukan.*
+
+    Contoh:
+
+    *hutang budi*
+
+    atau:
+
+    *detail hutang budi*
+
+    _ChatSaku Finance Assistant_"""
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+            nama = str(
+                nama
+            ).strip()
+
+            # ====================================================
+            # CARI EXACT
+            # ====================================================
+
+            hutang = HutangPiutang.query.filter(
+                HutangPiutang.nomor_wa == nomor_owner,
+                HutangPiutang.tipe == "HUTANG"
+            ).all()
+
+            hutang_ditemukan = None
+
+            nama_lower = nama.lower()
+
+            for item in hutang:
+
+                if (
+                    str(
+                        item.nama
+                    ).strip().lower()
+                    == nama_lower
+                ):
+
+                    hutang_ditemukan = item
+                    break
+
+            if not hutang_ditemukan:
+
+                kirim_wa(
+                    sender,
+                    f"""❌ *Hutang tidak ditemukan.*
+
+    👤 Nama:
+    *{nama}*
+
+    Gunakan:
+
+    *hutang*
+
+    untuk melihat semua hutang.
+
+    _ChatSaku Finance Assistant_"""
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+            h = hutang_ditemukan
+
+            status_text = (
                 "✅ LUNAS"
                 if h.status == "LUNAS"
                 else "⏳ BELUM LUNAS"
             )
 
+            viewer_info = ""
 
-            pesan += f"""
-    {i}. 👤 {h.nama}
-    💰 Rp {h.nominal:,.0f}
-    📌 {status}
-    📝 {h.keterangan or "-"}
+            if nomor_owner != sender:
 
-    """
-
-
-            if h.status != "LUNAS":
-                total += h.nominal
-
-
-
-        pesan += f"""
-    ━━━━━━━━━━━━━━
-    Total Aktif:
-    💰 Rp {total:,.0f}
-
-    _ChatSaku Finance Assistant_
-    """
-
-
-        kirim_wa(
-            sender,
-            pesan
-        )
-
-        return jsonify(status=True)
-
-
-    # =========================
-    # TAMBAH HUTANG
-    # =========================
-
-    if cmd.startswith("hutang "):
-
-        if not has_feature(sender, "hutang"):
-
-            kirim_wa(sender,
-    """
-    🔒 Fitur hutang hanya tersedia pada paket PREMIUM.
-
-    Upgrade sekarang agar dapat:
-
-    ✅ Budget Bulanan
-    ✅ Reminder
-    ✅ Target Tabungan
-    ✅ Hutang Piutang
-    ✅ AI Insight
-    ✅ Dashboard Lengkap
-
-            """)
-
-            return jsonify(status=True)
-
-        data = message.split(" ", 3)
-
-        if len(data) < 3:
+                viewer_info = (
+                    "\n👁 *Mode Viewer*\n"
+                )
 
             kirim_wa(
                 sender,
-                """❌ Format salah
+                f"""💳 *DETAIL HUTANG*
+    {viewer_info}
+    ━━━━━━━━━━━━━━━━━━
+
+    👤 *Nama*
+    {h.nama}
+
+    💰 *Nominal*
+    Rp {(h.nominal or 0):,.0f}
+
+    📌 *Status*
+    {status_text}
+
+    📝 *Keterangan*
+    {h.keterangan or "-"}
+
+    ━━━━━━━━━━━━━━━━━━
+
+    _ChatSaku Finance Assistant_"""
+            )
+
+            return jsonify({
+                "status": True,
+                "intent": "hutang",
+                "action": "detail",
+                "nama": h.nama,
+                "nominal": h.nominal,
+                "status_hutang": h.status,
+                "keterangan": h.keterangan
+            })
+
+        # ========================================================
+        # DELETE HUTANG
+        # ========================================================
+
+        if action == "delete":
+
+            nama = nlp.get(
+                "nama"
+            )
+
+            if not nama:
+
+                kirim_wa(
+                    sender,
+                    """❌ *Nama hutang belum ditemukan.*
 
     Contoh:
 
-    hutang budi 500000 pinjam uang"""
-            )
+    *hapus hutang budi*
 
-            return jsonify(status=True)
+    _ChatSaku Finance Assistant_"""
+                )
 
+                return jsonify(
+                    status=True
+                )
 
-        nama = data[1]
+            # ====================================================
+            # VIEWER TIDAK BOLEH MENGUBAH
+            # ====================================================
 
+            if is_viewer(sender):
 
-        try:
+                kirim_wa(
+                    sender,
+                    """🔒 *Mode Viewer*
 
-            nominal = normalize_nominal(data[2])
+    Anda hanya dapat melihat data hutang.
 
-        except:
+    Perubahan hutang hanya dapat dilakukan oleh Owner."""
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+            nama = str(
+                nama
+            ).strip()
+
+            daftar = HutangPiutang.query.filter(
+                HutangPiutang.nomor_wa == nomor_owner,
+                HutangPiutang.tipe == "HUTANG"
+            ).all()
+
+            hutang = None
+
+            nama_lower = nama.lower()
+
+            for item in daftar:
+
+                if (
+                    str(
+                        item.nama
+                    ).strip().lower()
+                    == nama_lower
+                ):
+
+                    hutang = item
+                    break
+
+            if not hutang:
+
+                kirim_wa(
+                    sender,
+                    f"""❌ *Hutang tidak ditemukan.*
+
+    👤 Nama:
+    *{nama}*
+
+    Gunakan:
+
+    *hutang*
+
+    untuk melihat semua hutang."""
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+            nama_hutang = hutang.nama
+
+            try:
+
+                db.session.delete(
+                    hutang
+                )
+
+                db.session.commit()
+
+            except Exception as e:
+
+                db.session.rollback()
+
+                print(
+                    "❌ ERROR DELETE HUTANG:",
+                    repr(e)
+                )
+
+                kirim_wa(
+                    sender,
+                    """❌ Gagal menghapus hutang.
+
+    Silakan coba kembali."""
+                )
+
+                return jsonify(
+                    status=False
+                )
 
             kirim_wa(
                 sender,
-                "❌ Nominal harus angka"
+                f"""🗑️ *Hutang Berhasil Dihapus*
+
+    👤 {nama_hutang}
+
+    Data hutang sudah dihapus.
+
+    _ChatSaku Finance Assistant_"""
             )
 
-            return jsonify(status=True)
+            return jsonify({
+                "status": True,
+                "intent": "hutang",
+                "action": "delete",
+                "nama": nama_hutang
+            })
 
+        # ========================================================
+        # CREATE HUTANG
+        # ========================================================
 
+        if action == "create":
 
-        keterangan = ""
+            # ====================================================
+            # VIEWER TIDAK BOLEH MENAMBAH
+            # ====================================================
 
-        if len(data) == 4:
-            keterangan = data[3]
+            if is_viewer(sender):
 
+                kirim_wa(
+                    sender,
+                    """🔒 *Mode Viewer*
 
+    Anda hanya dapat melihat data hutang.
 
-        hp = HutangPiutang(
+    Penambahan hutang hanya dapat dilakukan oleh Owner."""
+                )
 
-            nomor_wa = sender,
+                return jsonify(
+                    status=True
+                )
 
-            tipe = "HUTANG",
+            # ====================================================
+            # DATA NLP
+            # ====================================================
 
-            nama = nama,
+            nama = nlp.get(
+                "nama"
+            )
 
-            nominal = nominal,
+            nominal = nlp.get(
+                "nominal"
+            )
 
-            status = "AKTIF",
+            keterangan = nlp.get(
+                "keterangan"
+            )
 
-            keterangan = keterangan
+            # ====================================================
+            # VALIDASI NAMA
+            # ====================================================
 
-        )
+            if not nama:
 
+                kirim_wa(
+                    sender,
+                    """❌ *Nama orang belum ditemukan.*
 
-        db.session.add(hp)
+    Contoh:
 
-        db.session.commit()
+    *hutang budi 500000*
 
+    atau:
 
+    *saya hutang ke budi 500 ribu untuk pinjam uang*
+
+    _ChatSaku Finance Assistant_"""
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+            # ====================================================
+            # VALIDASI NOMINAL
+            # ====================================================
+
+            try:
+
+                nominal = parse_nominal_finance(
+                    str(nominal)
+                )
+
+            except Exception:
+
+                nominal = None
+
+            if not nominal or nominal <= 0:
+
+                # fallback langsung dari message
+
+                try:
+
+                    nominal = parse_nominal_finance(
+                        message
+                    )
+
+                except Exception:
+
+                    nominal = None
+
+            if not nominal or nominal <= 0:
+
+                kirim_wa(
+                    sender,
+                    """❌ *Nominal hutang belum ditemukan.*
+
+    Contoh:
+
+    *hutang budi 500000*
+
+    *hutang budi 500 ribu*
+
+    *saya hutang ke budi 1 juta*"""
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+            # ====================================================
+            # NORMALISASI NAMA
+            # ====================================================
+
+            nama = str(
+                nama
+            ).strip()
+
+            nama = re.sub(
+                r'\s+',
+                ' ',
+                nama
+            ).strip()
+
+            if not nama:
+
+                kirim_wa(
+                    sender,
+                    "❌ Nama hutang belum ditemukan."
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+            # ====================================================
+            # NORMALISASI KETERANGAN
+            # ====================================================
+
+            keterangan = (
+                str(keterangan).strip()
+                if keterangan
+                else ""
+            )
+
+            # ====================================================
+            # CEK DUPLIKAT / UPDATE
+            # ====================================================
+
+            hutang_lama = HutangPiutang.query.filter(
+                HutangPiutang.nomor_wa == nomor_owner,
+                HutangPiutang.tipe == "HUTANG"
+            ).all()
+
+            hutang_sama = None
+
+            nama_lower = nama.lower()
+
+            for item in hutang_lama:
+
+                if (
+                    str(
+                        item.nama
+                    ).strip().lower()
+                    == nama_lower
+                    and item.status != "LUNAS"
+                ):
+
+                    hutang_sama = item
+                    break
+
+            # ====================================================
+            # BUAT DATA BARU
+            # ====================================================
+
+            try:
+
+                hp = HutangPiutang(
+
+                    nomor_wa=nomor_owner,
+
+                    tipe="HUTANG",
+
+                    nama=nama,
+
+                    nominal=nominal,
+
+                    status="AKTIF",
+
+                    keterangan=keterangan
+                )
+
+                db.session.add(
+                    hp
+                )
+
+                db.session.commit()
+
+            except Exception as e:
+
+                db.session.rollback()
+
+                print(
+                    "❌ ERROR CREATE HUTANG:",
+                    repr(e)
+                )
+
+                kirim_wa(
+                    sender,
+                    """❌ *Gagal menyimpan hutang.*
+
+    Terjadi kesalahan saat menyimpan data.
+
+    Silakan coba kembali.
+
+    _ChatSaku Finance Assistant_"""
+                )
+
+                return jsonify(
+                    status=False
+                ), 500
+
+            # ====================================================
+            # RESPONSE
+            # ====================================================
+
+            kirim_wa(
+                sender,
+                f"""✅ *Hutang Berhasil Dicatat*
+
+    ━━━━━━━━━━━━━━━━━━
+
+    👤 *Nama*
+    {nama}
+
+    💰 *Nominal*
+    Rp {nominal:,.0f}
+
+    📝 *Keterangan*
+    {keterangan or "-"}
+
+    📌 *Status*
+    ⏳ BELUM LUNAS
+
+    ━━━━━━━━━━━━━━━━━━
+
+    Ketik:
+
+    *hutang*
+
+    untuk melihat semua hutang.
+
+    _ChatSaku Finance Assistant_"""
+            )
+
+            return jsonify({
+                "status": True,
+                "intent": "hutang",
+                "action": "create",
+                "nama": nama,
+                "nominal": nominal,
+                "keterangan": keterangan
+            })
+
+        # ========================================================
+        # ACTION TIDAK DIKENALI
+        # ========================================================
 
         kirim_wa(
             sender,
-            f"""✅ *Hutang Dicatat*
+            """❌ *Perintah hutang belum dikenali.*
 
-    👤 {nama}
-    💰 Rp {nominal:,.0f}
+    Contoh:
 
-    📝 {keterangan or "-"}
+    💳 *hutang*
 
-    Status:
-    ⏳ BELUM LUNAS
+    💳 *list hutang*
+
+    💳 *saya punya hutang apa*
+
+    💳 *hutang budi 500 ribu*
+
+    💳 *saya hutang ke budi 500 ribu*
+
+    💳 *detail hutang budi*
+
+    💳 *hapus hutang budi*
 
     _ChatSaku Finance Assistant_"""
         )
 
-
-        return jsonify(status=True)
+        return jsonify(
+            status=True
+        )
 
 
 
