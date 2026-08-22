@@ -1722,7 +1722,8 @@ _ChatSaku Finance Assistant_
     # =========================
     # KELUAR
     # =========================
-    if cmd.startswith("keluar"):
+    # if cmd.startswith("keluar"):
+    if intent == "keluar":
 
         try:
 
