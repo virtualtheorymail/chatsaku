@@ -2661,6 +2661,504 @@ def deteksi_pemasukan_nlp(message, data=None):
         "keterangan": keterangan
     }
 
+# ============================================================
+# NLP HUTANG
+# ============================================================
+
+def deteksi_hutang_nlp(message, data=None):
+
+    if not message:
+        return None
+
+    text = str(message).strip()
+
+    text_lower = re.sub(
+        r'\s+',
+        ' ',
+        text.lower()
+    ).strip()
+
+    if data is None:
+        data = {}
+
+    # ========================================================
+    # NORMALISASI TYPO / VARIASI UMUM
+    # ========================================================
+
+    text_normal = text_lower
+
+    text_normal = re.sub(
+        r'\bhutang2\b',
+        'hutang',
+        text_normal
+    )
+
+    text_normal = re.sub(
+        r'\bhutangnya\b',
+        'hutang',
+        text_normal
+    )
+
+    # ========================================================
+    # ACTION LIST HUTANG
+    # ========================================================
+
+    pola_list = [
+
+        r'^hutang$',
+
+        r'^list hutang$',
+        r'^daftar hutang$',
+        r'^lihat hutang$',
+        r'^lihat semua hutang$',
+        r'^cek hutang$',
+        r'^cek semua hutang$',
+
+        r'^hutang saya$',
+        r'^hutang saya apa$',
+        r'^hutang saya apa saja$',
+
+        r'^apa hutang saya$',
+        r'^apa saja hutang saya$',
+
+        r'^saya punya hutang$',
+        r'^saya punya hutang apa$',
+        r'^saya punya hutang apa saja$',
+
+        r'^saya punya list hutang$',
+        r'^saya punya daftar hutang$',
+
+        r'^punya hutang apa$',
+        r'^punya hutang apa saja$',
+
+        r'^berapa hutang saya$',
+        r'^total hutang saya$'
+    ]
+
+    for pola in pola_list:
+
+        if re.search(
+            pola,
+            text_normal,
+            re.IGNORECASE
+        ):
+
+            return {
+                "intent": "hutang",
+                "action": "list",
+                "nama": None,
+                "nominal": None,
+                "keterangan": None
+            }
+
+    # ========================================================
+    # ACTION DELETE
+    #
+    # Disiapkan supaya nantinya bisa:
+    #
+    # hapus hutang budi
+    # hapus hutang ke budi
+    # ========================================================
+
+    pola_delete = [
+
+        r'^hapus\s+hutang\s+(.+)$',
+
+        r'^hapuskan\s+hutang\s+(.+)$',
+
+        r'^hapus\s+hutang\s+ke\s+(.+)$',
+
+        r'^hapus\s+hutang\s+\.?\s*(.+)$'
+    ]
+
+    for pola in pola_delete:
+
+        match = re.search(
+            pola,
+            text_normal,
+            re.IGNORECASE
+        )
+
+        if match:
+
+            nama = match.group(1).strip()
+
+            nama = re.sub(
+                r'^ke\s+',
+                '',
+                nama,
+                flags=re.IGNORECASE
+            ).strip()
+
+            if nama:
+
+                return {
+                    "intent": "hutang",
+                    "action": "delete",
+                    "nama": nama,
+                    "nominal": None,
+                    "keterangan": None
+                }
+
+    # ========================================================
+    # ACTION DETAIL
+    #
+    # contoh:
+    # detail hutang budi
+    # cek hutang budi
+    # lihat hutang budi
+    # ========================================================
+
+    pola_detail = [
+
+        r'^detail\s+hutang\s+(.+)$',
+
+        r'^cek\s+hutang\s+(.+)$',
+
+        r'^lihat\s+hutang\s+(.+)$',
+
+        r'^hutang\s+ke\s+(.+)$'
+    ]
+
+    for pola in pola_detail:
+
+        match = re.search(
+            pola,
+            text_normal,
+            re.IGNORECASE
+        )
+
+        if match:
+
+            nama = match.group(1).strip()
+
+            # Jika ternyata ada nominal,
+            # jangan anggap detail.
+            nominal_test = parse_nominal_finance(
+                nama
+            )
+
+            if nominal_test:
+                continue
+
+            nama = re.sub(
+                r'\s+',
+                ' ',
+                nama
+            ).strip()
+
+            if nama:
+
+                return {
+                    "intent": "hutang",
+                    "action": "detail",
+                    "nama": nama,
+                    "nominal": None,
+                    "keterangan": None
+                }
+
+    # ========================================================
+    # NOMINAL
+    # ========================================================
+
+    nominal = parse_nominal_finance(
+        text
+    )
+
+    # ========================================================
+    # DETEKSI APAKAH INI PERINTAH HUTANG
+    # ========================================================
+
+    pola_hutang = [
+
+        r'\bhutang\b',
+
+        r'\bberhutang\b',
+
+        r'\bngutang\b',
+
+        r'\butang\b'
+    ]
+
+    ada_hutang = any(
+        re.search(
+            pola,
+            text_normal,
+            re.IGNORECASE
+        )
+        for pola in pola_hutang
+    )
+
+    # ========================================================
+    # NLP UTAMA MENGATAKAN HUTANG
+    # ========================================================
+
+    if data.get("intent") == "hutang":
+
+        ada_hutang = True
+
+    if not ada_hutang:
+
+        return None
+
+    # ========================================================
+    # JIKA TIDAK ADA NOMINAL
+    #
+    # Contoh:
+    #
+    # saya punya hutang budi
+    #
+    # kemungkinan detail
+    # ========================================================
+
+    if not nominal:
+
+        # Jangan salah menganggap kalimat list
+        # sebagai nama hutang.
+
+        if any(
+            kata in text_normal
+            for kata in [
+                "hutang saya",
+                "punya hutang",
+                "list hutang",
+                "daftar hutang",
+                "lihat hutang",
+                "cek hutang",
+                "hutang apa",
+                "hutang apa saja"
+            ]
+        ):
+
+            return {
+                "intent": "hutang",
+                "action": "list",
+                "nama": None,
+                "nominal": None,
+                "keterangan": None
+            }
+
+    # ========================================================
+    # CREATE HUTANG
+    # ========================================================
+
+    if nominal:
+
+        nama_text = text
+
+        # ====================================================
+        # HAPUS NOMINAL DARI NAMA
+        # ====================================================
+
+        nama_text = re.sub(
+            r'\b(?:rp\s*)?'
+            r'\d+(?:[.,]\d+)?\s*'
+            r'(?:juta|jt|ribu|rb|miliar|milyar)\b',
+            '',
+            nama_text,
+            flags=re.IGNORECASE
+        )
+
+        nama_text = re.sub(
+            r'(?:rp\s*)?[\d.,]+',
+            '',
+            nama_text,
+            flags=re.IGNORECASE
+        )
+
+        # ====================================================
+        # BERSIHKAN KATA PEMBUKA
+        # ====================================================
+
+        pola_hapus = [
+
+            r'^hutang\s+',
+
+            r'^hutang\s+ke\s+',
+
+            r'^berhutang\s+',
+
+            r'^berhutang\s+ke\s+',
+
+            r'^ngutang\s+',
+
+            r'^ngutang\s+ke\s+',
+
+            r'^utang\s+',
+
+            r'^utang\s+ke\s+',
+
+            r'^saya\s+hutang\s+',
+
+            r'^saya\s+hutang\s+ke\s+',
+
+            r'^saya\s+berhutang\s+',
+
+            r'^saya\s+berhutang\s+ke\s+',
+
+            r'^saya\s+ngutang\s+',
+
+            r'^saya\s+ngutang\s+ke\s+',
+
+            r'^saya\s+punya\s+hutang\s+',
+
+            r'^saya\s+punya\s+hutang\s+ke\s+',
+
+            r'^catat\s+hutang\s+',
+
+            r'^catat\s+hutang\s+ke\s+',
+
+            r'^buat\s+hutang\s+',
+
+            r'^buatkan\s+hutang\s+',
+
+            r'^tambah\s+hutang\s+',
+
+            r'^tambahkan\s+hutang\s+'
+        ]
+
+        for pola in pola_hapus:
+
+            nama_text = re.sub(
+                pola,
+                '',
+                nama_text,
+                flags=re.IGNORECASE
+            )
+
+        # ====================================================
+        # PISAHKAN KETERANGAN
+        #
+        # Contoh:
+        #
+        # hutang budi 500 ribu pinjam uang
+        #
+        # nama = budi
+        # keterangan = pinjam uang
+        # ====================================================
+
+        keterangan = ""
+
+        match_keterangan = re.search(
+            r'\b(?:karena|untuk|keterangan|catatan|sebab)\b\s+(.+)$',
+            nama_text,
+            flags=re.IGNORECASE
+        )
+
+        if match_keterangan:
+
+            keterangan = (
+                match_keterangan
+                .group(1)
+                .strip()
+            )
+
+            nama_text = (
+                nama_text[
+                    :match_keterangan.start()
+                ]
+                .strip()
+            )
+
+        # ====================================================
+        # BERSIHKAN KATA "KE"
+        # ====================================================
+
+        nama_text = re.sub(
+            r'\bke\b',
+            '',
+            nama_text,
+            flags=re.IGNORECASE
+        )
+
+        # ====================================================
+        # BERSIHKAN KATA UMUM
+        # ====================================================
+
+        nama_text = re.sub(
+            r'\b(?:sebesar|nominalnya|sejumlah)\b',
+            '',
+            nama_text,
+            flags=re.IGNORECASE
+        )
+
+        nama_text = re.sub(
+            r'\s+',
+            ' ',
+            nama_text
+        ).strip()
+
+        # ====================================================
+        # Jika NLP utama punya keterangan
+        # ====================================================
+
+        if not keterangan:
+
+            keterangan = (
+                data.get("keterangan")
+                or ""
+            )
+
+        # ====================================================
+        # VALIDASI NAMA
+        # ====================================================
+
+        if not nama_text:
+
+            return {
+                "intent": "hutang",
+                "action": "create",
+                "nama": None,
+                "nominal": nominal,
+                "keterangan": keterangan or None
+            }
+
+        return {
+            "intent": "hutang",
+            "action": "create",
+            "nama": nama_text,
+            "nominal": nominal,
+            "keterangan": keterangan or None
+        }
+
+    # ========================================================
+    # FALLBACK NLP
+    # ========================================================
+
+    if data.get("intent") == "hutang":
+
+        keterangan = str(
+            data.get("keterangan") or ""
+        ).strip()
+
+        nama = str(
+            data.get("nama")
+            or data.get("keterangan")
+            or ""
+        ).strip()
+
+        if nominal:
+
+            return {
+                "intent": "hutang",
+                "action": "create",
+                "nama": nama or None,
+                "nominal": nominal,
+                "keterangan": keterangan or None
+            }
+
+        if nama:
+
+            return {
+                "intent": "hutang",
+                "action": "detail",
+                "nama": nama,
+                "nominal": None,
+                "keterangan": None
+            }
+
+    return None
+
 def refresh_summary_after_transaction(tanggal_transaksi):
     """
     Refresh MonthlySummary setelah transaksi ditambah,
@@ -8715,506 +9213,6 @@ _ChatSaku Finance Assistant_
             )
 
         return jsonify(status=True)
-
-
-
-    # ============================================================
-# NLP HUTANG
-# ============================================================
-
-def deteksi_hutang_nlp(message, data=None):
-
-    if not message:
-        return None
-
-    text = str(message).strip()
-
-    text_lower = re.sub(
-        r'\s+',
-        ' ',
-        text.lower()
-    ).strip()
-
-    if data is None:
-        data = {}
-
-    # ========================================================
-    # NORMALISASI TYPO / VARIASI UMUM
-    # ========================================================
-
-    text_normal = text_lower
-
-    text_normal = re.sub(
-        r'\bhutang2\b',
-        'hutang',
-        text_normal
-    )
-
-    text_normal = re.sub(
-        r'\bhutangnya\b',
-        'hutang',
-        text_normal
-    )
-
-    # ========================================================
-    # ACTION LIST HUTANG
-    # ========================================================
-
-    pola_list = [
-
-        r'^hutang$',
-
-        r'^list hutang$',
-        r'^daftar hutang$',
-        r'^lihat hutang$',
-        r'^lihat semua hutang$',
-        r'^cek hutang$',
-        r'^cek semua hutang$',
-
-        r'^hutang saya$',
-        r'^hutang saya apa$',
-        r'^hutang saya apa saja$',
-
-        r'^apa hutang saya$',
-        r'^apa saja hutang saya$',
-
-        r'^saya punya hutang$',
-        r'^saya punya hutang apa$',
-        r'^saya punya hutang apa saja$',
-
-        r'^saya punya list hutang$',
-        r'^saya punya daftar hutang$',
-
-        r'^punya hutang apa$',
-        r'^punya hutang apa saja$',
-
-        r'^berapa hutang saya$',
-        r'^total hutang saya$'
-    ]
-
-    for pola in pola_list:
-
-        if re.search(
-            pola,
-            text_normal,
-            re.IGNORECASE
-        ):
-
-            return {
-                "intent": "hutang",
-                "action": "list",
-                "nama": None,
-                "nominal": None,
-                "keterangan": None
-            }
-
-    # ========================================================
-    # ACTION DELETE
-    #
-    # Disiapkan supaya nantinya bisa:
-    #
-    # hapus hutang budi
-    # hapus hutang ke budi
-    # ========================================================
-
-    pola_delete = [
-
-        r'^hapus\s+hutang\s+(.+)$',
-
-        r'^hapuskan\s+hutang\s+(.+)$',
-
-        r'^hapus\s+hutang\s+ke\s+(.+)$',
-
-        r'^hapus\s+hutang\s+\.?\s*(.+)$'
-    ]
-
-    for pola in pola_delete:
-
-        match = re.search(
-            pola,
-            text_normal,
-            re.IGNORECASE
-        )
-
-        if match:
-
-            nama = match.group(1).strip()
-
-            nama = re.sub(
-                r'^ke\s+',
-                '',
-                nama,
-                flags=re.IGNORECASE
-            ).strip()
-
-            if nama:
-
-                return {
-                    "intent": "hutang",
-                    "action": "delete",
-                    "nama": nama,
-                    "nominal": None,
-                    "keterangan": None
-                }
-
-    # ========================================================
-    # ACTION DETAIL
-    #
-    # contoh:
-    # detail hutang budi
-    # cek hutang budi
-    # lihat hutang budi
-    # ========================================================
-
-    pola_detail = [
-
-        r'^detail\s+hutang\s+(.+)$',
-
-        r'^cek\s+hutang\s+(.+)$',
-
-        r'^lihat\s+hutang\s+(.+)$',
-
-        r'^hutang\s+ke\s+(.+)$'
-    ]
-
-    for pola in pola_detail:
-
-        match = re.search(
-            pola,
-            text_normal,
-            re.IGNORECASE
-        )
-
-        if match:
-
-            nama = match.group(1).strip()
-
-            # Jika ternyata ada nominal,
-            # jangan anggap detail.
-            nominal_test = parse_nominal_finance(
-                nama
-            )
-
-            if nominal_test:
-                continue
-
-            nama = re.sub(
-                r'\s+',
-                ' ',
-                nama
-            ).strip()
-
-            if nama:
-
-                return {
-                    "intent": "hutang",
-                    "action": "detail",
-                    "nama": nama,
-                    "nominal": None,
-                    "keterangan": None
-                }
-
-    # ========================================================
-    # NOMINAL
-    # ========================================================
-
-    nominal = parse_nominal_finance(
-        text
-    )
-
-    # ========================================================
-    # DETEKSI APAKAH INI PERINTAH HUTANG
-    # ========================================================
-
-    pola_hutang = [
-
-        r'\bhutang\b',
-
-        r'\bberhutang\b',
-
-        r'\bngutang\b',
-
-        r'\butang\b'
-    ]
-
-    ada_hutang = any(
-        re.search(
-            pola,
-            text_normal,
-            re.IGNORECASE
-        )
-        for pola in pola_hutang
-    )
-
-    # ========================================================
-    # NLP UTAMA MENGATAKAN HUTANG
-    # ========================================================
-
-    if data.get("intent") == "hutang":
-
-        ada_hutang = True
-
-    if not ada_hutang:
-
-        return None
-
-    # ========================================================
-    # JIKA TIDAK ADA NOMINAL
-    #
-    # Contoh:
-    #
-    # saya punya hutang budi
-    #
-    # kemungkinan detail
-    # ========================================================
-
-    if not nominal:
-
-        # Jangan salah menganggap kalimat list
-        # sebagai nama hutang.
-
-        if any(
-            kata in text_normal
-            for kata in [
-                "hutang saya",
-                "punya hutang",
-                "list hutang",
-                "daftar hutang",
-                "lihat hutang",
-                "cek hutang",
-                "hutang apa",
-                "hutang apa saja"
-            ]
-        ):
-
-            return {
-                "intent": "hutang",
-                "action": "list",
-                "nama": None,
-                "nominal": None,
-                "keterangan": None
-            }
-
-    # ========================================================
-    # CREATE HUTANG
-    # ========================================================
-
-    if nominal:
-
-        nama_text = text
-
-        # ====================================================
-        # HAPUS NOMINAL DARI NAMA
-        # ====================================================
-
-        nama_text = re.sub(
-            r'\b(?:rp\s*)?'
-            r'\d+(?:[.,]\d+)?\s*'
-            r'(?:juta|jt|ribu|rb|miliar|milyar)\b',
-            '',
-            nama_text,
-            flags=re.IGNORECASE
-        )
-
-        nama_text = re.sub(
-            r'(?:rp\s*)?[\d.,]+',
-            '',
-            nama_text,
-            flags=re.IGNORECASE
-        )
-
-        # ====================================================
-        # BERSIHKAN KATA PEMBUKA
-        # ====================================================
-
-        pola_hapus = [
-
-            r'^hutang\s+',
-
-            r'^hutang\s+ke\s+',
-
-            r'^berhutang\s+',
-
-            r'^berhutang\s+ke\s+',
-
-            r'^ngutang\s+',
-
-            r'^ngutang\s+ke\s+',
-
-            r'^utang\s+',
-
-            r'^utang\s+ke\s+',
-
-            r'^saya\s+hutang\s+',
-
-            r'^saya\s+hutang\s+ke\s+',
-
-            r'^saya\s+berhutang\s+',
-
-            r'^saya\s+berhutang\s+ke\s+',
-
-            r'^saya\s+ngutang\s+',
-
-            r'^saya\s+ngutang\s+ke\s+',
-
-            r'^saya\s+punya\s+hutang\s+',
-
-            r'^saya\s+punya\s+hutang\s+ke\s+',
-
-            r'^catat\s+hutang\s+',
-
-            r'^catat\s+hutang\s+ke\s+',
-
-            r'^buat\s+hutang\s+',
-
-            r'^buatkan\s+hutang\s+',
-
-            r'^tambah\s+hutang\s+',
-
-            r'^tambahkan\s+hutang\s+'
-        ]
-
-        for pola in pola_hapus:
-
-            nama_text = re.sub(
-                pola,
-                '',
-                nama_text,
-                flags=re.IGNORECASE
-            )
-
-        # ====================================================
-        # PISAHKAN KETERANGAN
-        #
-        # Contoh:
-        #
-        # hutang budi 500 ribu pinjam uang
-        #
-        # nama = budi
-        # keterangan = pinjam uang
-        # ====================================================
-
-        keterangan = ""
-
-        match_keterangan = re.search(
-            r'\b(?:karena|untuk|keterangan|catatan|sebab)\b\s+(.+)$',
-            nama_text,
-            flags=re.IGNORECASE
-        )
-
-        if match_keterangan:
-
-            keterangan = (
-                match_keterangan
-                .group(1)
-                .strip()
-            )
-
-            nama_text = (
-                nama_text[
-                    :match_keterangan.start()
-                ]
-                .strip()
-            )
-
-        # ====================================================
-        # BERSIHKAN KATA "KE"
-        # ====================================================
-
-        nama_text = re.sub(
-            r'\bke\b',
-            '',
-            nama_text,
-            flags=re.IGNORECASE
-        )
-
-        # ====================================================
-        # BERSIHKAN KATA UMUM
-        # ====================================================
-
-        nama_text = re.sub(
-            r'\b(?:sebesar|nominalnya|sejumlah)\b',
-            '',
-            nama_text,
-            flags=re.IGNORECASE
-        )
-
-        nama_text = re.sub(
-            r'\s+',
-            ' ',
-            nama_text
-        ).strip()
-
-        # ====================================================
-        # Jika NLP utama punya keterangan
-        # ====================================================
-
-        if not keterangan:
-
-            keterangan = (
-                data.get("keterangan")
-                or ""
-            )
-
-        # ====================================================
-        # VALIDASI NAMA
-        # ====================================================
-
-        if not nama_text:
-
-            return {
-                "intent": "hutang",
-                "action": "create",
-                "nama": None,
-                "nominal": nominal,
-                "keterangan": keterangan or None
-            }
-
-        return {
-            "intent": "hutang",
-            "action": "create",
-            "nama": nama_text,
-            "nominal": nominal,
-            "keterangan": keterangan or None
-        }
-
-    # ========================================================
-    # FALLBACK NLP
-    # ========================================================
-
-    if data.get("intent") == "hutang":
-
-        keterangan = str(
-            data.get("keterangan") or ""
-        ).strip()
-
-        nama = str(
-            data.get("nama")
-            or data.get("keterangan")
-            or ""
-        ).strip()
-
-        if nominal:
-
-            return {
-                "intent": "hutang",
-                "action": "create",
-                "nama": nama or None,
-                "nominal": nominal,
-                "keterangan": keterangan or None
-            }
-
-        if nama:
-
-            return {
-                "intent": "hutang",
-                "action": "detail",
-                "nama": nama,
-                "nominal": None,
-                "keterangan": None
-            }
-
-    return None
 
 
     # ============================================================
