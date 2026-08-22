@@ -1621,51 +1621,327 @@ _ChatSaku Finance Assistant_
         return jsonify({"status": True})
 
     # ============================================================
-    # MASUK / PEMASUKAN - NLP HANDLER
+# MASUK / PEMASUKAN
+# NLP + FALLBACK NATURAL LANGUAGE
+# ============================================================
+
+# ============================================================
+# FALLBACK DETEKSI PEMASUKAN
+# ============================================================
+
+def deteksi_pemasukan_nlp(message, data=None):
+
+    if not message:
+        return None
+
+    text = message.lower().strip()
+
+    if data is None:
+        data = {}
+
+    # ========================================================
+    # HASIL NLP YANG SUDAH ADA
+    # ========================================================
+
+    intent_nlp = data.get("intent")
+    nominal_nlp = data.get("nominal")
+    keterangan_nlp = data.get("keterangan")
+
+    # ========================================================
+    # KATA / FRASE PEMASUKAN
+    # ========================================================
+
+    pola_masuk = [
+
+        "masuk",
+
+        "uang masuk",
+        "ada uang masuk",
+
+        "dapat uang",
+        "dapat duit",
+        "dapat pemasukan",
+
+        "saya dapat",
+        "aku dapat",
+        "kami dapat",
+
+        "menerima uang",
+        "saya menerima",
+        "aku menerima",
+
+        "terima uang",
+        "terima transfer",
+        "menerima transfer",
+
+        "dapat transfer",
+        "saya dapat transfer",
+        "aku dapat transfer",
+
+        "diberi uang",
+        "dikasih uang",
+        "dapat kiriman",
+
+        "gaji",
+        "bonus",
+        "pendapatan",
+        "pemasukan",
+
+        "sumbangan",
+        "donasi",
+
+        "hasil jual",
+        "hasil penjualan",
+        "hasil usaha",
+        "hasil dagang",
+        "hasil kerja",
+        "hasil proyek",
+
+        "bayaran",
+        "pembayaran diterima",
+
+    ]
+
+    # ========================================================
+    # CEK APAKAH KALIMAT MENGANDUNG INDIKASI PEMASUKAN
+    # ========================================================
+
+    terdeteksi_masuk = False
+
+    for pola in pola_masuk:
+
+        if pola in text:
+
+            terdeteksi_masuk = True
+            break
+
+    # ========================================================
+    # JIKA NLP SUDAH MENGENALI MASUK
+    # ========================================================
+
+    if intent_nlp == "masuk":
+
+        terdeteksi_masuk = True
+
+    # ========================================================
+    # JIKA TIDAK TERDETEKSI
+    # ========================================================
+
+    if not terdeteksi_masuk:
+
+        return None
+
+    # ========================================================
+    # EKSTRAK NOMINAL
+    # ========================================================
+
+    nominal = nominal_nlp
+
+    try:
+
+        if nominal:
+
+            nominal = int(
+                float(nominal)
+            )
+
+        else:
+
+            nominal = 0
+
+    except (
+        ValueError,
+        TypeError
+    ):
+
+        nominal = 0
+
+    # ========================================================
+    # CARI ANGKA DALAM PESAN
+    # ========================================================
+
+    if nominal <= 0:
+
+        angka = re.findall(
+            r'(?:rp\s*)?[\d.,]+',
+            text,
+            re.IGNORECASE
+        )
+
+        if angka:
+
+            kandidat = angka[-1]
+
+            try:
+
+                nominal = normalize_nominal(
+                    kandidat
+                )
+
+            except Exception:
+
+                nominal = 0
+
+    # ========================================================
+    # DUKUNGAN "RIBU", "JUTA", "MILYAR"
+    # ========================================================
+
+    if nominal <= 0:
+
+        pola_uang = re.search(
+            r'(\d+(?:[.,]\d+)?)\s*'
+            r'(juta|jt|ribu|rb|miliar|milyar)',
+            text,
+            re.IGNORECASE
+        )
+
+        if pola_uang:
+
+            angka_text = pola_uang.group(1)
+            satuan = pola_uang.group(2).lower()
+
+            try:
+
+                angka_float = float(
+                    angka_text.replace(",", ".")
+                )
+
+                if satuan in [
+                    "ribu",
+                    "rb"
+                ]:
+
+                    nominal = int(
+                        angka_float * 1000
+                    )
+
+                elif satuan in [
+                    "juta",
+                    "jt"
+                ]:
+
+                    nominal = int(
+                        angka_float * 1000000
+                    )
+
+                elif satuan in [
+                    "miliar",
+                    "milyar"
+                ]:
+
+                    nominal = int(
+                        angka_float * 1000000000
+                    )
+
+            except Exception:
+
+                nominal = 0
+
+    # ========================================================
+    # EKSTRAK KETERANGAN
+    # ========================================================
+
+    keterangan = keterangan_nlp
+
+    if not keterangan:
+
+        keterangan = message
+
+    keterangan = str(
+        keterangan
+    ).strip()
+
+    # ========================================================
+    # HAPUS NOMINAL DARI AKHIR KETERANGAN
+    # ========================================================
+
+    keterangan = re.sub(
+        r'\s+(?:rp\s*)?[\d.,]+\s*$',
+        '',
+        keterangan,
+        flags=re.IGNORECASE
+    ).strip()
+
+    # ========================================================
+    # HAPUS NOMINAL + SATUAN
+    # ========================================================
+
+    keterangan = re.sub(
+        r'\s+\d+(?:[.,]\d+)?\s*'
+        r'(?:juta|jt|ribu|rb|miliar|milyar)\s*$',
+        '',
+        keterangan,
+        flags=re.IGNORECASE
+    ).strip()
+
+    if not keterangan:
+
+        keterangan = "Pemasukan"
+
+    # ========================================================
+    # HASIL
+    # ========================================================
+
+    return {
+        "intent": "masuk",
+        "action": "create",
+        "nominal": nominal,
+        "keterangan": keterangan
+    }
+
+
+    # ============================================================
+    # MASUK / PEMASUKAN
     # ============================================================
 
-    if intent == "masuk":
+    if intent == "masuk" or deteksi_pemasukan_nlp(
+        message,
+        data
+    ):
 
         try:
 
             # ====================================================
-            # DATA DARI NLP
+            # AMBIL DATA NLP
             # ====================================================
 
-            nominal = data.get("nominal")
-            keterangan = data.get("keterangan")
+            hasil_masuk = deteksi_pemasukan_nlp(
+                message,
+                data
+            )
+
+            if hasil_masuk:
+
+                data = hasil_masuk
+
+                intent = "masuk"
+
+            # ====================================================
+            # DEBUG
+            # ====================================================
 
             print("========================================")
-            print("💰 PEMASUKAN NLP")
-            print("SENDER     :", sender)
-            print("MESSAGE    :", message)
-            print("INTENT     :", intent)
-            print("NOMINAL    :", nominal)
-            print("KETERANGAN :", keterangan)
-            print("DATA       :", data)
+            print("🤖 PEMASUKAN NLP")
+            print("TEXT       :", message)
+            print("INTENT     :", data.get("intent"))
+            print("ACTION     :", data.get("action"))
+            print("NOMINAL    :", data.get("nominal"))
+            print("KETERANGAN :", data.get("keterangan"))
             print("========================================")
 
             # ====================================================
-            # NOMOR OWNER
+            # AMBIL NOMINAL
             # ====================================================
 
-            nomor = get_owner_number(sender)
-
-            # ====================================================
-            # NORMALISASI NOMINAL
-            # ====================================================
+            nominal = data.get(
+                "nominal"
+            )
 
             try:
 
-                if nominal:
-
-                    nominal = int(
-                        float(nominal)
-                    )
-
-                else:
-
-                    nominal = 0
+                nominal = int(
+                    float(nominal or 0)
+                )
 
             except (
                 ValueError,
@@ -1675,18 +1951,7 @@ _ChatSaku Finance Assistant_
                 nominal = 0
 
             # ====================================================
-            # FALLBACK NOMINAL DARI PESAN ASLI
-            # ====================================================
-            #
-            # Jika NLP gagal mengambil nominal,
-            # cari angka langsung dari message.
-            #
-            # Contoh:
-            #
-            # gaji saya 5000000
-            # dapat uang 2 juta
-            # menerima transfer Rp750.000
-            #
+            # FALLBACK NOMINAL
             # ====================================================
 
             if nominal <= 0:
@@ -1701,10 +1966,8 @@ _ChatSaku Finance Assistant_
 
                     try:
 
-                        kandidat = angka[-1]
-
                         nominal = normalize_nominal(
-                            kandidat
+                            angka[-1]
                         )
 
                     except Exception:
@@ -1721,12 +1984,13 @@ _ChatSaku Finance Assistant_
                     sender,
                     """❌ *Nominal Pemasukan Tidak Ditemukan.*
 
-    Contoh:
+    Coba tulis seperti:
 
-    💰 gaji 5000000
+    💰 saya dapat sumbangan 4000000
+    💰 saya dapat gaji 5000000
     💰 menerima transfer 750000
-    💰 dapat uang proyek 2000000
-    💰 masuk 100000 bonus"""
+    💰 dapat bonus 1000000
+    💰 uang masuk 2 juta"""
                 )
 
                 return jsonify({
@@ -1737,9 +2001,9 @@ _ChatSaku Finance Assistant_
             # KETERANGAN
             # ====================================================
 
-            # Untuk pemasukan, lebih aman mengambil
-            # keterangan dari pesan asli apabila NLP
-            # belum menghasilkan keterangan.
+            keterangan = data.get(
+                "keterangan"
+            )
 
             if not keterangan:
 
@@ -1752,16 +2016,6 @@ _ChatSaku Finance Assistant_
             # ====================================================
             # BERSIHKAN NOMINAL DARI KETERANGAN
             # ====================================================
-            #
-            # "gaji saya 5000000"
-            # menjadi
-            # "gaji saya"
-            #
-            # "menerima transfer Rp750.000"
-            # menjadi
-            # "menerima transfer"
-            #
-            # ====================================================
 
             keterangan = re.sub(
                 r'\s+(?:rp\s*)?[\d.,]+\s*$',
@@ -1770,9 +2024,25 @@ _ChatSaku Finance Assistant_
                 flags=re.IGNORECASE
             ).strip()
 
+            keterangan = re.sub(
+                r'\s+\d+(?:[.,]\d+)?\s*'
+                r'(?:juta|jt|ribu|rb|miliar|milyar)\s*$',
+                '',
+                keterangan,
+                flags=re.IGNORECASE
+            ).strip()
+
             if not keterangan:
 
                 keterangan = "Pemasukan"
+
+            # ====================================================
+            # NOMOR OWNER
+            # ====================================================
+
+            nomor = get_owner_number(
+                sender
+            )
 
             # ====================================================
             # SIMPAN TRANSAKSI
@@ -1798,15 +2068,8 @@ _ChatSaku Finance Assistant_
 
             db.session.commit()
 
-            print("========================================")
-            print("✅ PEMASUKAN BERHASIL DISIMPAN")
-            print("NOMOR      :", nomor)
-            print("NOMINAL    :", nominal)
-            print("KETERANGAN :", keterangan)
-            print("========================================")
-
             # ====================================================
-            # HITUNG SALDO
+            # HITUNG TOTAL MASUK
             # ====================================================
 
             masuk = transaksi_user(
@@ -1819,6 +2082,10 @@ _ChatSaku Finance Assistant_
                 )
             ).scalar() or 0
 
+            # ====================================================
+            # HITUNG TOTAL KELUAR
+            # ====================================================
+
             keluar = transaksi_user(
                 nomor
             ).filter(
@@ -1829,8 +2096,13 @@ _ChatSaku Finance Assistant_
                 )
             ).scalar() or 0
 
+            # ====================================================
+            # SALDO
+            # ====================================================
+
             saldo = (
-                masuk - keluar
+                masuk -
+                keluar
             )
 
             # ====================================================
@@ -1851,9 +2123,10 @@ _ChatSaku Finance Assistant_
             # RESPONSE
             # ====================================================
 
-            pesan = f"""✅ *Transaksi Berhasil*
+            pesan = f"""✅ *Transaksi Berhasil Dicatat*
 
-    ┌────────────────────┐
+    ━━━━━━━━━━━━━━━━━━
+
     💰 *PEMASUKAN*
 
     💵 Nominal
@@ -1863,7 +2136,8 @@ _ChatSaku Finance Assistant_
     {keterangan}
 
     🕒 {sekarang().strftime("%d %b %Y • %H:%M")}
-    └────────────────────┘
+
+    ━━━━━━━━━━━━━━━━━━
 
     💳 *Saldo Saat Ini*
     *Rp {saldo:,.0f}*
@@ -1883,8 +2157,12 @@ _ChatSaku Finance Assistant_
     _ChatSaku Finance Assistant_
     """
 
+            # ====================================================
+            # KIRIM WHATSAPP
+            # ====================================================
+
             print("========================================")
-            print("📤 MENGIRIM BALASAN PEMASUKAN")
+            print("📤 KIRIM BALASAN PEMASUKAN")
             print("========================================")
             print(pesan)
 
@@ -1898,9 +2176,14 @@ _ChatSaku Finance Assistant_
                 hasil_kirim
             )
 
+            # ====================================================
+            # RESPONSE API
+            # ====================================================
+
             return jsonify({
                 "status": True,
                 "intent": "masuk",
+                "action": "create",
                 "nominal": nominal,
                 "keterangan": keterangan
             })
@@ -1914,7 +2197,7 @@ _ChatSaku Finance Assistant_
             db.session.rollback()
 
             print("========================================")
-            print("❌ ERROR TRANSAKSI MASUK")
+            print("❌ ERROR PEMASUKAN")
             print("SENDER :", sender)
             print("MESSAGE:", message)
             print("ERROR  :", repr(e))
@@ -1928,8 +2211,9 @@ _ChatSaku Finance Assistant_
 
     Contoh:
 
+    💰 saya dapat sumbangan 4000000
     💰 gaji 5000000
-    💰 bonus 1000000"""
+    💰 menerima transfer 750000"""
             )
 
             return jsonify({
