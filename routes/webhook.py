@@ -5340,48 +5340,72 @@ https://www.chatsaku.com
                 )
 
 
-            # ----------------------------------------------------
-            # CREATE DATABASE
-            # ----------------------------------------------------
+            # ============================================================
+            # CREATE DATABASE TARGET
+            # ============================================================
 
             try:
+
+                print("========================================")
+                print("💾 INSERT TARGET KE DATABASE")
+                print("========================================")
+                print("nomor_wa  :", nomor_owner)
+                print("nama      :", nama)
+                print("target    :", nominal)
+                print("deadline  :", deadline)
+                print("terkumpul :", 0)
+                print("aktif     :", True)
+                print("========================================")
 
                 target = TargetPembelian(
                     nomor_wa=nomor_owner,
                     nama=nama,
-                    target=nominal,
+                    target=int(nominal),
                     deadline=deadline,
                     terkumpul=0,
                     aktif=True
                 )
 
-                db.session.add(
-                    target
-                )
+                db.session.add(target)
+
+                print("💾 db.session.add() berhasil")
 
                 db.session.commit()
 
+                print("✅ db.session.commit() BERHASIL")
+                print("TARGET ID :", target.id)
+                print("========================================")
 
             except Exception as e:
 
                 db.session.rollback()
 
-                print(
-                    "❌ ERROR CREATE TARGET:",
-                    repr(e)
-                )
+                import traceback
+
+                print("========================================")
+                print("❌ ERROR CREATE TARGET")
+                print("========================================")
+                print("ERROR TYPE :", type(e).__name__)
+                print("ERROR      :", repr(e))
+                print("MESSAGE    :", str(e))
+                print("----------------------------------------")
+                traceback.print_exc()
+                print("========================================")
 
                 kirim_wa(
                     sender,
                     """❌ *Gagal membuat target.*
 
-    Silakan coba kembali beberapa saat lagi.
+            Terjadi kesalahan saat menyimpan target ke database.
 
-    _ChatSaku Finance Assistant_"""
+            Silakan coba kembali beberapa saat lagi.
+
+            _ChatSaku Finance Assistant_"""
                 )
 
                 return jsonify(
-                    status=False
+                    status=False,
+                    error=str(e)
                 ), 500
 
 
