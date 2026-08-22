@@ -2167,15 +2167,21 @@ _ChatSaku Finance Assistant_
     # =========================
     # BUDGET
     # =========================
-    if cmd.startswith("budget"):
+    if intent == "budget":
 
         nomor = get_owner_number(sender)
 
+        # ==================================================
+        # CEK FITUR
+        # ==================================================
+
         if not has_feature(sender, "budget"):
 
-            kirim_wa(sender,
-    """
-    🔒 Fitur Budget hanya tersedia pada paket PRO dan PREMIUM.
+            kirim_wa(
+                sender,
+                """🔒 *Fitur Budget*
+
+    Fitur Budget hanya tersedia pada paket PRO dan PREMIUM.
 
     Upgrade sekarang agar dapat:
 
@@ -2183,19 +2189,33 @@ _ChatSaku Finance Assistant_
     ✅ Reminder
     ✅ AI Insight
     ✅ Dashboard Lengkap
+    """
+            )
 
-            """)
-
-            return jsonify(status=True)
+            return jsonify({"status": True})
 
         try:
 
-            parts = message.lower().split()
+            # ==================================================
+            # DATA DARI NLP
+            # ==================================================
 
-            # =========================
-            # LIHAT BUDGET
-            # =========================
-            if len(parts) == 1:
+            kategori = data.get("kategori")
+            nominal = data.get("nominal")
+
+            print("========================================")
+            print("🎯 BUDGET NLP")
+            print("SENDER   :", sender)
+            print("KATEGORI :", kategori)
+            print("NOMINAL  :", nominal)
+            print("========================================")
+
+            # ==================================================
+            # JIKA TIDAK ADA KATEGORI + NOMINAL
+            # BERARTI USER HANYA MENANYAKAN BUDGET
+            # ==================================================
+
+            if not kategori and not nominal:
 
                 periode = periode_sekarang()
 
@@ -2210,9 +2230,15 @@ _ChatSaku Finance Assistant_
 
                     kirim_wa(
                         sender,
-                        "📭 Belum ada budget bulan ini.\n\n"
-                        "Contoh:\n"
-                        "budget makanan 1500000"
+                        f"""📭 *Belum Ada Budget*
+
+    Belum ada budget untuk periode *{periode}*.
+
+    Contoh:
+
+    💰 budget makanan 500000
+    💰 budget transport 1000000
+    """
                     )
 
                     return jsonify({"status": True})
@@ -2223,24 +2249,47 @@ _ChatSaku Finance Assistant_
                 total_budget = 0
                 total_terpakai = 0
 
+                now = sekarang()
+
+                awal_bulan = now.replace(
+                    day=1,
+                    hour=0,
+                    minute=0,
+                    second=0,
+                    microsecond=0
+                )
+
+                if now.month == 12:
+
+                    akhir_bulan = now.replace(
+                        year=now.year + 1,
+                        month=1,
+                        day=1,
+                        hour=0,
+                        minute=0,
+                        second=0,
+                        microsecond=0
+                    )
+
+                else:
+
+                    akhir_bulan = now.replace(
+                        month=now.month + 1,
+                        day=1,
+                        hour=0,
+                        minute=0,
+                        second=0,
+                        microsecond=0
+                    )
+
+                # ==================================================
+                # LOOP BUDGET
+                # ==================================================
+
                 for b in budgets:
 
                     total_budget += b.nominal
 
-                    now = sekarang()
-
-                    awal_bulan = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-
-                    if now.month == 12:
-                        akhir_bulan = now.replace(year=now.year + 1, month=1, day=1,
-                                                hour=0, minute=0, second=0, microsecond=0)
-                    else:
-                        akhir_bulan = now.replace(month=now.month + 1, day=1,
-                                                hour=0, minute=0, second=0, microsecond=0)
-
-                    # =============================
-                    # TOTAL PENGELUARAN KATEGORI BULAN INI
-                    # =============================
                     terpakai = transaksi_user(nomor).filter(
                         Transaksi.tipe == "KELUAR",
                         Transaksi.kategori == b.kategori,
@@ -2259,7 +2308,10 @@ _ChatSaku Finance Assistant_
 
                     sisa = b.nominal - terpakai
 
-                    blok = min(10, int(persen / 10))
+                    blok = min(
+                        10,
+                        max(0, int(persen / 10))
+                    )
 
                     progress = (
                         "🟩" * blok +
@@ -2282,11 +2334,15 @@ _ChatSaku Finance Assistant_
                         f"📂 *{b.kategori.title()}*\n"
                         f"💰 Budget   : Rp {b.nominal:,.0f}\n"
                         f"📉 Terpakai : Rp {terpakai:,.0f}\n"
-                        f"💵 Sisa     : Rp {max(sisa,0):,.0f}\n"
+                        f"💵 Sisa     : Rp {max(sisa, 0):,.0f}\n"
                         f"📊 {persen:.1f}%\n"
                         f"{progress}\n"
                         f"{status}\n\n"
                     )
+
+                # ==================================================
+                # TOTAL
+                # ==================================================
 
                 pesan += "━━━━━━━━━━━━━━\n"
 
@@ -2295,7 +2351,10 @@ _ChatSaku Finance Assistant_
                     if total_budget > 0 else 0
                 )
 
-                blok = min(10, int(total_persen / 10))
+                blok = min(
+                    10,
+                    max(0, int(total_persen / 10))
+                )
 
                 progress = (
                     "🟩" * blok +
@@ -2306,7 +2365,8 @@ _ChatSaku Finance Assistant_
                     f"💼 *TOTAL BUDGET*\n\n"
                     f"💰 Budget   : Rp {total_budget:,.0f}\n"
                     f"📉 Terpakai : Rp {total_terpakai:,.0f}\n"
-                    f"💵 Sisa     : Rp {max(total_budget-total_terpakai,0):,.0f}\n\n"
+                    f"💵 Sisa     : Rp "
+                    f"{max(total_budget - total_terpakai, 0):,.0f}\n\n"
                     f"📊 {total_persen:.1f}%\n"
                     f"{progress}"
                 )
@@ -2315,37 +2375,48 @@ _ChatSaku Finance Assistant_
 
                 return jsonify({"status": True})
 
+            # ==================================================
+            # VIEWER TIDAK BOLEH MENGUBAH
+            # ==================================================
+
             if is_viewer(sender):
 
                 kirim_wa(
                     sender,
-                    """🔒 Mode Viewer
+                    """🔒 *Mode Viewer*
 
-            Anda hanya dapat melihat Budget.
+    Anda hanya dapat melihat Budget.
 
-            Perubahan Budget hanya dapat dilakukan oleh Owner."""
+    Perubahan Budget hanya dapat dilakukan oleh Owner."""
                 )
 
-                return jsonify(status=True)
+                return jsonify({"status": True})
 
-            # =========================
-            # FORMAT
-            # =========================
-            if len(parts) < 3:
+            # ==================================================
+            # VALIDASI NLP
+            # ==================================================
+
+            if not kategori:
 
                 kirim_wa(
                     sender,
-                    "Format:\n"
-                    "budget makanan 1500000"
+                    """❌ *Kategori belum ditemukan.*
+
+    Contoh:
+
+    • budget makanan 500000
+    • budget transport 1000000
+    • budget listrik 750000"""
                 )
 
-                return jsonify({"status":True})
+                return jsonify({"status": True})
 
-            kategori = parts[1].lower()
+            kategori = str(kategori).lower().strip()
 
-            # =========================
+            # ==================================================
             # VALIDASI KATEGORI
-            # =========================
+            # ==================================================
+
             if kategori not in KATEGORI.keys():
 
                 daftar = "\n".join(
@@ -2355,47 +2426,94 @@ _ChatSaku Finance Assistant_
 
                 kirim_wa(
                     sender,
-                    f"""❌ Kategori tidak tersedia.
+                    f"""❌ *Kategori tidak tersedia.*
 
-Kategori:
+    Kategori yang tersedia:
 
-{daftar}
+    {daftar}
 
-Contoh:
-budget makanan 1500000
-"""
+    Contoh:
+
+    budget makanan 500000"""
                 )
 
-                return jsonify({"status":True})
+                return jsonify({"status": True})
 
-            nominal = normalize_nominal(parts[2])
+            # ==================================================
+            # VALIDASI NOMINAL
+            # ==================================================
+
+            try:
+
+                nominal = int(float(nominal or 0))
+
+            except (ValueError, TypeError):
+
+                nominal = 0
+
+            # ==================================================
+            # FALLBACK NOMINAL DARI MESSAGE
+            # ==================================================
+
+            if nominal <= 0:
+
+                angka = re.findall(
+                    r'(?:Rp\s*)?[\d.,]+',
+                    message,
+                    re.IGNORECASE
+                )
+
+                if angka:
+
+                    try:
+                        nominal = normalize_nominal(
+                            angka[-1]
+                        )
+
+                    except Exception:
+                        nominal = 0
 
             if nominal <= 0:
 
                 kirim_wa(
                     sender,
-                    "Nominal budget harus lebih dari 0."
+                    """❌ *Nominal Budget Belum Ditemukan.*
+
+    Contoh:
+
+    💰 budget makanan 500000
+    💰 budget transport 1 juta
+    💰 budget listrik 500 ribu"""
                 )
 
-                return jsonify(status=True)
+                return jsonify({"status": True})
+
+            # ==================================================
+            # PERIODE
+            # ==================================================
 
             periode = periode_sekarang()
 
-            # =========================
-            # VALIDASI SALDO
-            # =========================
+            # ==================================================
+            # SALDO
+            # ==================================================
 
-            # Hitung saldo saat ini
             saldo = hitung_saldo(nomor)
 
-            # Budget yang sudah ada (jika edit)
+            # ==================================================
+            # CARI BUDGET LAMA
+            # ==================================================
+
             budget_lama = Budget.query.filter_by(
                 nomor_wa=nomor,
                 kategori=kategori,
                 periode=periode
             ).first()
 
-            # Total budget bulan ini
+            # ==================================================
+            # TOTAL BUDGET BULAN INI
+            # ==================================================
+
             total_budget = db.session.query(
                 db.func.coalesce(
                     db.func.sum(Budget.nominal),
@@ -2404,42 +2522,53 @@ budget makanan 1500000
             ).filter(
                 Budget.nomor_wa == nomor,
                 Budget.periode == periode
-            ).scalar()
+            ).scalar() or 0
 
-            # Jika sedang mengubah budget,
-            # kurangi budget lama agar tidak dihitung dua kali
+            # Jika update,
+            # budget lama jangan dihitung dua kali
+
             if budget_lama:
+
                 total_budget -= budget_lama.nominal
 
             total_setelah = total_budget + nominal
 
-            # Tidak boleh melebihi saldo
+            # ==================================================
+            # VALIDASI SALDO
+            # ==================================================
+
             if total_setelah > saldo:
 
-                sisa = max(saldo - total_budget, 0)
+                sisa = max(
+                    saldo - total_budget,
+                    0
+                )
 
                 kirim_wa(
                     sender,
                     f"""⚠️ *Budget Tidak Dapat Dibuat*
-━━━━━━━━━━━━━━
 
-💰 Saldo Anda
-Rp {saldo:,.0f}
+    ━━━━━━━━━━━━━━
 
-📊 Total Budget Setelah Disimpan
-Rp {total_setelah:,.0f}
+    💰 Saldo Anda
+    *Rp {saldo:,.0f}*
 
-❌ Budget melebihi saldo yang tersedia.
+    📊 Total Budget Setelah Disimpan
+    *Rp {total_setelah:,.0f}*
 
-Sisa budget yang masih bisa dibuat:
+    ❌ Budget melebihi saldo yang tersedia.
 
-💵 Rp {sisa:,.0f}
+    💵 Maksimal budget tambahan
+    *Rp {sisa:,.0f}*
 
-Silakan kurangi nominal budget atau tambahkan saldo terlebih dahulu.
-"""
+    Silakan kurangi nominal budget atau tambahkan saldo terlebih dahulu."""
                 )
 
                 return jsonify({"status": True})
+
+            # ==================================================
+            # CREATE / UPDATE
+            # ==================================================
 
             budget = Budget.query.filter_by(
                 nomor_wa=nomor,
@@ -2456,10 +2585,12 @@ Silakan kurangi nominal budget atau tambahkan saldo terlebih dahulu.
             else:
 
                 budget = Budget(
-                    nomor_wa=sender,
+                    nomor_wa=nomor,
                     kategori=kategori,
                     nominal=nominal,
-                    periode=periode
+                    periode=periode,
+                    dibuat=sekarang(),
+                    auto_repeat=True
                 )
 
                 db.session.add(budget)
@@ -2468,37 +2599,51 @@ Silakan kurangi nominal budget atau tambahkan saldo terlebih dahulu.
 
             db.session.commit()
 
+            # ==================================================
+            # RESPONSE
+            # ==================================================
+
             kirim_wa(
                 sender,
                 f"""🎯 *Budget {status}*
-━━━━━━━━━━━━━━
 
-📂 Kategori
-{kategori.title()}
+    ━━━━━━━━━━━━━━
 
-💰 Budget
-Rp {nominal:,.0f}
+    📂 Kategori
+    *{kategori.title()}*
 
-📅 Periode
-{periode}
+    💰 Budget
+    *Rp {nominal:,.0f}*
 
-━━━━━━━━━━━━━━
+    📅 Periode
+    *{periode}*
 
-Ketik *budget*
-untuk melihat semua budget.
-"""
+    ━━━━━━━━━━━━━━
+
+    Ketik:
+
+    *budget*
+
+    untuk melihat semua budget."""
             )
 
         except Exception as e:
 
-            print(e)
+            db.session.rollback()
+
+            print("========================================")
+            print("❌ ERROR BUDGET")
+            print("ERROR :", repr(e))
+            print("========================================")
 
             kirim_wa(
                 sender,
-                f"Terjadi kesalahan.\n\n{e}"
+                """❌ *Terjadi kesalahan saat memproses Budget.*
+
+    Silakan coba lagi beberapa saat lagi."""
             )
 
-        return jsonify({"status":True})
+        return jsonify({"status": True})
 
     # =========================
     # AI INSIGHT
