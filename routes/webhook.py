@@ -1561,6 +1561,7 @@ def deteksi_target_nlp(message, data=None):
         return None
 
     text = str(message).strip()
+
     text_lower = re.sub(
         r'\s+',
         ' ',
@@ -1569,6 +1570,308 @@ def deteksi_target_nlp(message, data=None):
 
     if data is None:
         data = {}
+
+    # ========================================================
+    # HELPER
+    # ========================================================
+
+    def parse_target_deadline(value):
+
+        try:
+            return parse_deadline_finance(value)
+        except Exception:
+            pass
+
+        # fallback manual
+        match = re.search(
+            r'\b(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})\b',
+            str(value)
+        )
+
+        if match:
+
+            try:
+
+                return datetime.strptime(
+                    f"{match.group(1)}-"
+                    f"{match.group(2)}-"
+                    f"{match.group(3)}",
+                    "%d-%m-%Y"
+                ).date()
+
+            except Exception:
+                return None
+
+        return None
+
+
+    def parse_target_nominal(value):
+
+        if not value:
+            return None
+
+        value = str(value).strip()
+
+        # ====================================================
+        # PENTING:
+        #
+        # HAPUS TANGGAL DULU
+        #
+        # Supaya:
+        #
+        # 500000000 31-12-2026
+        #
+        # tidak menjadi:
+        #
+        # 2026
+        # ====================================================
+
+        value_without_date = re.sub(
+            r'\b\d{1,2}[-/.]\d{1,2}[-/.]\d{4}\b',
+            ' ',
+            value
+        )
+
+        value_without_date = re.sub(
+            r'\s+',
+            ' ',
+            value_without_date
+        ).strip()
+
+        # ====================================================
+        # NOMINAL SATUAN
+        #
+        # 30 juta
+        # 30 jt
+        # 500 ribu
+        # 500 rb
+        # 1 miliar
+        # ====================================================
+
+        match = re.search(
+            r'(\d+(?:[.,]\d+)?)\s*'
+            r'(juta|jt|ribu|rb|miliar|milyar)\b',
+            value_without_date,
+            re.IGNORECASE
+        )
+
+        if match:
+
+            try:
+
+                angka = float(
+                    match.group(1).replace(",", ".")
+                )
+
+                satuan = (
+                    match.group(2)
+                    .lower()
+                )
+
+                if satuan in (
+                    "ribu",
+                    "rb"
+                ):
+
+                    return int(
+                        angka * 1000
+                    )
+
+                if satuan in (
+                    "juta",
+                    "jt"
+                ):
+
+                    return int(
+                        angka * 1000000
+                    )
+
+                if satuan in (
+                    "miliar",
+                    "milyar"
+                ):
+
+                    return int(
+                        angka * 1000000000
+                    )
+
+            except Exception as e:
+
+                print(
+                    "❌ ERROR PARSE NOMINAL TARGET SATUAN:",
+                    repr(e)
+                )
+
+        # ====================================================
+        # NOMINAL ANGKA BIASA
+        #
+        # 500000000
+        # Rp 500000000
+        # 12.000.000
+        # ====================================================
+
+        angka = re.findall(
+            r'(?:rp\s*)?[\d.,]+',
+            value_without_date,
+            re.IGNORECASE
+        )
+
+        if angka:
+
+            # Ambil angka terakhir yang valid
+            # tetapi tanggal sudah dibuang
+
+            for angka_text in reversed(angka):
+
+                try:
+
+                    kandidat = normalize_nominal(
+                        angka_text
+                    )
+
+                    if kandidat and kandidat > 0:
+
+                        return int(
+                            kandidat
+                        )
+
+                except Exception:
+                    pass
+
+        return None
+
+
+    def extract_target_name(value):
+
+        nama = str(
+            value or ""
+        ).strip()
+
+        # ====================================================
+        # HAPUS DEADLINE
+        # ====================================================
+
+        nama = re.sub(
+            r'\b\d{1,2}[-/.]\d{1,2}[-/.]\d{4}\b',
+            ' ',
+            nama
+        )
+
+        # ====================================================
+        # HAPUS NOMINAL SATUAN
+        # ====================================================
+
+        nama = re.sub(
+            r'\b\d+(?:[.,]\d+)?\s*'
+            r'(?:juta|jt|ribu|rb|miliar|milyar)\b',
+            ' ',
+            nama,
+            flags=re.IGNORECASE
+        )
+
+        # ====================================================
+        # HAPUS NOMINAL ANGKA
+        # ====================================================
+
+        nama = re.sub(
+            r'(?:rp\s*)?[\d.,]+',
+            ' ',
+            nama,
+            flags=re.IGNORECASE
+        )
+
+        # ====================================================
+        # HAPUS KATA PEMBUKA TARGET
+        # ====================================================
+
+        pola_hapus = [
+
+            # target
+            r'^target\s+tabungan\s+',
+            r'^target\s+menabung\s+',
+            r'^target\s+untuk\s+beli\s+',
+            r'^target\s+beli\s+',
+            r'^target\s+',
+
+            # buat target
+            r'^buatkan\s+target\s+tabungan\s+',
+            r'^buatkan\s+target\s+',
+            r'^buat\s+target\s+tabungan\s+',
+            r'^buat\s+target\s+',
+
+            # bikin target
+            r'^bikin\s+target\s+tabungan\s+',
+            r'^bikin\s+target\s+',
+
+            # saya ingin
+            r'^saya\s+ingin\s+menabung\s+untuk\s+',
+            r'^saya\s+ingin\s+menabung\s+',
+            r'^saya\s+mau\s+menabung\s+untuk\s+',
+            r'^saya\s+mau\s+menabung\s+',
+
+            # ingin
+            r'^ingin\s+menabung\s+untuk\s+',
+            r'^ingin\s+menabung\s+',
+            r'^mau\s+menabung\s+untuk\s+',
+            r'^mau\s+menabung\s+',
+
+            # menabung
+            r'^menabung\s+untuk\s+',
+            r'^nabung\s+untuk\s+',
+
+            # beli
+            r'^saya\s+ingin\s+beli\s+',
+            r'^saya\s+mau\s+beli\s+',
+            r'^ingin\s+beli\s+',
+            r'^mau\s+beli\s+',
+
+            # generic
+            r'^untuk\s+',
+            r'^buat\s+'
+        ]
+
+        for pola in pola_hapus:
+
+            nama = re.sub(
+                pola,
+                '',
+                nama,
+                flags=re.IGNORECASE
+            )
+
+        # ====================================================
+        # HAPUS KATA PENGHUBUNG
+        # ====================================================
+
+        nama = re.sub(
+            r'\b(sampai|hingga|tanggal|tgl|sebesar|dengan)\b',
+            ' ',
+            nama,
+            flags=re.IGNORECASE
+        )
+
+        # ====================================================
+        # RAPKAN
+        # ====================================================
+
+        nama = re.sub(
+            r'\s+',
+            ' ',
+            nama
+        ).strip()
+
+        # ====================================================
+        # HAPUS KARAKTER ANEH DI AWAL/AKHIR
+        # ====================================================
+
+        nama = re.sub(
+            r'^[\s\-_:,]+|[\s\-_:,]+$',
+            '',
+            nama
+        ).strip()
+
+        return nama or None
+
 
     # ========================================================
     # ACTION LIST
@@ -1587,23 +1890,25 @@ def deteksi_target_nlp(message, data=None):
 
         r'\bsaya punya list target\b',
         r'\bsaya punya list target apa\b',
+
         r'\bsaya punya daftar target\b',
         r'\bsaya punya daftar target apa\b',
 
         r'\blist target\b',
         r'\bdaftar target\b',
-        r'\blihat target\b',
+
         r'\blihat semua target\b',
-        r'\bcek target\b',
+        r'\blihat target\b',
+
         r'\bcek semua target\b',
+        r'\bcek target\b',
 
         r'\btarget saya\b',
         r'\btarget tabungan saya\b',
         r'\btabungan saya\b',
 
         r'\bpunya target apa\b',
-        r'\bsaya punya target apa\b',
-        r'\bsaya punya target apa saja\b'
+        r'\bpunya target apa saja\b'
     ]
 
     for pola in pola_list:
@@ -1615,38 +1920,35 @@ def deteksi_target_nlp(message, data=None):
         ):
 
             return {
-
                 "intent": "target",
-
                 "action": "list",
-
                 "nama": None,
-
                 "nominal": None,
-
                 "deadline": None
-
             }
 
+
     # ========================================================
-    # ACTION: HAPUS TARGET
+    # ACTION DELETE
+    #
+    # hapus target laptop
+    # hapuskan target laptop
+    # hapus target tabungan laptop
+    # hapustarget laptop
     # ========================================================
 
     pola_delete = [
 
-        # hapus target laptop
-        r'^hapus\s+target\s+(.+)$',
-
-        # hapuskan target laptop
-        r'^hapuskan\s+target\s+(.+)$',
-
-        # hapus target tabungan laptop
         r'^hapus\s+target\s+tabungan\s+(.+)$',
 
-        # hapustarget laptop
+        r'^hapuskan\s+target\s+tabungan\s+(.+)$',
+
+        r'^hapus\s+target\s+(.+)$',
+
+        r'^hapuskan\s+target\s+(.+)$',
+
         r'^hapustarget\s+(.+)$',
 
-        # hapus target: laptop
         r'^hapus\s+target\s*:\s*(.+)$'
     ]
 
@@ -1660,99 +1962,48 @@ def deteksi_target_nlp(message, data=None):
 
         if match:
 
-            nama = match.group(1).strip()
-
-            # ================================================
-            # BERSIHKAN NAMA
-            # ================================================
-
-            nama = re.sub(
-                r'^(target|tabungan)\s+',
-                '',
-                nama,
-                flags=re.IGNORECASE
-            ).strip()
-
-            if not nama:
-                return {
-                    "intent": "target",
-                    "action": "delete",
-                    "nama": None,
-                    "nominal": None,
-                    "deadline": None
-                }
-
-            return {
-                "intent": "target",
-                "action": "delete",
-                "nama": nama,
-                "nominal": None,
-                "deadline": None
-            }
-
-    for pola in pola_delete:
-
-        match = re.search(
-            pola,
-            text_lower,
-            re.IGNORECASE
-        )
-
-        if match:
-
-            nama = clean_target_name(
+            nama = extract_target_name(
                 match.group(1)
             )
 
             return {
-
                 "intent": "target",
-
                 "action": "delete",
-
                 "nama": nama,
-
                 "nominal": None,
-
                 "deadline": None
-
             }
+
 
     # ========================================================
     # DEADLINE
     # ========================================================
 
-    deadline = parse_deadline_finance(
+    deadline = parse_target_deadline(
         text
     )
+
 
     # ========================================================
     # NOMINAL
     # ========================================================
 
-    nominal = parse_nominal_finance(
+    nominal = parse_target_nominal(
         text
     )
 
+
     # ========================================================
-    # TARGET CREATE
+    # CREATE TARGET
     #
-    # Kata-kata berikut berarti target:
+    # WAJIB ADA DEADLINE
     #
-    # saya mau menabung motor 5 juta
-    # hanya akan menjadi target jika ada deadline?
+    # Contoh CREATE:
     #
-    # TIDAK.
+    # buat target jalan-jalan 500000000 31-12-2026
     #
-    # Karena route perlu membedakan:
+    # saya mau menabung motor 5 juta sampai 31-12-2026
     #
-    # saya mau menabung motor 5 juta
-    #
-    # dari:
-    #
-    # saya mau menabung motor 5 juta sampai 20-12-2026
-    #
-    # Maka deadline adalah pembeda utama.
     # ========================================================
 
     pola_create_target = [
@@ -1800,34 +2051,33 @@ def deteksi_target_nlp(message, data=None):
         "buatkan target tabungan"
     ]
 
-    ada_pola_target = any(
+    ada_pola_create = any(
         pola in text_lower
         for pola in pola_create_target
     )
 
+
     # ========================================================
-    # CREATE TARGET HANYA JIKA ADA DEADLINE
+    # CREATE
     # ========================================================
 
-    if ada_pola_target and deadline:
+    if (
+        ada_pola_create
+        and deadline
+    ):
 
-        nama = clean_target_name(
+        nama = extract_target_name(
             text
         )
 
         return {
-
             "intent": "target",
-
             "action": "create",
-
             "nama": nama,
-
             "nominal": nominal,
-
             "deadline": deadline
-
         }
+
 
     # ========================================================
     # DETAIL TARGET
@@ -1859,58 +2109,56 @@ def deteksi_target_nlp(message, data=None):
             re.IGNORECASE
         )
 
-        if match:
+        if not match:
+            continue
 
-            nama = match.group(1).strip()
+        nama = match.group(1).strip()
 
-            # Jangan anggap sebagai detail jika
-            # ternyata memiliki nominal + deadline.
-            if nominal and deadline:
-                continue
+        # ====================================================
+        # JANGAN DETAIL JIKA CREATE
+        # ====================================================
 
-            # Jangan ambil kata "saya" sebagai nama.
-            if nama in (
-                "saya",
-                "saya apa",
-                "saya apa saja",
-                "saya punya",
-                "saya punya apa"
-            ):
-                continue
+        if nominal and deadline:
+            continue
 
-            nama = clean_target_name(
-                nama
-            )
+        # ====================================================
+        # JANGAN AMBIL KALIMAT LIST
+        # ====================================================
 
-            if nama:
+        if nama in (
+            "saya",
+            "saya apa",
+            "saya apa saja",
+            "saya punya",
+            "saya punya apa",
+            "apa",
+            "apa saja"
+        ):
+            continue
 
-                return {
+        nama = extract_target_name(
+            nama
+        )
 
-                    "intent": "target",
+        if nama:
 
-                    "action": "detail",
+            return {
+                "intent": "target",
+                "action": "detail",
+                "nama": nama,
+                "nominal": None,
+                "deadline": None
+            }
 
-                    "nama": nama,
-
-                    "nominal": None,
-
-                    "deadline": None
-
-                }
 
     # ========================================================
-    # JIKA NLP UTAMA SUDAH MENGATAKAN TARGET
+    # FALLBACK NLP UTAMA
     #
-    # Tetapi tidak memiliki action.
+    # Jika NLP utama:
     #
-    # Contoh:
-    #
-    # saya punya target apa
-    #
-    # NLP:
     # intent = target
     #
-    # Maka fallback ke LIST.
+    # tetapi action belum ada.
     # ========================================================
 
     if data.get("intent") == "target":
@@ -1919,61 +2167,72 @@ def deteksi_target_nlp(message, data=None):
             data.get("keterangan") or ""
         ).lower().strip()
 
-        # -----------------------------------------------
-        # Kalimat yang jelas merupakan LIST
-        # -----------------------------------------------
+        # ====================================================
+        # LIST
+        # ====================================================
+
+        pola_list_fallback = [
+
+            "target saya",
+
+            "punya target",
+
+            "list target",
+
+            "daftar target",
+
+            "lihat target",
+
+            "cek target",
+
+            "target apa",
+
+            "target apa saja",
+
+            "target saya apa",
+
+            "target saya apa saja"
+        ]
 
         if any(
             kata in text_lower
-            for kata in [
-                "target saya",
-                "punya target",
-                "list target",
-                "daftar target",
-                "lihat target",
-                "cek target",
-                "target apa",
-                "target apa saja"
-            ]
+            for kata in pola_list_fallback
         ):
 
             return {
-
                 "intent": "target",
-
                 "action": "list",
-
                 "nama": None,
-
                 "nominal": None,
-
                 "deadline": None
-
             }
 
-        # -----------------------------------------------
-        # Jika NLP memberikan nominal + deadline
-        # -----------------------------------------------
 
-        if nominal and deadline:
+        # ====================================================
+        # CREATE
+        # ====================================================
 
-            nama = clean_target_name(
+        if (
+            nominal
+            and deadline
+        ):
+
+            nama = extract_target_name(
                 text
             )
 
             return {
-
                 "intent": "target",
-
                 "action": "create",
-
                 "nama": nama,
-
                 "nominal": nominal,
-
                 "deadline": deadline
-
             }
+
+
+    # ========================================================
+    # TIDAK TERDETEKSI
+    # ========================================================
 
     return None
 # ============================================================
