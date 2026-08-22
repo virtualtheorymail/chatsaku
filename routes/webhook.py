@@ -15,7 +15,7 @@ from itsdangerous import SignatureExpired
 
 from utils.duplicate import is_duplicate
 from utils.helper import *
-from nlp_router import parse_message
+from routes.nlp_router import parse_message
 
 webhook_bp = Blueprint("webhook", __name__)
 

@@ -24,7 +24,7 @@ import atexit
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from auth import auth_bp
 import json
-from nlp_router import parse_message
+from routes.nlp_router import parse_message
 
 app = Flask(__name__)
 
