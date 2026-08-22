@@ -5184,7 +5184,7 @@ https://www.chatsaku.com
     💬 Cukup kirim transaksi melalui WhatsApp dan biarkan ChatSaku membantu mencatat keuangan Anda.
 
     Contoh:
-    _"menu"_
+    _"fitur apa yang tersedia?"_
 
     Selamat menggunakan *ChatSaku*! 💚
 
