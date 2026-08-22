@@ -16,6 +16,7 @@ from itsdangerous import SignatureExpired
 from utils.duplicate import is_duplicate
 from utils.helper import *
 from routes.nlp_router import parse_message
+import re
 
 webhook_bp = Blueprint("webhook", __name__)
 
@@ -1727,31 +1728,84 @@ _ChatSaku Finance Assistant_
 
         try:
 
-            parts = message.split()
+            # ==================================================
+            # AMBIL HASIL DARI NLP
+            # ==================================================
 
-            if len(parts) < 3:
+            nominal = data.get("nominal", 0)
+            keterangan = data.get("keterangan", "")
 
-                kirim_wa(
-                    sender,
-                    "Format:\nkeluar 25000 grab"
-                )
+            # Pastikan nominal berupa angka
+            try:
+                nominal = int(float(nominal))
+            except (ValueError, TypeError):
+                nominal = 0
 
-                return jsonify({"status": True})
-
-            nominal = normalize_nominal(parts[1])
+            # ==================================================
+            # VALIDASI NOMINAL
+            # ==================================================
 
             if nominal <= 0:
 
                 kirim_wa(
                     sender,
-                    "Nominal harus lebih dari 0."
+                    """❌ *Nominal tidak ditemukan.*
+
+    Contoh:
+    • beli bakso 20000
+    • bayar listrik 150000
+    • keluar 25000 grab
+    """
                 )
 
                 return jsonify({"status": True})
 
-            keterangan = " ".join(parts[2:])
+            # ==================================================
+            # BERSIHKAN KETERANGAN
+            # ==================================================
+
+            if not keterangan:
+                keterangan = message
+
+            # Hapus nominal dari akhir keterangan
+            # Contoh:
+            # "beli bakso 20000"
+            # menjadi:
+            # "beli bakso"
+
+            keterangan = keterangan.strip()
+
+            pola_nominal = re.compile(
+                r"""
+                \s+
+                Rp?\s*
+                [\d.,]+
+                \s*$
+                """,
+                re.IGNORECASE | re.VERBOSE
+            )
+
+            keterangan = pola_nominal.sub("", keterangan).strip()
+
+            if not keterangan:
+                keterangan = "Pengeluaran"
+
+            # ==================================================
+            # CARI KATEGORI
+            # ==================================================
 
             kategori, subkategori = cari_kategori(keterangan)
+
+            # Fallback jika kategori kosong
+            if not kategori:
+                kategori = "lainnya"
+
+            if not subkategori:
+                subkategori = "lainnya"
+
+            # ==================================================
+            # SIMPAN TRANSAKSI
+            # ==================================================
 
             trx = Transaksi(
                 tanggal=sekarang(),
@@ -1766,9 +1820,18 @@ _ChatSaku Finance Assistant_
             db.session.add(trx)
             db.session.commit()
 
-            # ======================================
+            print("========================================")
+            print("💰 TRANSAKSI KELUAR BERHASIL")
+            print("SENDER      :", sender)
+            print("NOMINAL     :", nominal)
+            print("KETERANGAN  :", keterangan)
+            print("KATEGORI    :", kategori)
+            print("SUBKATEGORI :", subkategori)
+            print("========================================")
+
+            # ==================================================
             # TOTAL SALDO
-            # ======================================
+            # ==================================================
 
             masuk = transaksi_user(sender).filter(
                 Transaksi.tipe == "MASUK"
@@ -1784,15 +1847,15 @@ _ChatSaku Finance Assistant_
 
             saldo = masuk - keluar
 
-            # ======================================
+            # ==================================================
             # DASHBOARD
-            # ======================================
+            # ==================================================
 
             link = generate_dashboard_link(sender)
 
-            # ======================================
+            # ==================================================
             # BUDGET
-            # ======================================
+            # ==================================================
 
             periode = periode_sekarang()
 
@@ -1817,6 +1880,7 @@ _ChatSaku Finance Assistant_
                 )
 
                 if now.month == 12:
+
                     akhir_bulan = now.replace(
                         year=now.year + 1,
                         month=1,
@@ -1826,7 +1890,9 @@ _ChatSaku Finance Assistant_
                         second=0,
                         microsecond=0
                     )
+
                 else:
+
                     akhir_bulan = now.replace(
                         month=now.month + 1,
                         day=1,
@@ -1847,20 +1913,29 @@ _ChatSaku Finance Assistant_
 
                 persen = (
                     (total_keluar / budget.nominal) * 100
-                    if budget.nominal > 0 else 0
+                    if budget.nominal > 0
+                    else 0
                 )
 
                 sisa = budget.nominal - total_keluar
 
-                blok = min(10, int(persen / 10))
-                bar = "🟩" * blok + "⬜" * (10 - blok)
+                # Batasi progress bar maksimal 10 blok
+                blok = min(10, max(0, int(persen / 10)))
+
+                bar = (
+                    "🟩" * blok +
+                    "⬜" * (10 - blok)
+                )
 
                 if persen <= 50:
                     status = "🟢 Budget Aman"
+
                 elif persen <= 80:
                     status = "🟡 Perlu Perhatian"
+
                 elif persen <= 100:
                     status = "🟠 Hampir Habis"
+
                 else:
                     status = "🔴 Budget Terlampaui"
 
@@ -1878,7 +1953,7 @@ _ChatSaku Finance Assistant_
     Rp {total_keluar:,.0f}
 
     💳 Sisa Budget
-    Rp {max(sisa,0):,.0f}
+    Rp {max(sisa, 0):,.0f}
 
     📊 Progress
     {persen:.1f}%
@@ -1911,13 +1986,17 @@ _ChatSaku Finance Assistant_
     budget transport 1000000
     """
 
-            kirim_wa(
-                sender,
-                f"""🏦 *Notifikasi Transaksi*
+            # ==================================================
+            # KIRIM BALASAN WHATSAPP
+            # ==================================================
+
+            pesan = f"""🏦 *Notifikasi Transaksi*
     ──────────────────
 
-    ✅ *Debit Berhasil*
-    💸 - Rp {nominal:,.0f}
+    ✅ *Pengeluaran Berhasil Dicatat*
+
+    💸 Nominal
+    *Rp {nominal:,.0f}*
 
     🏷️ Kategori
     {kategori.title()}
@@ -1937,34 +2016,71 @@ _ChatSaku Finance Assistant_
     💳 Saldo Tersedia
     *Rp {saldo:,.0f}*
 
+    🌐 Dashboard
+    {link}
+
     ──────────────────
     _ChatSaku Finance Assistant_
     """
+
+            print("========================================")
+            print("📤 MENGIRIM BALASAN WA")
+            print("========================================")
+            print(pesan)
+
+            hasil_kirim = kirim_wa(
+                sender,
+                pesan
             )
+
+            print("📨 HASIL KIRIM WA :", hasil_kirim)
+
+            return jsonify({
+                "status": True,
+                "intent": "keluar",
+                "nominal": nominal,
+                "keterangan": keterangan
+            })
 
         except ValueError:
 
+            db.session.rollback()
+
             kirim_wa(
                 sender,
-                "❌ Nominal tidak valid.\n\nContoh:\nkeluar 2.000.000 grab"
+                """❌ Nominal tidak valid.
+
+    Contoh:
+    beli bakso 20000
+    bayar listrik 150000
+    keluar 25000 grab"""
             )
+
+            return jsonify({"status": True})
 
         except Exception as e:
 
-            print(e)
+            db.session.rollback()
+
+            print("========================================")
+            print("❌ ERROR TRANSAKSI KELUAR")
+            print("ERROR :", repr(e))
+            print("========================================")
 
             kirim_wa(
                 sender,
-                f"""❌ Terjadi kesalahan
+                f"""❌ *Terjadi kesalahan saat mencatat transaksi.*
 
-    {e}
+    Silakan coba lagi.
 
-    Format:
-    keluar 25000 grab
-    """
+    Contoh:
+    beli bakso 20000"""
             )
 
-        return jsonify({"status": True})
+            return jsonify({
+                "status": False,
+                "error": str(e)
+            }), 500
 
     # =========================
     # HARI INI
