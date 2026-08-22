@@ -606,526 +606,526 @@ def deteksi_reminder_nlp(message, data=None):
     }
 
 
-# ============================================================
-# NORMALISASI INTENT REMINDER
-#
-# PENTING:
-# BLOK INI HARUS DIJALANKAN SEBELUM TARGET
-# ============================================================
+    # ============================================================
+    # NORMALISASI INTENT REMINDER
+    #
+    # PENTING:
+    # BLOK INI HARUS DIJALANKAN SEBELUM TARGET
+    # ============================================================
 
-reminder_nlp = deteksi_reminder_nlp(
-    message,
-    nlp
-)
-
-print("========================================")
-print("🔔 REMINDER NLP")
-print("MESSAGE :", message)
-print("RESULT  :", reminder_nlp)
-print("========================================")
-
-
-if reminder_nlp:
-
-    intent = "reminder"
-
-    nlp["intent"] = "reminder"
-
-    nlp["action"] = (
-        reminder_nlp.get("action")
-    )
-
-    nlp["nama"] = (
-        reminder_nlp.get("nama")
-    )
-
-    nlp["tanggal"] = (
-        reminder_nlp.get("tanggal")
-    )
-
-    nlp["nominal"] = (
-        reminder_nlp.get("nominal")
-    )
-
-    print(
-        "🔔 INTENT DIUBAH MENJADI REMINDER:",
+    reminder_nlp = deteksi_reminder_nlp(
+        message,
         nlp
     )
 
-
-# ============================================================
-# HANDLER REMINDER
-# ============================================================
-
-if intent == "reminder":
-
-    # ========================================================
-    # CEK FITUR
-    # ========================================================
-
-    if not has_feature(
-        sender,
-        "reminder"
-    ):
-
-        kirim_wa(
-            sender,
-            """🔒 *Reminder tersedia di paket PRO.*
-
-Upgrade sekarang agar dapat:
-
-✅ Budget Bulanan
-✅ Reminder
-✅ Target Tabungan
-✅ Hutang Piutang
-✅ AI Insight
-✅ Dashboard Lengkap
-
-🌐 www.chatsaku.com
-
-_ChatSaku Finance Assistant_"""
-        )
-
-        return jsonify(
-            status=True
-        )
-
-    # ========================================================
-    # OWNER
-    # ========================================================
-
-    nomor_owner = get_owner_number(
-        sender
-    )
-
-    action = nlp.get(
-        "action"
-    )
-
-    nama = nlp.get(
-        "nama"
-    )
-
-    tanggal = nlp.get(
-        "tanggal"
-    )
-
-    nominal = nlp.get(
-        "nominal"
-    )
-
     print("========================================")
-    print("🔔 PROSES REMINDER")
-    print("SENDER   :", sender)
-    print("OWNER    :", nomor_owner)
-    print("ACTION   :", action)
-    print("NAMA     :", nama)
-    print("TANGGAL  :", tanggal)
-    print("NOMINAL  :", nominal)
+    print("🔔 REMINDER NLP")
+    print("MESSAGE :", message)
+    print("RESULT  :", reminder_nlp)
     print("========================================")
 
-    # ========================================================
-    # LIST
-    # ========================================================
 
-    if action == "list":
+    if reminder_nlp:
 
-        reminders = Reminder.query.filter_by(
-            nomor_wa=nomor_owner,
-            aktif=True
-        ).order_by(
-            Reminder.tanggal.asc()
-        ).all()
+        intent = "reminder"
 
-        if not reminders:
+        nlp["intent"] = "reminder"
 
-            kirim_wa(
-                sender,
-                """📭 *Belum ada reminder.*
-
-Contoh:
-
-🔔 reminder listrik tanggal 20 500 ribu
-
-_ChatSaku Finance Assistant_"""
-            )
-
-            return jsonify(
-                status=True
-            )
-
-        pesan = (
-            "🔔 *DAFTAR REMINDER*\n"
-            "━━━━━━━━━━━━━━━━━━\n\n"
+        nlp["action"] = (
+            reminder_nlp.get("action")
         )
 
-        total = 0
-
-        for i, r in enumerate(
-            reminders,
-            1
-        ):
-
-            total += (
-                r.nominal or 0
-            )
-
-            pesan += (
-                f"*{i}. {r.nama.title()}*\n"
-                f"📅 Jatuh Tempo : "
-                f"Tanggal {r.tanggal}\n"
-                f"💰 Nominal : "
-                f"Rp {(r.nominal or 0):,.0f}\n\n"
-            )
-
-        pesan += (
-            "━━━━━━━━━━━━━━━━━━\n"
-            f"💵 *Total Tagihan*\n"
-            f"Rp {total:,.0f}\n\n"
-            "_ChatSaku Finance Assistant_"
+        nlp["nama"] = (
+            reminder_nlp.get("nama")
         )
 
-        kirim_wa(
+        nlp["tanggal"] = (
+            reminder_nlp.get("tanggal")
+        )
+
+        nlp["nominal"] = (
+            reminder_nlp.get("nominal")
+        )
+
+        print(
+            "🔔 INTENT DIUBAH MENJADI REMINDER:",
+            nlp
+        )
+
+
+    # ============================================================
+    # HANDLER REMINDER
+    # ============================================================
+
+    if intent == "reminder":
+
+        # ========================================================
+        # CEK FITUR
+        # ========================================================
+
+        if not has_feature(
             sender,
-            pesan
-        )
-
-        return jsonify(
-            status=True
-        )
-
-    # ========================================================
-    # DELETE
-    # ========================================================
-
-    if action == "delete":
-
-        if is_viewer(sender):
-
-            kirim_wa(
-                sender,
-                """🔒 *Mode Viewer*
-
-Anda hanya dapat melihat Reminder.
-
-Perubahan Reminder hanya dapat dilakukan oleh Owner."""
-            )
-
-            return jsonify(
-                status=True
-            )
-
-        if not nama:
-
-            kirim_wa(
-                sender,
-                """❌ *Nama reminder belum ditemukan.*
-
-Contoh:
-
-*hapus reminder listrik*"""
-            )
-
-            return jsonify(
-                status=True
-            )
-
-        nama = str(
-            nama
-        ).strip()
-
-        reminder = Reminder.query.filter_by(
-            nomor_wa=nomor_owner,
-            nama=nama
-        ).first()
-
-        if not reminder:
-
-            kirim_wa(
-                sender,
-                f"""❌ *Reminder tidak ditemukan.*
-
-🔔 Reminder:
-*{nama}*
-
-Gunakan:
-
-*reminder*
-
-untuk melihat semua reminder."""
-            )
-
-            return jsonify(
-                status=True
-            )
-
-        try:
-
-            db.session.delete(
-                reminder
-            )
-
-            db.session.commit()
-
-        except Exception as e:
-
-            db.session.rollback()
-
-            print(
-                "❌ ERROR DELETE REMINDER:",
-                repr(e)
-            )
-
-            kirim_wa(
-                sender,
-                "❌ Gagal menghapus reminder."
-            )
-
-            return jsonify(
-                status=False
-            ), 500
-
-        kirim_wa(
-            sender,
-            f"""🗑️ *Reminder Berhasil Dihapus*
-
-📄 {nama.title()}
-
-_ChatSaku Finance Assistant_"""
-        )
-
-        return jsonify(
-            status=True
-        )
-
-    # ========================================================
-    # CREATE / UPDATE
-    # ========================================================
-
-    if action == "create":
-
-        # ----------------------------------------------------
-        # VIEWER
-        # ----------------------------------------------------
-
-        if is_viewer(sender):
-
-            kirim_wa(
-                sender,
-                """🔒 *Mode Viewer*
-
-Anda hanya dapat melihat Reminder.
-
-Perubahan Reminder hanya dapat dilakukan oleh Owner."""
-            )
-
-            return jsonify(
-                status=True
-            )
-
-        # ----------------------------------------------------
-        # VALIDASI NAMA
-        # ----------------------------------------------------
-
-        if not nama:
-
-            kirim_wa(
-                sender,
-                """❌ *Nama reminder belum ditemukan.*
-
-Contoh:
-
-🔔 *reminder listrik tanggal 20 500 ribu*
-
-🔔 *reminder internet tanggal 25 350 ribu*"""
-            )
-
-            return jsonify(
-                status=True
-            )
-
-        # ----------------------------------------------------
-        # VALIDASI TANGGAL
-        # ----------------------------------------------------
-
-        try:
-
-            tanggal = int(
-                tanggal
-            )
-
-        except (
-            TypeError,
-            ValueError
-        ):
-
-            tanggal = None
-
-        if (
-            tanggal is None
-            or tanggal < 1
-            or tanggal > 31
+            "reminder"
         ):
 
             kirim_wa(
                 sender,
-                """❌ *Tanggal reminder belum ditemukan atau tidak valid.*
+                """🔒 *Reminder tersedia di paket PRO.*
 
-Tanggal harus antara *1 sampai 31*.
+    Upgrade sekarang agar dapat:
 
-Contoh:
+    ✅ Budget Bulanan
+    ✅ Reminder
+    ✅ Target Tabungan
+    ✅ Hutang Piutang
+    ✅ AI Insight
+    ✅ Dashboard Lengkap
 
-🔔 *reminder listrik tanggal 20 500 ribu*"""
+    🌐 www.chatsaku.com
+
+    _ChatSaku Finance Assistant_"""
             )
 
             return jsonify(
                 status=True
             )
 
-        # ----------------------------------------------------
-        # VALIDASI NOMINAL
-        # ----------------------------------------------------
+        # ========================================================
+        # OWNER
+        # ========================================================
 
-        try:
+        nomor_owner = get_owner_number(
+            sender
+        )
 
-            nominal = normalize_nominal(
-                nominal
-            )
+        action = nlp.get(
+            "action"
+        )
 
-        except Exception:
+        nama = nlp.get(
+            "nama"
+        )
 
-            nominal = None
+        tanggal = nlp.get(
+            "tanggal"
+        )
 
-        if not nominal or nominal <= 0:
+        nominal = nlp.get(
+            "nominal"
+        )
 
-            kirim_wa(
-                sender,
-                """❌ *Nominal reminder belum ditemukan.*
+        print("========================================")
+        print("🔔 PROSES REMINDER")
+        print("SENDER   :", sender)
+        print("OWNER    :", nomor_owner)
+        print("ACTION   :", action)
+        print("NAMA     :", nama)
+        print("TANGGAL  :", tanggal)
+        print("NOMINAL  :", nominal)
+        print("========================================")
 
-Contoh:
+        # ========================================================
+        # LIST
+        # ========================================================
 
-🔔 *reminder listrik tanggal 20 500 ribu*
+        if action == "list":
 
-🔔 *reminder internet tanggal 25 350000*"""
-            )
+            reminders = Reminder.query.filter_by(
+                nomor_wa=nomor_owner,
+                aktif=True
+            ).order_by(
+                Reminder.tanggal.asc()
+            ).all()
 
-            return jsonify(
-                status=True
-            )
+            if not reminders:
 
-        # ----------------------------------------------------
-        # NORMALISASI NAMA
-        # ----------------------------------------------------
+                kirim_wa(
+                    sender,
+                    """📭 *Belum ada reminder.*
 
-        nama = str(
-            nama
-        ).strip()
+    Contoh:
 
-        # ----------------------------------------------------
-        # CARI REMINDER
-        # ----------------------------------------------------
+    🔔 reminder listrik tanggal 20 500 ribu
 
-        reminder = Reminder.query.filter_by(
-            nomor_wa=nomor_owner,
-            nama=nama
-        ).first()
-
-        try:
-
-            if reminder:
-
-                reminder.tanggal = tanggal
-                reminder.nominal = nominal
-                reminder.aktif = True
-
-                status = "Diperbarui"
-
-            else:
-
-                reminder = Reminder(
-                    nomor_wa=nomor_owner,
-                    nama=nama,
-                    tanggal=tanggal,
-                    nominal=nominal,
-                    aktif=True
+    _ChatSaku Finance Assistant_"""
                 )
 
-                db.session.add(
+                return jsonify(
+                    status=True
+                )
+
+            pesan = (
+                "🔔 *DAFTAR REMINDER*\n"
+                "━━━━━━━━━━━━━━━━━━\n\n"
+            )
+
+            total = 0
+
+            for i, r in enumerate(
+                reminders,
+                1
+            ):
+
+                total += (
+                    r.nominal or 0
+                )
+
+                pesan += (
+                    f"*{i}. {r.nama.title()}*\n"
+                    f"📅 Jatuh Tempo : "
+                    f"Tanggal {r.tanggal}\n"
+                    f"💰 Nominal : "
+                    f"Rp {(r.nominal or 0):,.0f}\n\n"
+                )
+
+            pesan += (
+                "━━━━━━━━━━━━━━━━━━\n"
+                f"💵 *Total Tagihan*\n"
+                f"Rp {total:,.0f}\n\n"
+                "_ChatSaku Finance Assistant_"
+            )
+
+            kirim_wa(
+                sender,
+                pesan
+            )
+
+            return jsonify(
+                status=True
+            )
+
+        # ========================================================
+        # DELETE
+        # ========================================================
+
+        if action == "delete":
+
+            if is_viewer(sender):
+
+                kirim_wa(
+                    sender,
+                    """🔒 *Mode Viewer*
+
+    Anda hanya dapat melihat Reminder.
+
+    Perubahan Reminder hanya dapat dilakukan oleh Owner."""
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+            if not nama:
+
+                kirim_wa(
+                    sender,
+                    """❌ *Nama reminder belum ditemukan.*
+
+    Contoh:
+
+    *hapus reminder listrik*"""
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+            nama = str(
+                nama
+            ).strip()
+
+            reminder = Reminder.query.filter_by(
+                nomor_wa=nomor_owner,
+                nama=nama
+            ).first()
+
+            if not reminder:
+
+                kirim_wa(
+                    sender,
+                    f"""❌ *Reminder tidak ditemukan.*
+
+    🔔 Reminder:
+    *{nama}*
+
+    Gunakan:
+
+    *reminder*
+
+    untuk melihat semua reminder."""
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+            try:
+
+                db.session.delete(
                     reminder
                 )
 
-                status = "Dibuat"
+                db.session.commit()
 
-            db.session.commit()
+            except Exception as e:
 
-        except Exception as e:
+                db.session.rollback()
 
-            db.session.rollback()
+                print(
+                    "❌ ERROR DELETE REMINDER:",
+                    repr(e)
+                )
 
-            print(
-                "❌ ERROR SAVE REMINDER:",
-                repr(e)
-            )
+                kirim_wa(
+                    sender,
+                    "❌ Gagal menghapus reminder."
+                )
+
+                return jsonify(
+                    status=False
+                ), 500
 
             kirim_wa(
                 sender,
-                "❌ Gagal menyimpan reminder."
+                f"""🗑️ *Reminder Berhasil Dihapus*
+
+    📄 {nama.title()}
+
+    _ChatSaku Finance Assistant_"""
             )
 
             return jsonify(
-                status=False
-            ), 500
+                status=True
+            )
 
-        # ----------------------------------------------------
-        # RESPONSE
-        # ----------------------------------------------------
+        # ========================================================
+        # CREATE / UPDATE
+        # ========================================================
+
+        if action == "create":
+
+            # ----------------------------------------------------
+            # VIEWER
+            # ----------------------------------------------------
+
+            if is_viewer(sender):
+
+                kirim_wa(
+                    sender,
+                    """🔒 *Mode Viewer*
+
+    Anda hanya dapat melihat Reminder.
+
+    Perubahan Reminder hanya dapat dilakukan oleh Owner."""
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+            # ----------------------------------------------------
+            # VALIDASI NAMA
+            # ----------------------------------------------------
+
+            if not nama:
+
+                kirim_wa(
+                    sender,
+                    """❌ *Nama reminder belum ditemukan.*
+
+    Contoh:
+
+    🔔 *reminder listrik tanggal 20 500 ribu*
+
+    🔔 *reminder internet tanggal 25 350 ribu*"""
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+            # ----------------------------------------------------
+            # VALIDASI TANGGAL
+            # ----------------------------------------------------
+
+            try:
+
+                tanggal = int(
+                    tanggal
+                )
+
+            except (
+                TypeError,
+                ValueError
+            ):
+
+                tanggal = None
+
+            if (
+                tanggal is None
+                or tanggal < 1
+                or tanggal > 31
+            ):
+
+                kirim_wa(
+                    sender,
+                    """❌ *Tanggal reminder belum ditemukan atau tidak valid.*
+
+    Tanggal harus antara *1 sampai 31*.
+
+    Contoh:
+
+    🔔 *reminder listrik tanggal 20 500 ribu*"""
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+            # ----------------------------------------------------
+            # VALIDASI NOMINAL
+            # ----------------------------------------------------
+
+            try:
+
+                nominal = normalize_nominal(
+                    nominal
+                )
+
+            except Exception:
+
+                nominal = None
+
+            if not nominal or nominal <= 0:
+
+                kirim_wa(
+                    sender,
+                    """❌ *Nominal reminder belum ditemukan.*
+
+    Contoh:
+
+    🔔 *reminder listrik tanggal 20 500 ribu*
+
+    🔔 *reminder internet tanggal 25 350000*"""
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+            # ----------------------------------------------------
+            # NORMALISASI NAMA
+            # ----------------------------------------------------
+
+            nama = str(
+                nama
+            ).strip()
+
+            # ----------------------------------------------------
+            # CARI REMINDER
+            # ----------------------------------------------------
+
+            reminder = Reminder.query.filter_by(
+                nomor_wa=nomor_owner,
+                nama=nama
+            ).first()
+
+            try:
+
+                if reminder:
+
+                    reminder.tanggal = tanggal
+                    reminder.nominal = nominal
+                    reminder.aktif = True
+
+                    status = "Diperbarui"
+
+                else:
+
+                    reminder = Reminder(
+                        nomor_wa=nomor_owner,
+                        nama=nama,
+                        tanggal=tanggal,
+                        nominal=nominal,
+                        aktif=True
+                    )
+
+                    db.session.add(
+                        reminder
+                    )
+
+                    status = "Dibuat"
+
+                db.session.commit()
+
+            except Exception as e:
+
+                db.session.rollback()
+
+                print(
+                    "❌ ERROR SAVE REMINDER:",
+                    repr(e)
+                )
+
+                kirim_wa(
+                    sender,
+                    "❌ Gagal menyimpan reminder."
+                )
+
+                return jsonify(
+                    status=False
+                ), 500
+
+            # ----------------------------------------------------
+            # RESPONSE
+            # ----------------------------------------------------
+
+            kirim_wa(
+                sender,
+                f"""🔔 *Reminder {status}*
+
+    ━━━━━━━━━━━━━━━━━━
+
+    📄 *Tagihan*
+    {nama.title()}
+
+    📅 *Jatuh Tempo*
+    Tanggal {tanggal}
+
+    💰 *Estimasi*
+    Rp {nominal:,.0f}
+
+    ━━━━━━━━━━━━━━━━━━
+
+    Ketik *reminder* untuk melihat seluruh reminder.
+
+    _ChatSaku Finance Assistant_"""
+            )
+
+            return jsonify(
+                status=True
+            )
+
+        # ========================================================
+        # FALLBACK
+        # ========================================================
 
         kirim_wa(
             sender,
-            f"""🔔 *Reminder {status}*
+            """❌ *Perintah reminder tidak dikenali.*
 
-━━━━━━━━━━━━━━━━━━
+    Contoh:
 
-📄 *Tagihan*
-{nama.title()}
+    🔔 *reminder*
 
-📅 *Jatuh Tempo*
-Tanggal {tanggal}
+    🔔 *reminder listrik tanggal 20 500 ribu*
 
-💰 *Estimasi*
-Rp {nominal:,.0f}
-
-━━━━━━━━━━━━━━━━━━
-
-Ketik *reminder* untuk melihat seluruh reminder.
-
-_ChatSaku Finance Assistant_"""
+    🗑️ *hapus reminder listrik*"""
         )
 
         return jsonify(
             status=True
         )
-
-    # ========================================================
-    # FALLBACK
-    # ========================================================
-
-    kirim_wa(
-        sender,
-        """❌ *Perintah reminder tidak dikenali.*
-
-Contoh:
-
-🔔 *reminder*
-
-🔔 *reminder listrik tanggal 20 500 ribu*
-
-🗑️ *hapus reminder listrik*"""
-    )
-
-    return jsonify(
-        status=True
-    )
 
 # ============================================================
 # TARGET & TABUNG NLP - FINAL
