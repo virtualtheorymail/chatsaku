@@ -1729,15 +1729,44 @@ _ChatSaku Finance Assistant_
         try:
 
             # ==================================================
-            # AMBIL HASIL DARI NLP
+            # AMBIL HASIL NLP
             # ==================================================
 
-            nominal = data.get("nominal", 0)
+            nominal = data.get("nominal")
             keterangan = data.get("keterangan", "")
 
-            # Pastikan nominal berupa angka
+            # ==================================================
+            # FALLBACK NOMINAL DARI PESAN ASLI
+            # ==================================================
+            # Jika NLP gagal menemukan nominal,
+            # ambil angka dari message.
+            #
+            # Contoh:
+            # beli baso dengan arip 30000
+            # beli bakso 20.000
+            # bayar listrik Rp150.000
+            # ==================================================
+
+            if not nominal or nominal <= 0:
+
+                angka = re.findall(
+                    r'(?:Rp\s*)?[\d.,]+',
+                    message,
+                    re.IGNORECASE
+                )
+
+                if angka:
+
+                    kandidat = angka[-1]
+
+                    try:
+                        nominal = normalize_nominal(kandidat)
+                    except Exception:
+                        nominal = 0
+
+            # Pastikan integer
             try:
-                nominal = int(float(nominal))
+                nominal = int(float(nominal or 0))
             except (ValueError, TypeError):
                 nominal = 0
 
@@ -1766,12 +1795,6 @@ _ChatSaku Finance Assistant_
 
             if not keterangan:
                 keterangan = message
-
-            # Hapus nominal dari akhir keterangan
-            # Contoh:
-            # "beli bakso 20000"
-            # menjadi:
-            # "beli bakso"
 
             keterangan = keterangan.strip()
 
