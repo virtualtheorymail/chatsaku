@@ -470,15 +470,43 @@ https://www.chatsaku.com
     # NLP CHATSAKU
     # ==========================================
 
-    nlp = parse_message(message)
+    print("========================================")
+    print("🧠 MULAI PARSE NLP")
+    print("MESSAGE :", message)
+    print("========================================")
+
+    try:
+
+        nlp = parse_message(message)
+
+        print("========================================")
+        print("🧠 PARSE NLP SELESAI")
+        print("NLP :", nlp)
+        print("========================================")
+
+    except Exception as e:
+
+        print("========================================")
+        print("❌ ERROR parse_message()")
+        print("MESSAGE :", message)
+        print("ERROR   :", repr(e))
+        print("========================================")
+
+        nlp = {
+            "intent": None,
+            "nominal": None,
+            "keterangan": message
+        }
+
 
     intent = nlp.get("intent")
 
+
     print("========================================")
     print("🤖 NLP RESULT")
-    print(f"TEXT   : {message}")
-    print(f"INTENT : {intent}")
-    print(f"DATA   : {nlp}")
+    print("TEXT   :", message)
+    print("INTENT :", intent)
+    print("DATA   :", nlp)
     print("========================================")
 
 
