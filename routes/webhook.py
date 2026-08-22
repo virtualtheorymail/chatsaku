@@ -1892,23 +1892,38 @@ def deteksi_pemasukan_nlp(message, data=None):
 
     # ============================================================
     # MASUK / PEMASUKAN
+    # NLP NATURAL LANGUAGE
     # ============================================================
 
-    if intent == "masuk" or deteksi_pemasukan_nlp(
-        message,
-        data
-    ):
+    # ============================================================
+    # JALANKAN DETEKSI PEMASUKAN SATU KALI
+    # ============================================================
+
+    hasil_masuk = None
+
+    try:
+
+        hasil_masuk = deteksi_pemasukan_nlp(
+            message,
+            data
+        )
+
+    except Exception as e:
+
+        print("❌ ERROR deteksi_pemasukan_nlp:", repr(e))
+
+
+    # ============================================================
+    # JIKA NLP MENGENALI PEMASUKAN
+    # ============================================================
+
+    if intent == "masuk" or hasil_masuk:
 
         try:
 
             # ====================================================
-            # AMBIL DATA NLP
+            # PRIORITASKAN HASIL NLP
             # ====================================================
-
-            hasil_masuk = deteksi_pemasukan_nlp(
-                message,
-                data
-            )
 
             if hasil_masuk:
 
@@ -1916,32 +1931,45 @@ def deteksi_pemasukan_nlp(message, data=None):
 
                 intent = "masuk"
 
+
             # ====================================================
-            # DEBUG
+            # DEBUG NLP
             # ====================================================
 
             print("========================================")
             print("🤖 PEMASUKAN NLP")
             print("TEXT       :", message)
-            print("INTENT     :", data.get("intent"))
-            print("ACTION     :", data.get("action"))
+            print("INTENT     :", intent)
+            print("DATA       :", data)
             print("NOMINAL    :", data.get("nominal"))
             print("KETERANGAN :", data.get("keterangan"))
             print("========================================")
 
+
             # ====================================================
-            # AMBIL NOMINAL
+            # AMBIL NOMINAL DARI NLP
             # ====================================================
 
             nominal = data.get(
                 "nominal"
             )
 
+
+            # ====================================================
+            # NORMALISASI NOMINAL
+            # ====================================================
+
             try:
 
-                nominal = int(
-                    float(nominal or 0)
-                )
+                if nominal:
+
+                    nominal = int(
+                        float(nominal)
+                    )
+
+                else:
+
+                    nominal = 0
 
             except (
                 ValueError,
@@ -1950,8 +1978,13 @@ def deteksi_pemasukan_nlp(message, data=None):
 
                 nominal = 0
 
+
             # ====================================================
-            # FALLBACK NOMINAL
+            # FALLBACK:
+            #
+            # 4000000
+            # Rp 4000000
+            # 4.000.000
             # ====================================================
 
             if nominal <= 0:
@@ -1970,21 +2003,105 @@ def deteksi_pemasukan_nlp(message, data=None):
                             angka[-1]
                         )
 
-                    except Exception:
+                    except Exception as e:
+
+                        print(
+                            "❌ ERROR normalize nominal:",
+                            repr(e)
+                        )
 
                         nominal = 0
+
+
+            # ====================================================
+            # FALLBACK:
+            #
+            # 4 juta
+            # 4 jt
+            # 500 ribu
+            # 500 rb
+            # 1 miliar
+            # ====================================================
+
+            if nominal <= 0:
+
+                pola_uang = re.search(
+                    r'(\d+(?:[.,]\d+)?)\s*'
+                    r'(juta|jt|ribu|rb|miliar|milyar)',
+                    message.lower(),
+                    re.IGNORECASE
+                )
+
+                if pola_uang:
+
+                    angka_text = (
+                        pola_uang.group(1)
+                        .replace(",", ".")
+                    )
+
+                    satuan = (
+                        pola_uang.group(2)
+                        .lower()
+                    )
+
+                    try:
+
+                        angka_float = float(
+                            angka_text
+                        )
+
+
+                        if satuan in [
+                            "ribu",
+                            "rb"
+                        ]:
+
+                            nominal = int(
+                                angka_float * 1000
+                            )
+
+
+                        elif satuan in [
+                            "juta",
+                            "jt"
+                        ]:
+
+                            nominal = int(
+                                angka_float * 1000000
+                            )
+
+
+                        elif satuan in [
+                            "miliar",
+                            "milyar"
+                        ]:
+
+                            nominal = int(
+                                angka_float * 1000000000
+                            )
+
+
+                    except Exception as e:
+
+                        print(
+                            "❌ ERROR parsing satuan:",
+                            repr(e)
+                        )
+
+                        nominal = 0
+
 
             # ====================================================
             # VALIDASI NOMINAL
             # ====================================================
 
-            if nominal <= 0:
+            if not nominal or nominal <= 0:
 
                 kirim_wa(
                     sender,
                     """❌ *Nominal Pemasukan Tidak Ditemukan.*
 
-    Coba tulis seperti:
+    Contoh:
 
     💰 saya dapat sumbangan 4000000
     💰 saya dapat gaji 5000000
@@ -1997,6 +2114,7 @@ def deteksi_pemasukan_nlp(message, data=None):
                     "status": True
                 })
 
+
             # ====================================================
             # KETERANGAN
             # ====================================================
@@ -2005,16 +2123,25 @@ def deteksi_pemasukan_nlp(message, data=None):
                 "keterangan"
             )
 
+
             if not keterangan:
 
                 keterangan = message
+
 
             keterangan = str(
                 keterangan
             ).strip()
 
+
             # ====================================================
-            # BERSIHKAN NOMINAL DARI KETERANGAN
+            # BERSIHKAN NOMINAL ANGKA DARI KETERANGAN
+            #
+            # "saya dapat sumbangan 4000000"
+            #
+            # menjadi:
+            #
+            # "saya dapat sumbangan"
             # ====================================================
 
             keterangan = re.sub(
@@ -2024,6 +2151,15 @@ def deteksi_pemasukan_nlp(message, data=None):
                 flags=re.IGNORECASE
             ).strip()
 
+
+            # ====================================================
+            # BERSIHKAN:
+            #
+            # 4 juta
+            # 500 ribu
+            # 1 miliar
+            # ====================================================
+
             keterangan = re.sub(
                 r'\s+\d+(?:[.,]\d+)?\s*'
                 r'(?:juta|jt|ribu|rb|miliar|milyar)\s*$',
@@ -2032,9 +2168,15 @@ def deteksi_pemasukan_nlp(message, data=None):
                 flags=re.IGNORECASE
             ).strip()
 
+
+            # ====================================================
+            # FALLBACK KETERANGAN
+            # ====================================================
+
             if not keterangan:
 
                 keterangan = "Pemasukan"
+
 
             # ====================================================
             # NOMOR OWNER
@@ -2044,8 +2186,22 @@ def deteksi_pemasukan_nlp(message, data=None):
                 sender
             )
 
+
             # ====================================================
-            # SIMPAN TRANSAKSI
+            # DEBUG SEBELUM SIMPAN
+            # ====================================================
+
+            print("========================================")
+            print("💰 SIMPAN PEMASUKAN")
+            print("SENDER     :", sender)
+            print("OWNER      :", nomor)
+            print("NOMINAL    :", nominal)
+            print("KETERANGAN :", keterangan)
+            print("========================================")
+
+
+            # ====================================================
+            # BUAT TRANSAKSI
             # ====================================================
 
             trx = Transaksi(
@@ -2062,14 +2218,21 @@ def deteksi_pemasukan_nlp(message, data=None):
 
             )
 
+
             db.session.add(
                 trx
             )
 
-            db.session.commit()
 
             # ====================================================
-            # HITUNG TOTAL MASUK
+            # COMMIT
+            # ====================================================
+
+            db.session.commit()
+
+
+            # ====================================================
+            # TOTAL PEMASUKAN
             # ====================================================
 
             masuk = transaksi_user(
@@ -2082,8 +2245,9 @@ def deteksi_pemasukan_nlp(message, data=None):
                 )
             ).scalar() or 0
 
+
             # ====================================================
-            # HITUNG TOTAL KELUAR
+            # TOTAL PENGELUARAN
             # ====================================================
 
             keluar = transaksi_user(
@@ -2096,6 +2260,7 @@ def deteksi_pemasukan_nlp(message, data=None):
                 )
             ).scalar() or 0
 
+
             # ====================================================
             # SALDO
             # ====================================================
@@ -2104,6 +2269,7 @@ def deteksi_pemasukan_nlp(message, data=None):
                 masuk -
                 keluar
             )
+
 
             # ====================================================
             # DASHBOARD
@@ -2115,12 +2281,18 @@ def deteksi_pemasukan_nlp(message, data=None):
                     sender
                 )
 
-            except Exception:
+            except Exception as e:
+
+                print(
+                    "⚠️ Dashboard link error:",
+                    repr(e)
+                )
 
                 link = ""
 
+
             # ====================================================
-            # RESPONSE
+            # PESAN WHATSAPP
             # ====================================================
 
             pesan = f"""✅ *Transaksi Berhasil Dicatat*
@@ -2143,6 +2315,11 @@ def deteksi_pemasukan_nlp(message, data=None):
     *Rp {saldo:,.0f}*
     """
 
+
+            # ====================================================
+            # DASHBOARD
+            # ====================================================
+
             if link:
 
                 pesan += f"""
@@ -2151,42 +2328,62 @@ def deteksi_pemasukan_nlp(message, data=None):
     {link}
     """
 
+
             pesan += """
 
     ━━━━━━━━━━━━━━━━━━
     _ChatSaku Finance Assistant_
     """
 
+
             # ====================================================
-            # KIRIM WHATSAPP
+            # DEBUG KIRIM
             # ====================================================
 
             print("========================================")
             print("📤 KIRIM BALASAN PEMASUKAN")
-            print("========================================")
+            print("SENDER :", sender)
+            print("MESSAGE:")
             print(pesan)
+            print("========================================")
+
+
+            # ====================================================
+            # KIRIM WHATSAPP
+            # ====================================================
 
             hasil_kirim = kirim_wa(
                 sender,
                 pesan
             )
 
+
             print(
-                "📨 HASIL KIRIM WA :",
+                "📨 HASIL KIRIM WA:",
                 hasil_kirim
             )
 
+
             # ====================================================
-            # RESPONSE API
+            # SELESAI
             # ====================================================
 
             return jsonify({
+
                 "status": True,
+
                 "intent": "masuk",
+
                 "action": "create",
+
                 "nominal": nominal,
-                "keterangan": keterangan
+
+                "keterangan": keterangan,
+
+                "saldo": saldo
+
             })
+
 
         # ========================================================
         # ERROR
@@ -2200,8 +2397,10 @@ def deteksi_pemasukan_nlp(message, data=None):
             print("❌ ERROR PEMASUKAN")
             print("SENDER :", sender)
             print("MESSAGE:", message)
+            print("DATA   :", data)
             print("ERROR  :", repr(e))
             print("========================================")
+
 
             kirim_wa(
                 sender,
@@ -2216,9 +2415,13 @@ def deteksi_pemasukan_nlp(message, data=None):
     💰 menerima transfer 750000"""
             )
 
+
             return jsonify({
+
                 "status": False,
+
                 "error": str(e)
+
             }), 500
 
     # =========================
