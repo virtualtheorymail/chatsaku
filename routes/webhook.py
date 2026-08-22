@@ -1290,6 +1290,10 @@ def deteksi_pemasukan_nlp(message, data=None):
 # DETEKSI REMINDER NLP
 # ============================================================
 
+# ============================================================
+# DETEKSI REMINDER NLP
+# ============================================================
+
 def deteksi_reminder_nlp(message, data=None):
 
     if not message:
@@ -1302,7 +1306,7 @@ def deteksi_reminder_nlp(message, data=None):
         data = {}
 
     # ========================================================
-    # NORMALISASI SPASI
+    # NORMALISASI
     # ========================================================
 
     text_lower = re.sub(
@@ -1317,23 +1321,105 @@ def deteksi_reminder_nlp(message, data=None):
 
     pola_list = [
 
+        # --------------------------------------------
+        # REMINDER LANGSUNG
+        # --------------------------------------------
+
         r'^reminder$',
+        r'^reminders$',
+
         r'^lihat reminder$',
+        r'^lihat reminders$',
+
         r'^cek reminder$',
+        r'^cek reminders$',
+
         r'^daftar reminder$',
+        r'^daftar reminders$',
+
         r'^list reminder$',
+        r'^list reminders$',
+
         r'^lihat semua reminder$',
+        r'^lihat semua reminders$',
+
         r'^cek semua reminder$',
+        r'^cek semua reminders$',
+
+        # --------------------------------------------
+        # REMINDER SAYA
+        # --------------------------------------------
+
         r'^reminder saya$',
+        r'^reminders saya$',
+
         r'^reminder saya apa$',
+        r'^reminder saya apa saja$',
+        r'^reminder saya apa aja$',
+
         r'^apa reminder saya$',
         r'^apa saja reminder saya$',
-        r'^reminder apa saja$'
+        r'^apa aja reminder saya$',
+
+        r'^apa reminder yang saya punya$',
+        r'^apa saja reminder yang saya punya$',
+        r'^apa aja reminder yang saya punya$',
+
+        # --------------------------------------------
+        # SAYA PUNYA REMINDER
+        # --------------------------------------------
+
+        r'^saya punya reminder$',
+        r'^saya punya reminders$',
+
+        r'^saya punya reminder apa$',
+        r'^saya punya reminder apa saja$',
+        r'^saya punya reminder apa aja$',
+
+        r'^saya punya reminders apa$',
+        r'^saya punya reminders apa saja$',
+        r'^saya punya reminders apa aja$',
+
+        # --------------------------------------------
+        # ADA REMINDER
+        # --------------------------------------------
+
+        r'^ada reminder$',
+        r'^ada reminders$',
+
+        r'^ada reminder apa$',
+        r'^ada reminder apa saja$',
+        r'^ada reminder apa aja$',
+
+        r'^ada reminders apa$',
+        r'^ada reminders apa saja$',
+        r'^ada reminders apa aja$',
+
+        # --------------------------------------------
+        # PERINTAH NATURAL
+        # --------------------------------------------
+
+        r'^tampilkan reminder$',
+        r'^tampilkan semua reminder$',
+
+        r'^tunjukkan reminder$',
+        r'^tunjukkan semua reminder$',
+
+        r'^berikan reminder saya$',
+        r'^kasih reminder saya$',
+
+        r'^lihat tagihan saya$',
+        r'^cek tagihan saya$',
+        r'^daftar tagihan saya$',
+
+        r'^tagihan saya apa$',
+        r'^tagihan saya apa saja$',
+        r'^tagihan saya apa aja$'
     ]
 
     for pola in pola_list:
 
-        if re.search(
+        if re.fullmatch(
             pola,
             text_lower,
             re.IGNORECASE
@@ -1348,7 +1434,24 @@ def deteksi_reminder_nlp(message, data=None):
             }
 
     # ========================================================
-    # ACTION: DELETE REMINDER
+    # JIKA NLP UTAMA SUDAH MENGENALI LIST REMINDER
+    # ========================================================
+
+    if (
+        data.get("intent") == "reminder"
+        and data.get("action") == "list"
+    ):
+
+        return {
+            "intent": "reminder",
+            "action": "list",
+            "nama": None,
+            "tanggal": None,
+            "nominal": None
+        }
+
+    # ========================================================
+    # ACTION DELETE
     # ========================================================
 
     pola_delete = [
@@ -1359,7 +1462,7 @@ def deteksi_reminder_nlp(message, data=None):
 
         r'^hapuskan\s+reminder\s+(.+)$',
 
-        r'^hapus reminder tagihan\s+(.+)$'
+        r'^hapus\s+reminder\s+tagihan\s+(.+)$'
     ]
 
     for pola in pola_delete:
@@ -1390,6 +1493,8 @@ def deteksi_reminder_nlp(message, data=None):
 
         r'\breminder\b',
 
+        r'\breminders\b',
+
         r'\bingatkan\b',
 
         r'\bdiingatkan\b',
@@ -1418,41 +1523,12 @@ def deteksi_reminder_nlp(message, data=None):
 
     if not ada_reminder:
 
-        # Jika NLP utama sudah mengenali reminder
         if data.get("intent") != "reminder":
+
             return None
 
     # ========================================================
-    # ACTION DARI NLP UTAMA
-    # ========================================================
-
-    action = data.get(
-        "action"
-    )
-
-    if action in (
-        "list",
-        "delete",
-        "create",
-        "update"
-    ):
-
-        # Jangan langsung return karena kita tetap
-        # perlu ekstrak data dari message.
-        pass
-
-    # ========================================================
     # CARI TANGGAL
-    #
-    # Bentuk:
-    #
-    # tanggal 20
-    # tgl 20
-    # tanggal: 20
-    # jatuh tempo 20
-    # 20
-    #
-    # Reminder menggunakan tanggal hari dalam bulan.
     # ========================================================
 
     tanggal = None
@@ -1491,60 +1567,7 @@ def deteksi_reminder_nlp(message, data=None):
             break
 
     # ========================================================
-    # FALLBACK TANGGAL
-    #
-    # Format lama:
-    #
-    # reminder listrik 20 500000
-    #
-    # Cari angka yang kemungkinan tanggal.
-    # Tetapi jangan mengambil nominal.
-    # ========================================================
-
-    if tanggal is None:
-
-        angka_kecil = re.findall(
-            r'\b\d{1,2}\b',
-            text_lower
-        )
-
-        for angka in angka_kecil:
-
-            try:
-
-                kandidat = int(
-                    angka
-                )
-
-                if 1 <= kandidat <= 31:
-
-                    tanggal = kandidat
-
-                    break
-
-            except Exception:
-
-                pass
-
-    # ========================================================
-    # VALIDASI TANGGAL
-    # ========================================================
-
-    if tanggal is not None:
-
-        if tanggal < 1 or tanggal > 31:
-
-            tanggal = None
-
-    # ========================================================
     # CARI NOMINAL DENGAN SATUAN
-    #
-    # 500 ribu
-    # 500rb
-    # 1 juta
-    # 1,5 juta
-    # 2 jt
-    # 1 miliar
     # ========================================================
 
     nominal = None
@@ -1577,28 +1600,19 @@ def deteksi_reminder_nlp(message, data=None):
                 .lower()
             )
 
-            if satuan in (
-                "ribu",
-                "rb"
-            ):
+            if satuan in ("ribu", "rb"):
 
                 nominal = int(
                     angka_float * 1000
                 )
 
-            elif satuan in (
-                "juta",
-                "jt"
-            ):
+            elif satuan in ("juta", "jt"):
 
                 nominal = int(
                     angka_float * 1000000
                 )
 
-            elif satuan in (
-                "miliar",
-                "milyar"
-            ):
+            elif satuan in ("miliar", "milyar"):
 
                 nominal = int(
                     angka_float * 1000000000
@@ -1613,10 +1627,6 @@ def deteksi_reminder_nlp(message, data=None):
 
     # ========================================================
     # FALLBACK NOMINAL ANGKA BIASA
-    #
-    # 500000
-    # 500.000
-    # Rp 500000
     # ========================================================
 
     if not nominal:
@@ -1633,7 +1643,6 @@ def deteksi_reminder_nlp(message, data=None):
 
             angka_text = angka_text.strip()
 
-            # Hilangkan prefix Rp
             angka_text = re.sub(
                 r'^(rp|idr)\s*',
                 '',
@@ -1641,26 +1650,13 @@ def deteksi_reminder_nlp(message, data=None):
                 flags=re.IGNORECASE
             )
 
-            # Jangan ambil angka tanggal
-            if re.fullmatch(
-                r'\d{1,2}[-/.]\d{1,2}[-/.]\d{4}',
-                angka_text
-            ):
-                continue
-
             try:
 
                 nilai = normalize_nominal(
                     angka_text
                 )
 
-                if nilai and nilai > 0:
-
-                    # Angka 1-31 kemungkinan tanggal,
-                    # bukan nominal
-                    if nilai <= 31:
-
-                        continue
+                if nilai and nilai > 31:
 
                     kandidat_nominal.append(
                         nilai
@@ -1672,82 +1668,78 @@ def deteksi_reminder_nlp(message, data=None):
 
         if kandidat_nominal:
 
-            # Ambil nominal terakhir
             nominal = kandidat_nominal[-1]
 
     # ========================================================
-    # JIKA HANYA "REMINDER"
+    # JIKA HANYA PERINTAH LIST
+    #
+    # Ini penting agar:
+    #
+    # "saya punya reminder apa aja"
+    #
+    # tidak masuk CREATE.
     # ========================================================
 
-    if (
-        action == "list"
-        or text_lower in (
-            "reminder",
-            "lihat reminder",
-            "cek reminder",
-            "daftar reminder",
-            "list reminder"
-        )
-    ):
-
-        return {
-            "intent": "reminder",
-            "action": "list",
-            "nama": None,
-            "tanggal": None,
-            "nominal": None
-        }
-
-    # ========================================================
-    # JIKA DELETE
-    # ========================================================
-
-    if text_lower.startswith(
-        "hapusreminder"
-    ) or re.match(
-        r'^hapus\s+reminder\b',
+    if re.search(
+        r'\b(reminder|reminders)\b',
         text_lower
     ):
 
-        nama = text
+        pola_pertanyaan_list = [
 
-        nama = re.sub(
-            r'^hapusreminder\s*',
-            '',
-            nama,
-            flags=re.IGNORECASE
+            r'\bapa\s+(saja|aja)\b',
+
+            r'\bapa\s+yang\s+saya\s+punya\b',
+
+            r'\byang\s+saya\s+punya\b',
+
+            r'\bsaya\s+punya\b',
+
+            r'\bpunya\s+apa\b',
+
+            r'\bpunya\s+(saja|aja)\b',
+
+            r'\blihat\b',
+
+            r'\bcek\b',
+
+            r'\bdaftar\b',
+
+            r'\blist\b',
+
+            r'\btampilkan\b',
+
+            r'\btunjukkan\b'
+        ]
+
+        ada_pertanyaan_list = any(
+            re.search(
+                pola,
+                text_lower,
+                re.IGNORECASE
+            )
+            for pola in pola_pertanyaan_list
         )
 
-        nama = re.sub(
-            r'^hapus\s+reminder\s*',
-            '',
-            nama,
-            flags=re.IGNORECASE
-        )
+        # Jika tidak ada nominal dan tidak ada tanggal,
+        # dan kalimat bernuansa pertanyaan/list,
+        # maka otomatis LIST.
+        if (
+            ada_pertanyaan_list
+            and not nominal
+            and not tanggal
+        ):
 
-        nama = re.sub(
-            r'^hapuskan\s+reminder\s*',
-            '',
-            nama,
-            flags=re.IGNORECASE
-        )
-
-        nama = re.sub(
-            r'\s+',
-            ' ',
-            nama
-        ).strip()
-
-        return {
-            "intent": "reminder",
-            "action": "delete",
-            "nama": nama or None,
-            "tanggal": None,
-            "nominal": None
-        }
+            return {
+                "intent": "reminder",
+                "action": "list",
+                "nama": None,
+                "tanggal": None,
+                "nominal": None
+            }
 
     # ========================================================
-    # EKSTRAK NAMA REMINDER
+    # EKSTRAK NAMA
     # ========================================================
 
     nama = text
@@ -1783,6 +1775,8 @@ def deteksi_reminder_nlp(message, data=None):
     pola_hapus = [
 
         r'^reminder\s*',
+
+        r'^reminders\s*',
 
         r'^buat\s+reminder\s*',
 
@@ -1857,15 +1851,15 @@ def deteksi_reminder_nlp(message, data=None):
     # ========================================================
 
     nama = re.sub(
-        r'\b(sebesar|dengan|nominal|rp|idr|tanggal|tgl|'
-        r'jatuh tempo|tempo|pada|setiap|bulan)\b',
+        r'\b(sebesar|dengan|nominal|rp|idr|'
+        r'tanggal|tgl|jatuh tempo|tempo|pada|setiap|bulan)\b',
         '',
         nama,
         flags=re.IGNORECASE
     )
 
     # ========================================================
-    # HAPUS ANGKA TANGGAL FALLBACK
+    # HAPUS ANGKA TANGGAL
     # ========================================================
 
     if tanggal is not None:
@@ -1886,16 +1880,12 @@ def deteksi_reminder_nlp(message, data=None):
         nama
     ).strip()
 
-    # Hapus kata sambung di awal/akhir
-    nama = re.sub(
-        r'^(untuk|buat|bayar|membayar)\s+',
-        '',
-        nama,
-        flags=re.IGNORECASE
-    )
+    # ========================================================
+    # BERSIHKAN KATA PEMBUKA
+    # ========================================================
 
     nama = re.sub(
-        r'\s+(sebesar|dengan|pada|tanggal|tgl)$',
+        r'^(untuk|buat|bayar|membayar)\s+',
         '',
         nama,
         flags=re.IGNORECASE
@@ -1904,10 +1894,14 @@ def deteksi_reminder_nlp(message, data=None):
     nama = nama.strip()
 
     # ========================================================
-    # TENTUKAN ACTION
+    # JIKA TIDAK ADA DATA CREATE
     # ========================================================
 
-    if not nama and not tanggal and not nominal:
+    if (
+        not nama
+        and not tanggal
+        and not nominal
+    ):
 
         return {
             "intent": "reminder",
@@ -1918,7 +1912,7 @@ def deteksi_reminder_nlp(message, data=None):
         }
 
     # ========================================================
-    # HASIL
+    # HASIL CREATE
     # ========================================================
 
     return {
