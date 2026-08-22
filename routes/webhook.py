@@ -9687,15 +9687,15 @@ _ChatSaku Finance Assistant_
                 "nama": nama_hutang
             })
 
-        # ========================================================
+        # ============================================================
         # CREATE HUTANG
-        # ========================================================
+        # ============================================================
 
         if action == "create":
 
-            # ====================================================
+            # ========================================================
             # VIEWER TIDAK BOLEH MENAMBAH
-            # ====================================================
+            # ========================================================
 
             if is_viewer(sender):
 
@@ -9703,34 +9703,36 @@ _ChatSaku Finance Assistant_
                     sender,
                     """🔒 *Mode Viewer*
 
-    Anda hanya dapat melihat data hutang.
+        Anda hanya dapat melihat data hutang.
 
-    Penambahan hutang hanya dapat dilakukan oleh Owner."""
+        Penambahan hutang hanya dapat dilakukan oleh Owner."""
                 )
 
                 return jsonify(
                     status=True
                 )
 
-            # ====================================================
+            # ========================================================
             # DATA NLP
-            # ====================================================
+            # ========================================================
 
-            nama = nlp.get(
-                "nama"
-            )
+            nama = nlp.get("nama")
+            nominal = nlp.get("nominal")
+            keterangan = nlp.get("keterangan")
 
-            nominal = nlp.get(
-                "nominal"
-            )
+            print("========================================")
+            print("💳 CREATE HUTANG")
+            print("SENDER      :", sender)
+            print("OWNER       :", nomor_owner)
+            print("MESSAGE     :", message)
+            print("NAMA        :", nama)
+            print("NOMINAL     :", nominal)
+            print("KETERANGAN  :", keterangan)
+            print("========================================")
 
-            keterangan = nlp.get(
-                "keterangan"
-            )
-
-            # ====================================================
+            # ========================================================
             # VALIDASI NAMA
-            # ====================================================
+            # ========================================================
 
             if not nama:
 
@@ -9738,24 +9740,22 @@ _ChatSaku Finance Assistant_
                     sender,
                     """❌ *Nama orang belum ditemukan.*
 
-    Contoh:
+        Contoh:
 
-    *hutang budi 500000*
+        *hutang budi 500000*
 
-    atau:
+        atau:
 
-    *saya hutang ke budi 500 ribu untuk pinjam uang*
-
-    _ChatSaku Finance Assistant_"""
+        *saya hutang ke budi 500 ribu*"""
                 )
 
                 return jsonify(
                     status=True
                 )
 
-            # ====================================================
+            # ========================================================
             # VALIDASI NOMINAL
-            # ====================================================
+            # ========================================================
 
             try:
 
@@ -9763,13 +9763,16 @@ _ChatSaku Finance Assistant_
                     str(nominal)
                 )
 
-            except Exception:
+            except Exception as e:
+
+                print(
+                    "❌ ERROR PARSE NOMINAL HUTANG:",
+                    repr(e)
+                )
 
                 nominal = None
 
             if not nominal or nominal <= 0:
-
-                # fallback langsung dari message
 
                 try:
 
@@ -9777,7 +9780,12 @@ _ChatSaku Finance Assistant_
                         message
                     )
 
-                except Exception:
+                except Exception as e:
+
+                    print(
+                        "❌ ERROR FALLBACK NOMINAL:",
+                        repr(e)
+                    )
 
                     nominal = None
 
@@ -9787,22 +9795,22 @@ _ChatSaku Finance Assistant_
                     sender,
                     """❌ *Nominal hutang belum ditemukan.*
 
-    Contoh:
+        Contoh:
 
-    *hutang budi 500000*
+        *hutang budi 20000*
 
-    *hutang budi 500 ribu*
+        *hutang budi 20 ribu*
 
-    *saya hutang ke budi 1 juta*"""
+        *saya hutang ke budi 500 ribu*"""
                 )
 
                 return jsonify(
                     status=True
                 )
 
-            # ====================================================
+            # ========================================================
             # NORMALISASI NAMA
-            # ====================================================
+            # ========================================================
 
             nama = str(
                 nama
@@ -9814,20 +9822,17 @@ _ChatSaku Finance Assistant_
                 nama
             ).strip()
 
-            if not nama:
+            # Bersihkan "ke" di awal
+            nama = re.sub(
+                r'^ke\s+',
+                '',
+                nama,
+                flags=re.IGNORECASE
+            ).strip()
 
-                kirim_wa(
-                    sender,
-                    "❌ Nama hutang belum ditemukan."
-                )
-
-                return jsonify(
-                    status=True
-                )
-
-            # ====================================================
+            # ========================================================
             # NORMALISASI KETERANGAN
-            # ====================================================
+            # ========================================================
 
             keterangan = (
                 str(keterangan).strip()
@@ -9835,35 +9840,36 @@ _ChatSaku Finance Assistant_
                 else ""
             )
 
-            # ====================================================
-            # CEK DUPLIKAT / UPDATE
-            # ====================================================
+            # ========================================================
+            # VALIDASI AKHIR
+            # ========================================================
 
-            hutang_lama = HutangPiutang.query.filter(
-                HutangPiutang.nomor_wa == nomor_owner,
-                HutangPiutang.tipe == "HUTANG"
-            ).all()
+            if not nama:
 
-            hutang_sama = None
+                kirim_wa(
+                    sender,
+                    """❌ *Nama hutang belum ditemukan.*
 
-            nama_lower = nama.lower()
+        Contoh:
 
-            for item in hutang_lama:
+        *hutang ke ucup 20000*"""
+                )
 
-                if (
-                    str(
-                        item.nama
-                    ).strip().lower()
-                    == nama_lower
-                    and item.status != "LUNAS"
-                ):
+                return jsonify(
+                    status=True
+                )
 
-                    hutang_sama = item
-                    break
+            print("========================================")
+            print("💳 DATA SIAP DISIMPAN")
+            print("NOMOR WA   :", nomor_owner)
+            print("NAMA       :", nama)
+            print("NOMINAL    :", nominal)
+            print("KETERANGAN :", keterangan)
+            print("========================================")
 
-            # ====================================================
-            # BUAT DATA BARU
-            # ====================================================
+            # ========================================================
+            # CREATE DATABASE
+            # ========================================================
 
             try:
 
@@ -9875,7 +9881,7 @@ _ChatSaku Finance Assistant_
 
                     nama=nama,
 
-                    nominal=nominal,
+                    nominal=int(nominal),
 
                     status="AKTIF",
 
@@ -9886,72 +9892,89 @@ _ChatSaku Finance Assistant_
                     hp
                 )
 
+                print("💾 DB SESSION ADD BERHASIL")
+
                 db.session.commit()
+
+                print("✅ COMMIT HUTANG BERHASIL")
 
             except Exception as e:
 
                 db.session.rollback()
 
-                print(
-                    "❌ ERROR CREATE HUTANG:",
-                    repr(e)
-                )
+                print("========================================")
+                print("❌ ERROR CREATE HUTANG")
+                print("ERROR TYPE :", type(e).__name__)
+                print("ERROR      :", repr(e))
+                print("========================================")
+
+                import traceback
+
+                traceback.print_exc()
 
                 kirim_wa(
                     sender,
                     """❌ *Gagal menyimpan hutang.*
 
-    Terjadi kesalahan saat menyimpan data.
+        Terjadi kesalahan saat menyimpan data ke database.
 
-    Silakan coba kembali.
+        Silakan coba kembali.
 
-    _ChatSaku Finance Assistant_"""
+        _ChatSaku Finance Assistant_"""
                 )
 
                 return jsonify(
-                    status=False
+                    status=False,
+                    error=str(e)
                 ), 500
 
-            # ====================================================
+            # ========================================================
             # RESPONSE
-            # ====================================================
+            # ========================================================
 
             kirim_wa(
                 sender,
                 f"""✅ *Hutang Berhasil Dicatat*
 
-    ━━━━━━━━━━━━━━━━━━
+        ━━━━━━━━━━━━━━━━━━
 
-    👤 *Nama*
-    {nama}
+        👤 *Nama*
+        {nama}
 
-    💰 *Nominal*
-    Rp {nominal:,.0f}
+        💰 *Nominal*
+        Rp {nominal:,.0f}
 
-    📝 *Keterangan*
-    {keterangan or "-"}
+        📝 *Keterangan*
+        {keterangan or "-"}
 
-    📌 *Status*
-    ⏳ BELUM LUNAS
+        📌 *Status*
+        ⏳ BELUM LUNAS
 
-    ━━━━━━━━━━━━━━━━━━
+        ━━━━━━━━━━━━━━━━━━
 
-    Ketik:
+        Ketik:
 
-    *hutang*
+        *hutang*
 
-    untuk melihat semua hutang.
+        untuk melihat semua hutang.
 
-    _ChatSaku Finance Assistant_"""
+        _ChatSaku Finance Assistant_"""
             )
 
             return jsonify({
+
                 "status": True,
+
                 "intent": "hutang",
+
                 "action": "create",
+
                 "nama": nama,
+
                 "nominal": nominal,
+
                 "keterangan": keterangan
+
             })
 
         # ========================================================
