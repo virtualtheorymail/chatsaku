@@ -705,7 +705,7 @@ https://www.chatsaku.com
     💬 Cukup kirim transaksi melalui WhatsApp dan biarkan ChatSaku membantu mencatat keuangan Anda.
 
     Contoh:
-    _"Makan siang 25 ribu"_
+    _"menu"_
 
     Selamat menggunakan *ChatSaku*! 💚
 
