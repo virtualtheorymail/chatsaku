@@ -481,94 +481,495 @@ https://www.chatsaku.com
     print(f"DATA   : {nlp}")
     print("========================================")
 
+
+    # ============================================================
+    # NLP FALLBACK TRANSAKSI
+    # ============================================================
+    # Digunakan ketika parse_message() belum mengenali intent.
+    #
+    # Contoh:
+    #
+    # saya dapat sumbangan 3000000
+    # saya dapat gaji 5000000
+    # menerima transfer 750000
+    # dapat bonus 1000000
+    #
+    # akan menjadi:
+    #
+    # intent  = masuk
+    # nominal = 3000000
+    # ============================================================
+
+    if not intent:
+
+        text_lower = (
+            message or ""
+        ).lower().strip()
+
+
+        # ========================================================
+        # POLA PEMASUKAN
+        # ========================================================
+
+        pola_masuk = [
+
+            "saya dapat",
+            "aku dapat",
+            "kami dapat",
+
+            "dapat uang",
+            "dapat duit",
+            "dapat pemasukan",
+
+            "saya menerima",
+            "aku menerima",
+            "kami menerima",
+
+            "menerima uang",
+            "menerima duit",
+
+            "menerima transfer",
+            "terima transfer",
+
+            "dapat transfer",
+            "saya dapat transfer",
+            "aku dapat transfer",
+
+            "diberi uang",
+            "diberi duit",
+
+            "dikasih uang",
+            "dikasih duit",
+
+            "dapat kiriman",
+
+            "uang masuk",
+            "ada uang masuk",
+
+            "gaji",
+            "gajian",
+
+            "bonus",
+
+            "pendapatan",
+            "pemasukan",
+
+            "sumbangan",
+            "donasi",
+
+            "hasil jual",
+            "hasil jualan",
+            "hasil penjualan",
+
+            "hasil usaha",
+            "hasil dagang",
+
+            "hasil kerja",
+            "hasil proyek",
+
+            "dibayar",
+            "sudah dibayar",
+
+            "menerima pembayaran",
+            "pembayaran diterima",
+
+            "bayaran masuk"
+
+        ]
+
+
+        # ========================================================
+        # DETEKSI PEMASUKAN
+        # ========================================================
+
+        terdeteksi_masuk = any(
+            pola in text_lower
+            for pola in pola_masuk
+        )
+
+
+        # ========================================================
+        # JIKA PEMASUKAN
+        # ========================================================
+
+        if terdeteksi_masuk:
+
+            nominal = None
+
+
+            # ====================================================
+            # CARI NOMINAL ANGKA
+            # ====================================================
+
+            angka = re.findall(
+                r'(?:rp\s*)?[\d.,]+',
+                text_lower,
+                re.IGNORECASE
+            )
+
+
+            if angka:
+
+                try:
+
+                    nominal = normalize_nominal(
+                        angka[-1]
+                    )
+
+                except Exception as e:
+
+                    print(
+                        "❌ ERROR NORMALIZE NOMINAL:",
+                        repr(e)
+                    )
+
+                    nominal = None
+
+
+            # ====================================================
+            # DUKUNGAN NOMINAL:
+            #
+            # 3 juta
+            # 3 jt
+            # 500 ribu
+            # 500 rb
+            # 1 miliar
+            # ====================================================
+
+            if not nominal:
+
+                pola_uang = re.search(
+                    r'(\d+(?:[.,]\d+)?)\s*'
+                    r'(juta|jt|ribu|rb|miliar|milyar)',
+                    text_lower,
+                    re.IGNORECASE
+                )
+
+
+                if pola_uang:
+
+                    angka_text = (
+                        pola_uang.group(1)
+                        .replace(",", ".")
+                    )
+
+                    satuan = (
+                        pola_uang.group(2)
+                        .lower()
+                    )
+
+
+                    try:
+
+                        angka_float = float(
+                            angka_text
+                        )
+
+
+                        if satuan in (
+                            "ribu",
+                            "rb"
+                        ):
+
+                            nominal = int(
+                                angka_float * 1000
+                            )
+
+
+                        elif satuan in (
+                            "juta",
+                            "jt"
+                        ):
+
+                            nominal = int(
+                                angka_float * 1000000
+                            )
+
+
+                        elif satuan in (
+                            "miliar",
+                            "milyar"
+                        ):
+
+                            nominal = int(
+                                angka_float * 1000000000
+                            )
+
+
+                    except Exception as e:
+
+                        print(
+                            "❌ ERROR PARSING SATUAN:",
+                            repr(e)
+                        )
+
+                        nominal = None
+
+
+            # ====================================================
+            # JIKA NOMINAL VALID
+            # ====================================================
+
+            if nominal and nominal > 0:
+
+                intent = "masuk"
+
+
+                # =================================================
+                # KETERANGAN
+                # =================================================
+
+                keterangan = message
+
+
+                # =================================================
+                # HAPUS NOMINAL ANGKA DARI AKHIR
+                # =================================================
+
+                keterangan = re.sub(
+                    r'\s+(?:rp\s*)?[\d.,]+\s*$',
+                    '',
+                    keterangan,
+                    flags=re.IGNORECASE
+                ).strip()
+
+
+                # =================================================
+                # HAPUS NOMINAL SATUAN
+                # =================================================
+
+                keterangan = re.sub(
+                    r'\s+\d+(?:[.,]\d+)?\s*'
+                    r'(?:juta|jt|ribu|rb|miliar|milyar)\s*$',
+                    '',
+                    keterangan,
+                    flags=re.IGNORECASE
+                ).strip()
+
+
+                if not keterangan:
+
+                    keterangan = "Pemasukan"
+
+
+                # =================================================
+                # UPDATE NLP RESULT
+                # =================================================
+
+                nlp = {
+
+                    "intent": "masuk",
+
+                    "nominal": nominal,
+
+                    "keterangan": keterangan
+
+                }
+
+
+                print("========================================")
+                print("🤖 NLP FALLBACK")
+                print(f"TEXT       : {message}")
+                print(f"INTENT     : {intent}")
+                print(f"NOMINAL    : {nominal}")
+                print(f"KETERANGAN : {keterangan}")
+                print(f"DATA       : {nlp}")
+                print("========================================")
+
+
+    # ============================================================
+    # MAPPING INTENT → COMMAND
+    # ============================================================
+
     if intent:
+
         if intent == "saldo":
+
             cmd = "saldo"
 
+
         elif intent == "hari_ini":
+
             cmd = "hari ini"
 
+
         elif intent == "dashboard":
+
             cmd = "dashboard"
 
+
         elif intent == "insight":
+
             cmd = "insight"
 
+
         elif intent == "budget":
+
             cmd = "budget"
 
+
         elif intent == "reminder":
+
             cmd = "reminder"
 
+
         elif intent == "hapusreminder":
+
             cmd = "hapusreminder"
 
+
         elif intent == "hutang":
+
             cmd = "hutang"
 
+
         elif intent == "piutang":
+
             cmd = "piutang"
 
+
         elif intent == "bayarhutang":
+
             cmd = "bayarhutang"
 
+
         elif intent == "bayarpiutang":
+
             cmd = "bayarpiutang"
 
+
         elif intent == "target":
+
             cmd = "target"
 
+
         elif intent == "tabung":
+
             cmd = "tabung"
 
+
         elif intent == "help":
+
             cmd = "help"
 
-    # =====================================================
-    # HANYA RESPON COMMAND YANG DIKENAL
-    # =====================================================
+
+        # ========================================================
+        # MASUK
+        # ========================================================
+
+        elif intent == "masuk":
+
+            cmd = "masuk"
+
+
+        # ========================================================
+        # KELUAR
+        # ========================================================
+
+        elif intent == "keluar":
+
+            cmd = "keluar"
+
+
+    # ============================================================
+    # VALID COMMAND
+    # ============================================================
+
     valid_command = (
+
         intent is not None
+
         or
+
         cmd == "saldo"
+
         or cmd == "hari ini"
+
         or cmd == "insight"
+
         or cmd == "dashboard"
+
         or cmd == "viewer"
+
         or cmd == "user"
+
         or cmd.startswith("adduser ")
+
         or cmd.startswith("deluser ")
+
         or cmd.startswith("paket ")
+
         or cmd.startswith("aktif ")
+
         or cmd.startswith("nonaktif ")
+
         or cmd.startswith("share ")
+
         or cmd.startswith("unshare ")
+
         or cmd.startswith("masuk")
+
         or cmd.startswith("keluar")
+
         or cmd.startswith("budget")
+
         or cmd.startswith("reminder")
+
         or cmd.startswith("hapusreminder")
-        or cmd.startswith("halo chatsaku, saya ingin mencoba versi gratis")
+
+        or cmd.startswith(
+            "halo chatsaku, saya ingin mencoba versi gratis"
+        )
+
         or cmd == "menu"
+
         or cmd == "fitur"
+
         or cmd == "help"
+
         or cmd == "target"
+
         or cmd.startswith("target ")
+
         or cmd.startswith("tabung")
+
         or cmd.startswith("hapustarget")
-        or cmd=="hutang"
+
+        or cmd == "hutang"
+
         or cmd.startswith("hutang ")
-        or cmd=="piutang"
+
+        or cmd == "piutang"
+
         or cmd.startswith("piutang ")
+
         or cmd.startswith("bayarhutang")
+
         or cmd.startswith("bayarpiutang")
+
     )
 
+
+    # ============================================================
+    # IGNORE NON COMMAND
+    # HARUS PALING BAWAH
+    # ============================================================
+
     if not valid_command:
-        print("IGNORE NON COMMAND")
+
+        print("========================================")
+        print("🚫 IGNORE NON COMMAND")
+        print(f"MESSAGE : {message}")
+        print(f"INTENT  : {intent}")
+        print(f"DATA    : {nlp}")
+        print("========================================")
+
         return jsonify({
+
             "status": True,
+
             "ignored": True
+
         })
 
     # ======================================
