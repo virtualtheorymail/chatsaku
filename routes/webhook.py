@@ -156,7 +156,7 @@ def deteksi_tabung_nlp(message, data=None):
         data = {}
 
     # ========================================================
-    # NLP UTAMA
+    # JIKA NLP UTAMA SUDAH MENGENALI TABUNG
     # ========================================================
 
     if data.get("intent") == "tabung":
@@ -169,95 +169,173 @@ def deteksi_tabung_nlp(message, data=None):
         }
 
     # ========================================================
-    # DETEKSI
+    # DETEKSI POLA TABUNG
     # ========================================================
 
     pola = [
+
         r'^tabung\s+',
-        r'^menabung\s+',
+
         r'^nabung\s+',
+
+        r'^menabung\s+',
+
+        r'^saya\s+tabung\s+',
+
+        r'^saya\s+nabung\s+',
+
         r'^saya\s+menabung\s+',
+
         r'^saya\s+ingin\s+menabung\s+',
+
         r'^saya\s+mau\s+menabung\s+'
+
     ]
 
     terdeteksi = any(
         re.search(
-            p,
-            text_lower
+            pola_item,
+            text_lower,
+            re.IGNORECASE
         )
-        for p in pola
+        for pola_item in pola
     )
 
     if not terdeteksi:
         return None
 
     # ========================================================
-    # NOMINAL
+    # PENTING
+    #
+    # Kalau ada DEADLINE, jangan dianggap tambah tabungan.
+    #
+    # Contoh:
+    #
+    # saya ingin menabung laptop 30 juta
+    # sampai 20-12-2026
+    #
+    # Ini adalah TARGET.
+    # ========================================================
+
+    deadline_match = re.search(
+        r'\b\d{1,2}[-/.]\d{1,2}[-/.]\d{4}\b',
+        text_lower
+    )
+
+    if deadline_match:
+
+        return None
+
+    # ========================================================
+    # CARI NOMINAL SATUAN
+    #
+    # 500 ribu
+    # 500 rb
+    # 1 juta
+    # 1 jt
+    # 2 miliar
     # ========================================================
 
     nominal = None
 
     pola_uang = re.search(
         r'(\d+(?:[.,]\d+)?)\s*'
-        r'(juta|jt|ribu|rb|miliar|milyar)',
+        r'(juta|jt|ribu|rb|miliar|milyar)\b',
         text_lower,
         re.IGNORECASE
     )
 
     if pola_uang:
 
-        angka = float(
-            pola_uang.group(1).replace(",", ".")
-        )
+        try:
 
-        satuan = pola_uang.group(2).lower()
+            angka = float(
+                pola_uang.group(1).replace(",", ".")
+            )
 
-        if satuan in ("ribu", "rb"):
-            nominal = int(angka * 1000)
+            satuan = (
+                pola_uang.group(2)
+                .lower()
+            )
 
-        elif satuan in ("juta", "jt"):
-            nominal = int(angka * 1000000)
+            if satuan in ("ribu", "rb"):
 
-        elif satuan in ("miliar", "milyar"):
-            nominal = int(angka * 1000000000)
+                nominal = int(
+                    angka * 1000
+                )
+
+            elif satuan in ("juta", "jt"):
+
+                nominal = int(
+                    angka * 1000000
+                )
+
+            elif satuan in ("miliar", "milyar"):
+
+                nominal = int(
+                    angka * 1000000000
+                )
+
+        except Exception as e:
+
+            print(
+                "❌ ERROR PARSE NOMINAL TABUNG:",
+                repr(e)
+            )
+
+            nominal = None
 
     # ========================================================
-    # FALLBACK
+    # FALLBACK NOMINAL ANGKA BIASA
+    #
+    # tabung laptop 500000
+    # tabung laptop 500.000
+    # tabung laptop Rp 500000
     # ========================================================
 
     if not nominal:
 
         angka = re.findall(
             r'(?:rp\s*)?[\d.,]+',
-            text_lower
+            text_lower,
+            re.IGNORECASE
         )
 
-        if angka:
+        for angka_text in reversed(angka):
 
             try:
-                nominal = normalize_nominal(
-                    angka[-1]
+
+                kandidat = normalize_nominal(
+                    angka_text
                 )
-            except:
-                nominal = None
+
+                if kandidat and kandidat > 0:
+
+                    nominal = kandidat
+                    break
+
+            except Exception:
+
+                pass
 
     # ========================================================
-    # NAMA
+    # EKSTRAK NAMA TARGET
     # ========================================================
 
     nama = text
 
-    # hapus nominal satuan
+    # Hapus nominal satuan
+
     nama = re.sub(
         r'\d+(?:[.,]\d+)?\s*'
-        r'(juta|jt|ribu|rb|miliar|milyar)',
+        r'(juta|jt|ribu|rb|miliar|milyar)\b',
         '',
         nama,
         flags=re.IGNORECASE
     )
 
-    # hapus nominal angka
+    # Hapus nominal angka
+
     nama = re.sub(
         r'(?:rp\s*)?[\d.,]+',
         '',
@@ -265,20 +343,38 @@ def deteksi_tabung_nlp(message, data=None):
         flags=re.IGNORECASE
     )
 
-    # hapus kata pembuka
-    nama = re.sub(
-        r'^(tabung|menabung|nabung)\s+',
-        '',
-        nama,
-        flags=re.IGNORECASE
-    )
+    # Hapus pembuka
 
-    nama = re.sub(
-        r'^saya\s+(ingin|mau)\s+menabung\s+',
-        '',
-        nama,
-        flags=re.IGNORECASE
-    )
+    pola_hapus = [
+
+        r'^saya\s+ingin\s+menabung\s+',
+
+        r'^saya\s+mau\s+menabung\s+',
+
+        r'^saya\s+menabung\s+',
+
+        r'^saya\s+nabung\s+',
+
+        r'^saya\s+tabung\s+',
+
+        r'^menabung\s+',
+
+        r'^nabung\s+',
+
+        r'^tabung\s+'
+
+    ]
+
+    for pola_item in pola_hapus:
+
+        nama = re.sub(
+            pola_item,
+            '',
+            nama,
+            flags=re.IGNORECASE
+        )
+
+    # Hapus kata "untuk"
 
     nama = re.sub(
         r'^(untuk|buat)\s+',
@@ -287,11 +383,17 @@ def deteksi_tabung_nlp(message, data=None):
         flags=re.IGNORECASE
     )
 
+    # Rapikan
+
     nama = re.sub(
         r'\s+',
         ' ',
         nama
     ).strip()
+
+    # ========================================================
+    # HASIL
+    # ========================================================
 
     return {
 
@@ -319,6 +421,131 @@ def deteksi_target_nlp(message, data=None):
 
     if data is None:
         data = {}
+
+    # ========================================================
+    # NORMALISASI
+    # ========================================================
+
+    text_lower = re.sub(
+        r'\s+',
+        ' ',
+        text_lower
+    ).strip()
+
+    # ========================================================
+    # ========================================================
+    # ACTION LIST TARGET
+    # ========================================================
+    # Contoh:
+    #
+    # saya punya target apa
+    # saya punya target apa saja
+    # target saya apa
+    # target saya apa saja
+    # apa target saya
+    # list target
+    # daftar target
+    # lihat target
+    # cek target
+    # ========================================================
+
+    pola_list = [
+
+        r'^saya\s+punya\s+target\s+apa\s*$',
+
+        r'^saya\s+punya\s+target\s+apa\s+saja\s*$',
+
+        r'^target\s+saya\s+apa\s*$',
+
+        r'^target\s+saya\s+apa\s+saja\s*$',
+
+        r'^apa\s+target\s+saya\s*$',
+
+        r'^apa\s+saja\s+target\s+saya\s*$',
+
+        r'^list\s+target\s*$',
+
+        r'^daftar\s+target\s*$',
+
+        r'^lihat\s+target\s*$',
+
+        r'^lihat\s+semua\s+target\s*$',
+
+        r'^cek\s+target\s*$',
+
+        r'^cek\s+semua\s+target\s*$',
+
+        r'^target\s+saya\s*$',
+
+        r'^target\s+tabungan\s+saya\s*$',
+
+        r'^tabungan\s+saya\s*$'
+
+    ]
+
+    for pola in pola_list:
+
+        if re.search(
+            pola,
+            text_lower,
+            re.IGNORECASE
+        ):
+
+            return {
+
+                "intent": "target",
+
+                "action": "list",
+
+                "nama": None,
+
+                "nominal": None,
+
+                "deadline": None
+
+            }
+
+    # ========================================================
+    # ACTION DELETE TARGET
+    # ========================================================
+
+    pola_delete = [
+
+        r'^hapus\s+target\s+tabungan\s+(.+)$',
+
+        r'^hapuskan\s+target\s+(.+)$',
+
+        r'^hapus\s+target\s+(.+)$',
+
+        r'^hapustarget\s+(.+)$'
+
+    ]
+
+    for pola in pola_delete:
+
+        match = re.search(
+            pola,
+            text_lower,
+            re.IGNORECASE
+        )
+
+        if match:
+
+            nama = match.group(1).strip()
+
+            return {
+
+                "intent": "target",
+
+                "action": "delete",
+
+                "nama": nama,
+
+                "nominal": None,
+
+                "deadline": None
+
+            }
 
     # ========================================================
     # CARI DEADLINE
@@ -363,21 +590,39 @@ def deteksi_target_nlp(message, data=None):
 
         try:
 
-            angka_text = pola_uang.group(1)
-            satuan = pola_uang.group(2).lower()
+            angka_text = (
+                pola_uang
+                .group(1)
+                .replace(",", ".")
+            )
+
+            satuan = (
+                pola_uang
+                .group(2)
+                .lower()
+            )
 
             angka_float = float(
-                angka_text.replace(",", ".")
+                angka_text
             )
 
             if satuan in ("ribu", "rb"):
-                nominal = int(angka_float * 1000)
+
+                nominal = int(
+                    angka_float * 1000
+                )
 
             elif satuan in ("juta", "jt"):
-                nominal = int(angka_float * 1000000)
+
+                nominal = int(
+                    angka_float * 1000000
+                )
 
             elif satuan in ("miliar", "milyar"):
-                nominal = int(angka_float * 1000000000)
+
+                nominal = int(
+                    angka_float * 1000000000
+                )
 
         except Exception as e:
 
@@ -387,7 +632,7 @@ def deteksi_target_nlp(message, data=None):
             )
 
     # ========================================================
-    # FALLBACK NOMINAL ANGKA BIASA
+    # FALLBACK NOMINAL ANGKA
     # ========================================================
 
     if not nominal:
@@ -401,6 +646,7 @@ def deteksi_target_nlp(message, data=None):
         for angka_text in reversed(angka):
 
             # Jangan ambil tanggal
+
             if re.fullmatch(
                 r'\d{1,2}[-/.]\d{1,2}[-/.]\d{4}',
                 angka_text
@@ -416,37 +662,61 @@ def deteksi_target_nlp(message, data=None):
                 if kandidat and kandidat > 0:
 
                     nominal = kandidat
+
                     break
 
             except Exception:
+
                 pass
 
     # ========================================================
-    # TENTUKAN APAKAH INI TARGET
+    # DETEKSI CREATE TARGET
     # ========================================================
 
     pola_target = [
+
         "target",
+
         "target tabungan",
+
         "target menabung",
+
         "ingin menabung",
+
         "mau menabung",
+
         "saya ingin menabung",
+
         "saya mau menabung",
+
         "ingin punya",
+
         "mau punya",
+
         "ingin beli",
+
         "mau beli",
+
         "saya ingin beli",
+
         "saya mau beli",
+
         "target beli",
+
         "target untuk beli",
+
         "menabung untuk",
+
         "nabung untuk",
+
         "buat target",
+
         "bikin target",
+
         "buatkan target",
+
         "buatkan target tabungan"
+
     ]
 
     ada_kata_target = any(
@@ -454,45 +724,44 @@ def deteksi_target_nlp(message, data=None):
         for pola in pola_target
     )
 
-    # ========================================================
-    # PENTING:
-    #
-    # Kalau ada:
-    # - kata menabung/target
-    # - nominal
-    # - deadline
-    #
-    # maka PASTI target baru.
-    #
-    # Contoh:
-    #
-    # saya ingin menabung laptop 30 juta
-    # sampai 20-12-2026
-    #
-    # walaupun NLP utama mengatakan "tabung",
-    # kita override menjadi "target".
-    # ========================================================
+    # Kalau bukan target, keluar
 
     if not ada_kata_target:
 
         return None
 
-    if nominal and deadline:
+    # ========================================================
+    # CREATE TARGET
+    #
+    # HARUS ADA:
+    #
+    # 1. NOMINAL
+    # 2. DEADLINE
+    #
+    # Contoh:
+    #
+    # saya ingin menabung leptop
+    # 30 juta sampai 20-12-2026
+    # ========================================================
 
-        # ====================================================
-        # EKSTRAK NAMA
-        # ====================================================
+    if nominal and deadline:
 
         nama = text
 
-        # Hapus tanggal
+        # ====================================================
+        # HAPUS TANGGAL
+        # ====================================================
+
         nama = re.sub(
             r'\b\d{1,2}[-/.]\d{1,2}[-/.]\d{4}\b',
             '',
             nama
         )
 
-        # Hapus nominal satuan
+        # ====================================================
+        # HAPUS NOMINAL SATUAN
+        # ====================================================
+
         nama = re.sub(
             r'\b\d+(?:[.,]\d+)?\s*'
             r'(?:juta|jt|ribu|rb|miliar|milyar)\b',
@@ -501,7 +770,10 @@ def deteksi_target_nlp(message, data=None):
             flags=re.IGNORECASE
         )
 
-        # Hapus nominal biasa
+        # ====================================================
+        # HAPUS NOMINAL ANGKA
+        # ====================================================
+
         nama = re.sub(
             r'(?:rp\s*)?[\d.,]+',
             '',
@@ -516,41 +788,63 @@ def deteksi_target_nlp(message, data=None):
         pola_hapus = [
 
             r'^target\s+tabungan\s*',
+
             r'^target\s+menabung\s*',
+
             r'^target\s*',
 
             r'^buatkan\s+target\s+tabungan\s*',
+
             r'^buatkan\s+target\s*',
 
             r'^buat\s+target\s+tabungan\s*',
+
             r'^buat\s+target\s*',
 
             r'^bikin\s+target\s+tabungan\s*',
+
             r'^bikin\s+target\s*',
 
             r'^saya\s+ingin\s+menabung\s+untuk\s*',
+
             r'^saya\s+mau\s+menabung\s+untuk\s*',
 
             r'^saya\s+ingin\s+menabung\s*',
+
             r'^saya\s+mau\s+menabung\s*',
 
+            r'^saya\s+menabung\s+untuk\s*',
+
+            r'^saya\s+menabung\s*',
+
             r'^ingin\s+menabung\s+untuk\s*',
+
             r'^mau\s+menabung\s+untuk\s*',
 
             r'^ingin\s+menabung\s*',
+
             r'^mau\s+menabung\s*',
 
             r'^menabung\s+untuk\s*',
+
+            r'^menabung\s*',
+
             r'^nabung\s+untuk\s*',
 
+            r'^nabung\s*',
+
             r'^saya\s+ingin\s+beli\s*',
+
             r'^saya\s+mau\s+beli\s*',
 
             r'^ingin\s+beli\s*',
+
             r'^mau\s+beli\s*',
 
             r'^target\s+beli\s*',
+
             r'^target\s+untuk\s+beli\s*'
+
         ]
 
         for pola in pola_hapus:
@@ -573,32 +867,88 @@ def deteksi_target_nlp(message, data=None):
             flags=re.IGNORECASE
         )
 
+        # ====================================================
+        # RAPIIKAN
+        # ====================================================
+
         nama = re.sub(
             r'\s+',
             ' ',
             nama
         ).strip()
 
-        if not nama:
-            nama = None
-
         return {
+
             "intent": "target",
+
             "action": "create",
-            "nama": nama,
+
+            "nama": nama or None,
+
             "nominal": nominal,
+
             "deadline": deadline
+
         }
 
     # ========================================================
-    # Kalau tidak ada deadline
+    # DETAIL TARGET
     #
-    # Jangan paksa menjadi target.
-    # Biarkan intent TABUNG menangani:
-    #
-    # tabung laptop 500000
-    # nabung motor 500 ribu
+    # target laptop
+    # detail target laptop
+    # lihat target laptop
     # ========================================================
+
+    pola_detail = [
+
+        r'^detail\s+target\s+(.+)$',
+
+        r'^target\s+detail\s+(.+)$',
+
+        r'^lihat\s+target\s+(.+)$',
+
+        r'^cek\s+target\s+(.+)$',
+
+        r'^target\s+(.+)$'
+
+    ]
+
+    for pola in pola_detail:
+
+        match = re.search(
+            pola,
+            text_lower,
+            re.IGNORECASE
+        )
+
+        if match:
+
+            nama = match.group(1).strip()
+
+            # Jangan jadikan kata-kata umum sebagai detail
+
+            if nama in (
+                "saya",
+                "saya apa",
+                "saya apa saja",
+                "tabungan saya"
+            ):
+
+                continue
+
+            return {
+
+                "intent": "target",
+
+                "action": "detail",
+
+                "nama": nama,
+
+                "nominal": None,
+
+                "deadline": None
+
+            }
 
     return None
 # ============================================================
@@ -2222,7 +2572,25 @@ https://www.chatsaku.com
         return jsonify(status=True)
 
     # ============================================================
-    # NORMALISASI INTENT TARGET
+    # ============================================================
+    # NORMALISASI TARGET & TABUNG
+    # ============================================================
+    # Urutan sangat penting:
+    #
+    # 1. TARGET detector
+    # 2. TABUNG detector
+    #
+    # Karena:
+    #
+    # "saya ingin menabung laptop 30 juta sampai 20-12-2026"
+    #
+    # harus TARGET.
+    #
+    # Sedangkan:
+    #
+    # "tabung laptop 500000"
+    #
+    # harus TABUNG.
     # ============================================================
 
     target_nlp = deteksi_target_nlp(
@@ -2230,45 +2598,98 @@ https://www.chatsaku.com
         nlp
     )
 
+    tabung_nlp = deteksi_tabung_nlp(
+        message,
+        nlp
+    )
+
     print("========================================")
-    print("🎯 DETEKSI TARGET NLP")
-    print("MESSAGE :", message)
-    print("RESULT  :", target_nlp)
+    print("🎯 TARGET NLP :", target_nlp)
+    print("💰 TABUNG NLP :", tabung_nlp)
     print("========================================")
+
+
+    # ============================================================
+    # PRIORITAS TARGET
+    # ============================================================
 
     if target_nlp:
 
-        # Jika ada deadline, ini adalah PEMBUATAN TARGET
-        if target_nlp.get("deadline"):
+        action = target_nlp.get("action")
 
-            intent = "target"
+        print("🎯 TARGET ACTION :", action)
 
-            nlp["intent"] = "target"
-            nlp["action"] = "create"
-            nlp["nama"] = target_nlp.get("nama")
-            nlp["nominal"] = target_nlp.get("nominal")
-            nlp["deadline"] = target_nlp.get("deadline")
+        # ========================================================
+        # NORMALISASI DATA
+        # ========================================================
 
-            print("🎯 INTENT DIUBAH MENJADI TARGET")
+        intent = "target"
 
-        else:
+        nlp["intent"] = "target"
+        nlp["action"] = action
 
-            # Tidak ada deadline → jangan ubah
-            # tetap mengikuti intent NLP utama
-            print("💰 BUKAN TARGET, LANJUT KE INTENT:", intent)
+        nlp["nama"] = target_nlp.get("nama")
+        nlp["nominal"] = target_nlp.get("nominal")
+        nlp["deadline"] = target_nlp.get("deadline")
+
 
     # ============================================================
-    # TARGET / BUAT TARGET TABUNGAN
-    # NLP INTENT = target
+    # JIKA BUKAN TARGET
+    # MAKA CEK TABUNG
+    # ============================================================
+
+    elif tabung_nlp:
+
+        intent = "tabung"
+
+        nlp["intent"] = "tabung"
+        nlp["action"] = "add"
+
+        nlp["nama"] = tabung_nlp.get("nama")
+        nlp["nominal"] = tabung_nlp.get("nominal")
+
+        print("💰 INTENT TABUNG TERDETEKSI")
+
+
+    # ============================================================
+    # DEBUG AKHIR
+    # ============================================================
+
+    print("========================================")
+    print("🧠 INTENT FINAL")
+    print("MESSAGE :", message)
+    print("INTENT  :", intent)
+    print("ACTION  :", nlp.get("action"))
+    print("NAMA    :", nlp.get("nama"))
+    print("NOMINAL :", nlp.get("nominal"))
+    print("DEADLINE:", nlp.get("deadline"))
+    print("========================================")
+
+
+    # ============================================================
+    # ============================================================
+    # TARGET HANDLER
+    # ============================================================
+    # Action:
+    #
+    # list
+    # detail
+    # delete
+    # create
     # ============================================================
 
     if intent == "target":
+
+        action = nlp.get("action")
 
         # ========================================================
         # CEK FITUR
         # ========================================================
 
-        if not has_feature(sender, "target"):
+        if not has_feature(
+            sender,
+            "target"
+        ):
 
             kirim_wa(
                 sender,
@@ -2288,127 +2709,536 @@ https://www.chatsaku.com
     _ChatSaku Finance Assistant_"""
             )
 
-            return jsonify(status=True)
+            return jsonify(
+                status=True
+            )
 
         # ========================================================
-        # AMBIL DATA NLP
+        # OWNER
         # ========================================================
 
-        nama = nlp.get("nama")
-        nominal = nlp.get("nominal")
-        deadline = nlp.get("deadline")
-
-        print("========================================")
-        print("🎯 PROSES TARGET NLP")
-        print("SENDER   :", sender)
-        print("MESSAGE  :", message)
-        print("INTENT   :", intent)
-        print("NAMA     :", nama)
-        print("NOMINAL  :", nominal)
-        print("DEADLINE :", deadline)
-        print("========================================")
+        nomor_owner = get_owner_number(
+            sender
+        )
 
         # ========================================================
-        # VALIDASI NAMA
+        # ========================================================
+        # ACTION LIST
+        # ========================================================
+        # Contoh:
+        #
+        # saya punya target apa
+        # target saya apa
+        # list target
         # ========================================================
 
-        if not nama:
+        if action == "list":
+
+            data_target = TargetPembelian.query.filter_by(
+                nomor_wa=nomor_owner,
+                aktif=True
+            ).all()
+
+            # ====================================================
+            # BELUM ADA TARGET
+            # ====================================================
+
+            if not data_target:
+
+                kirim_wa(
+                    sender,
+                    """🎯 *Target Tabungan*
+
+    Belum ada target tabungan.
+
+    Contoh membuat target:
+
+    *Saya ingin menabung laptop 30 juta sampai 20-12-2026*
+
+    _ChatSaku Finance Assistant_"""
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+            # ====================================================
+            # RESPONSE
+            # ====================================================
+
+            text = "🎯 *TARGET TABUNGAN*\n\n"
+
+            if nomor_owner != sender:
+
+                text += (
+                    "👁 *Mode Viewer "
+                    "(Data Owner)*\n\n"
+                )
+
+            for i, item in enumerate(
+                data_target,
+                1
+            ):
+
+                terkumpul = (
+                    item.terkumpul or 0
+                )
+
+                target_nominal = (
+                    item.target or 0
+                )
+
+                persen = 0
+
+                if target_nominal > 0:
+
+                    persen = round(
+                        (
+                            terkumpul /
+                            target_nominal
+                        ) * 100
+                    )
+
+                persen = min(
+                    persen,
+                    100
+                )
+
+                sisa = max(
+                    target_nominal -
+                    terkumpul,
+                    0
+                )
+
+                deadline_text = "-"
+
+                if item.deadline:
+
+                    deadline_text = (
+                        item.deadline
+                        .strftime("%d-%m-%Y")
+                    )
+
+                text += f"""
+    *{i}. {item.nama}*
+
+    🎯 Target
+    Rp {target_nominal:,.0f}
+
+    💰 Terkumpul
+    Rp {terkumpul:,.0f}
+
+    💵 Sisa
+    Rp {sisa:,.0f}
+
+    📊 Progress
+    {persen}%
+
+    📅 Deadline
+    {deadline_text}
+
+    """
+
+            text += (
+                "\n_ChatSaku Finance Assistant_"
+            )
 
             kirim_wa(
                 sender,
-                """❌ *Nama target belum ditemukan.*
+                text
+            )
+
+            return jsonify(
+                status=True,
+                intent="target",
+                action="list"
+            )
+
+        # ========================================================
+        # ========================================================
+        # ACTION DETAIL
+        # ========================================================
+        # Contoh:
+        #
+        # target laptop
+        # detail target laptop
+        # cek target laptop
+        # ========================================================
+
+        if action == "detail":
+
+            nama = (
+                nlp.get("nama") or ""
+            ).strip()
+
+            if not nama:
+
+                kirim_wa(
+                    sender,
+                    """❌ *Nama target belum ditemukan.*
 
     Contoh:
 
-    🎯 saya ingin menabung laptop 30 juta sampai 20-12-2026
+    *target laptop*
 
-    _ChatSaku Finance Assistant_"""
+    *detail target laptop*"""
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+            target = TargetPembelian.query.filter_by(
+                nomor_wa=nomor_owner,
+                nama=nama,
+                aktif=True
+            ).first()
+
+            # ====================================================
+            # Coba pencarian case-insensitive
+            # ====================================================
+
+            if not target:
+
+                target = TargetPembelian.query.filter(
+                    TargetPembelian.nomor_wa == nomor_owner,
+                    TargetPembelian.nama.ilike(nama),
+                    TargetPembelian.aktif == True
+                ).first()
+
+            # ====================================================
+            # TIDAK DITEMUKAN
+            # ====================================================
+
+            if not target:
+
+                kirim_wa(
+                    sender,
+                    f"""❌ *Target tidak ditemukan.*
+
+    🎯 Target:
+    *{nama}*
+
+    Gunakan:
+
+    *target*
+
+    untuk melihat semua target."""
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+            # ====================================================
+            # HITUNG
+            # ====================================================
+
+            terkumpul = (
+                target.terkumpul or 0
             )
 
-            return jsonify(status=True)
+            target_nominal = (
+                target.target or 0
+            )
 
-        # ========================================================
-        # VALIDASI NOMINAL
-        # ========================================================
+            persen = 0
 
-        try:
+            if target_nominal > 0:
 
-            nominal = int(float(nominal or 0))
+                persen = round(
+                    (
+                        terkumpul /
+                        target_nominal
+                    ) * 100
+                )
 
-        except (
-            ValueError,
-            TypeError
-        ):
+            persen = min(
+                persen,
+                100
+            )
 
-            nominal = 0
+            sisa = max(
+                target_nominal -
+                terkumpul,
+                0
+            )
 
-        if nominal <= 0:
+            deadline_text = "-"
+
+            if target.deadline:
+
+                deadline_text = (
+                    target.deadline
+                    .strftime("%d-%m-%Y")
+                )
+
+            viewer_info = ""
+
+            if nomor_owner != sender:
+
+                viewer_info = (
+                    "\n👁 *Mode Viewer "
+                    "(Data Owner)*\n"
+                )
+
+            # ====================================================
+            # RESPONSE
+            # ====================================================
 
             kirim_wa(
                 sender,
-                """❌ *Nominal target belum ditemukan.*
+                f"""🎯 *DETAIL TARGET*
 
-    Contoh:
+    ━━━━━━━━━━━━━━━━━━
 
-    🎯 saya ingin menabung laptop 30 juta sampai 20-12-2026
+    🎯 *Nama*
+    {target.nama}
 
+    💰 *Target*
+    Rp {target_nominal:,.0f}
+
+    💵 *Terkumpul*
+    Rp {terkumpul:,.0f}
+
+    💸 *Sisa*
+    Rp {sisa:,.0f}
+
+    📊 *Progress*
+    {persen}%
+
+    📅 *Deadline*
+    {deadline_text}
+
+    ━━━━━━━━━━━━━━━━━━
+    {viewer_info}
     _ChatSaku Finance Assistant_"""
             )
 
-            return jsonify(status=True)
+            return jsonify(
+                status=True,
+                intent="target",
+                action="detail",
+                nama=target.nama
+            )
 
         # ========================================================
-        # VALIDASI DEADLINE
+        # ========================================================
+        # ACTION DELETE
         # ========================================================
 
-        if isinstance(deadline, str):
+        if action == "delete":
+
+            nama = (
+                nlp.get("nama") or ""
+            ).strip()
+
+            if not nama:
+
+                kirim_wa(
+                    sender,
+                    """❌ *Nama target belum ditemukan.*
+
+    Contoh:
+
+    *hapus target laptop*"""
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+            target = TargetPembelian.query.filter_by(
+                nomor_wa=nomor_owner,
+                nama=nama,
+                aktif=True
+            ).first()
+
+            if not target:
+
+                target = TargetPembelian.query.filter(
+                    TargetPembelian.nomor_wa == nomor_owner,
+                    TargetPembelian.nama.ilike(nama),
+                    TargetPembelian.aktif == True
+                ).first()
+
+            if not target:
+
+                kirim_wa(
+                    sender,
+                    f"""❌ *Target tidak ditemukan.*
+
+    🎯 Target:
+    *{nama}*"""
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+            # ====================================================
+            # SOFT DELETE
+            # ====================================================
+
+            target.aktif = False
+
+            db.session.commit()
+
+            kirim_wa(
+                sender,
+                f"""🗑️ *Target Berhasil Dihapus*
+
+    🎯 Target:
+    *{target.nama}*
+
+    Target sudah tidak aktif."""
+            )
+
+            return jsonify(
+                status=True,
+                intent="target",
+                action="delete",
+                nama=target.nama
+            )
+
+        # ========================================================
+        # ========================================================
+        # ACTION CREATE
+        # ========================================================
+
+        if action == "create":
+
+            nama = nlp.get(
+                "nama"
+            )
+
+            nominal = nlp.get(
+                "nominal"
+            )
+
+            deadline = nlp.get(
+                "deadline"
+            )
+
+            print("========================================")
+            print("🎯 PROSES CREATE TARGET")
+            print("NAMA     :", nama)
+            print("NOMINAL  :", nominal)
+            print("DEADLINE :", deadline)
+            print("========================================")
+
+            # ====================================================
+            # VALIDASI NAMA
+            # ====================================================
+
+            if not nama:
+
+                kirim_wa(
+                    sender,
+                    """❌ *Nama target belum ditemukan.*
+
+    Contoh:
+
+    🎯 *Saya ingin menabung laptop 30 juta sampai 20-12-2026*
+
+    _ChatSaku Finance Assistant_"""
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+            # ====================================================
+            # VALIDASI NOMINAL
+            # ====================================================
 
             try:
 
-                deadline = datetime.strptime(
-                    deadline,
-                    "%d-%m-%Y"
-                ).date()
+                nominal = int(
+                    float(
+                        nominal or 0
+                    )
+                )
 
-            except ValueError:
+            except (
+                ValueError,
+                TypeError
+            ):
+
+                nominal = 0
+
+            if nominal <= 0:
+
+                kirim_wa(
+                    sender,
+                    """❌ *Nominal target belum ditemukan.*
+
+    Contoh:
+
+    🎯 *Saya ingin menabung laptop 30 juta sampai 20-12-2026*"""
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+            # ====================================================
+            # VALIDASI DEADLINE
+            # ====================================================
+
+            if isinstance(
+                deadline,
+                str
+            ):
 
                 try:
 
                     deadline = datetime.strptime(
                         deadline,
-                        "%Y-%m-%d"
+                        "%d-%m-%Y"
                     ).date()
 
                 except ValueError:
 
-                    deadline = None
+                    try:
 
-        if not deadline:
+                        deadline = datetime.strptime(
+                            deadline,
+                            "%Y-%m-%d"
+                        ).date()
 
-            kirim_wa(
-                sender,
-                """❌ *Deadline target belum ditemukan.*
+                    except ValueError:
+
+                        deadline = None
+
+            if not deadline:
+
+                kirim_wa(
+                    sender,
+                    """❌ *Deadline target belum ditemukan.*
 
     Contoh:
 
-    🎯 saya ingin menabung laptop 30 juta sampai 20-12-2026
+    🎯 *Saya ingin menabung laptop 30 juta sampai 20-12-2026*
 
     Gunakan format:
 
     *DD-MM-YYYY*"""
-            )
+                )
 
-            return jsonify(status=True)
+                return jsonify(
+                    status=True
+                )
 
-        # ========================================================
-        # VALIDASI DEADLINE
-        # ========================================================
+            # ====================================================
+            # DEADLINE HARUS MASA DEPAN
+            # ====================================================
 
-        if deadline < date.today():
+            if deadline < date.today():
 
-            kirim_wa(
-                sender,
-                f"""❌ *Deadline tidak valid.*
+                kirim_wa(
+                    sender,
+                    f"""❌ *Deadline tidak valid.*
 
     Tanggal:
 
@@ -2416,99 +3246,138 @@ https://www.chatsaku.com
 
     sudah lewat.
 
-    Silakan gunakan tanggal target yang akan datang."""
+    Silakan gunakan tanggal yang akan datang."""
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+            # ====================================================
+            # NORMALISASI NAMA
+            # ====================================================
+
+            nama = str(
+                nama
+            ).strip()
+
+            # ====================================================
+            # OWNER
+            # ====================================================
+
+            nomor_owner = get_owner_number(
+                sender
             )
 
-            return jsonify(status=True)
+            # ====================================================
+            # CEK DUPLIKAT
+            # ====================================================
 
-        # ========================================================
-        # NORMALISASI NAMA
-        # ========================================================
+            cek = TargetPembelian.query.filter_by(
+                nomor_wa=nomor_owner,
+                nama=nama,
+                aktif=True
+            ).first()
 
-        nama = str(nama).strip()
+            if not cek:
 
-        # ========================================================
-        # OWNER
-        # ========================================================
+                cek = TargetPembelian.query.filter(
+                    TargetPembelian.nomor_wa == nomor_owner,
+                    TargetPembelian.nama.ilike(nama),
+                    TargetPembelian.aktif == True
+                ).first()
 
-        nomor_owner = get_owner_number(sender)
+            if cek:
 
-        # ========================================================
-        # CEK TARGET
-        # ========================================================
+                deadline_lama = "-"
 
-        cek = TargetPembelian.query.filter_by(
-            nomor_wa=nomor_owner,
-            nama=nama,
-            aktif=True
-        ).first()
+                if cek.deadline:
 
-        if cek:
+                    deadline_lama = (
+                        cek.deadline
+                        .strftime("%d-%m-%Y")
+                    )
 
-            kirim_wa(
-                sender,
-                f"""⚠️ *Target tersebut sudah ada.*
+                kirim_wa(
+                    sender,
+                    f"""⚠️ *Target tersebut sudah ada.*
 
-    🎯 Nama
-    {nama}
+    🎯 *Nama*
+    {cek.nama}
 
-    💰 Target
+    💰 *Target*
     Rp {cek.target:,.0f}
 
-    📅 Deadline
-    {cek.deadline.strftime("%d-%m-%Y")}
-
-    💵 Terkumpul
+    💵 *Terkumpul*
     Rp {(cek.terkumpul or 0):,.0f}
+
+    📅 *Deadline*
+    {deadline_lama}
 
     Silakan gunakan nama target lain.
 
     _ChatSaku Finance Assistant_"""
-            )
+                )
 
-            return jsonify(status=True)
+                return jsonify(
+                    status=True
+                )
 
-        # ========================================================
-        # BUAT TARGET
-        # ========================================================
+            # ====================================================
+            # CREATE
+            # ====================================================
 
-        try:
+            try:
 
-            target = TargetPembelian(
-                nomor_wa=nomor_owner,
-                nama=nama,
-                target=nominal,
-                deadline=deadline,
-                terkumpul=0,
-                aktif=True
-            )
+                target = TargetPembelian(
 
-            db.session.add(target)
-            db.session.commit()
+                    nomor_wa=nomor_owner,
 
-        except Exception as e:
+                    nama=nama,
 
-            db.session.rollback()
+                    target=nominal,
 
-            print(
-                "❌ ERROR CREATE TARGET:",
-                repr(e)
-            )
+                    deadline=deadline,
+
+                    terkumpul=0,
+
+                    aktif=True
+
+                )
+
+                db.session.add(
+                    target
+                )
+
+                db.session.commit()
+
+            except Exception as e:
+
+                db.session.rollback()
+
+                print(
+                    "❌ ERROR CREATE TARGET:",
+                    repr(e)
+                )
+
+                kirim_wa(
+                    sender,
+                    """❌ *Gagal membuat target.*
+
+    Silakan coba kembali beberapa saat lagi."""
+                )
+
+                return jsonify(
+                    status=False
+                ), 500
+
+            # ====================================================
+            # RESPONSE
+            # ====================================================
 
             kirim_wa(
                 sender,
-                "❌ Gagal membuat target. Silakan coba kembali."
-            )
-
-            return jsonify(status=False), 500
-
-        # ========================================================
-        # RESPONSE
-        # ========================================================
-
-        kirim_wa(
-            sender,
-            f"""🎯 *Target Berhasil Dibuat*
+                f"""🎯 *Target Berhasil Dibuat*
 
     ━━━━━━━━━━━━━━━━━━
 
@@ -2536,26 +3405,71 @@ https://www.chatsaku.com
     *tabung {nama} 500000*
 
     _ChatSaku Finance Assistant_"""
-        )
+            )
 
-        return jsonify({
-            "status": True,
-            "intent": "target",
-            "action": "create",
-            "nama": nama,
-            "nominal": nominal,
-            "deadline": deadline.strftime("%d-%m-%Y")
-        })
+            return jsonify({
+
+                "status": True,
+
+                "intent": "target",
+
+                "action": "create",
+
+                "nama": nama,
+
+                "nominal": nominal,
+
+                "deadline": deadline.strftime(
+                    "%d-%m-%Y"
+                )
+
+            })
+
+        # ========================================================
+        # TARGET ACTION TIDAK DIKENALI
+        # ========================================================
+
+        return jsonify(
+            status=True
+        )
 
 
     # ============================================================
-    # TAMBAH TABUNGAN KE TARGET
-    # NLP INTENT = tabung
+    # ============================================================
+    # TAMBAH TABUNGAN
+    # ============================================================
+    # HANYA:
+    #
+    # intent = tabung
+    # action = add
+    #
+    # Contoh:
+    #
+    # tabung laptop 500000
+    # tabung laptop 500 ribu
+    # nabung motor 1 juta
     # ============================================================
 
     if intent == "tabung":
 
-        if not has_feature(sender, "tabung"):
+        action = nlp.get(
+            "action"
+        )
+
+        if action != "add":
+
+            return jsonify(
+                status=True
+            )
+
+        # ========================================================
+        # CEK FITUR
+        # ========================================================
+
+        if not has_feature(
+            sender,
+            "tabung"
+        ):
 
             kirim_wa(
                 sender,
@@ -2570,20 +3484,29 @@ https://www.chatsaku.com
     ✅ AI Insight
     ✅ Dashboard Lengkap
 
-    🌐 www.chatsaku.com"""
+    🌐 www.chatsaku.com
+
+    _ChatSaku Finance Assistant_"""
             )
 
-            return jsonify(status=True)
+            return jsonify(
+                status=True
+            )
 
         # ========================================================
         # DATA NLP
         # ========================================================
 
-        nama = nlp.get("nama")
-        nominal = nlp.get("nominal")
+        nama = nlp.get(
+            "nama"
+        )
+
+        nominal = nlp.get(
+            "nominal"
+        )
 
         print("========================================")
-        print("💰 PROSES TAMBAH TABUNGAN NLP")
+        print("💰 PROSES TAMBAH TABUNGAN")
         print("SENDER  :", sender)
         print("MESSAGE :", message)
         print("NAMA    :", nama)
@@ -2591,12 +3514,8 @@ https://www.chatsaku.com
         print("========================================")
 
         # ========================================================
-        # FALLBACK DARI deteksi_target_nlp
+        # VALIDASI NAMA
         # ========================================================
-
-        if not nama:
-
-            nama = nlp.get("keterangan")
 
         if not nama:
 
@@ -2611,19 +3530,44 @@ https://www.chatsaku.com
     *tabung motor 500 ribu*"""
             )
 
-            return jsonify(status=True)
+            return jsonify(
+                status=True
+            )
 
         # ========================================================
-        # NOMINAL
+        # NORMALISASI NOMINAL
         # ========================================================
 
         try:
 
-            nominal = normalize_nominal(nominal)
+            # Kalau nominal sudah angka
+            if isinstance(
+                nominal,
+                (int, float)
+            ):
 
-        except Exception:
+                nominal = int(
+                    nominal
+                )
+
+            else:
+
+                nominal = normalize_nominal(
+                    nominal
+                )
+
+        except Exception as e:
+
+            print(
+                "❌ ERROR NORMALIZE TABUNG:",
+                repr(e)
+            )
 
             nominal = None
+
+        # ========================================================
+        # VALIDASI NOMINAL
+        # ========================================================
 
         if not nominal or nominal <= 0:
 
@@ -2635,20 +3579,22 @@ https://www.chatsaku.com
 
     *tabung laptop 500000*
 
-    *tabung laptop 500 ribu*"""
+    *tabung laptop 500 ribu*
+
+    *tabung motor 1 juta*"""
             )
 
-            return jsonify(status=True)
+            return jsonify(
+                status=True
+            )
 
         # ========================================================
         # BERSIHKAN NAMA
         # ========================================================
 
-        nama = str(nama).strip()
-
-        # Kalau NLP memberikan:
-        # "saya tabung laptop"
-        # bersihkan kata kerja
+        nama = str(
+            nama
+        ).strip()
 
         nama = re.sub(
             r'^(saya|aku|kami)\s+',
@@ -2677,13 +3623,17 @@ https://www.chatsaku.com
                 "❌ Nama target tabungan belum diisi."
             )
 
-            return jsonify(status=True)
+            return jsonify(
+                status=True
+            )
 
         # ========================================================
         # OWNER
         # ========================================================
 
-        nomor_owner = get_owner_number(sender)
+        nomor_owner = get_owner_number(
+            sender
+        )
 
         # ========================================================
         # CARI TARGET
@@ -2694,6 +3644,22 @@ https://www.chatsaku.com
             nama=nama,
             aktif=True
         ).first()
+
+        # ========================================================
+        # CASE INSENSITIVE
+        # ========================================================
+
+        if not target:
+
+            target = TargetPembelian.query.filter(
+                TargetPembelian.nomor_wa == nomor_owner,
+                TargetPembelian.nama.ilike(nama),
+                TargetPembelian.aktif == True
+            ).first()
+
+        # ========================================================
+        # TARGET TIDAK ADA
+        # ========================================================
 
         if not target:
 
@@ -2706,38 +3672,89 @@ https://www.chatsaku.com
 
     Pastikan nama target sesuai dengan yang sudah dibuat.
 
-    Contoh:
+    Gunakan:
 
-    *tabung laptop 500000*"""
+    *target*
+
+    untuk melihat daftar target."""
             )
 
-            return jsonify(status=True)
+            return jsonify(
+                status=True
+            )
+
+        # ========================================================
+        # VALIDASI TARGET
+        # ========================================================
+
+        if not target.target or target.target <= 0:
+
+            kirim_wa(
+                sender,
+                "❌ Target tabungan tidak valid."
+            )
+
+            return jsonify(
+                status=True
+            )
 
         # ========================================================
         # TAMBAH TABUNGAN
         # ========================================================
 
-        target.terkumpul = (
-            target.terkumpul or 0
-        ) + nominal
+        try:
 
-        db.session.commit()
+            target.terkumpul = (
+                target.terkumpul or 0
+            ) + nominal
+
+            db.session.commit()
+
+        except Exception as e:
+
+            db.session.rollback()
+
+            print(
+                "❌ ERROR TAMBAH TABUNGAN:",
+                repr(e)
+            )
+
+            kirim_wa(
+                sender,
+                "❌ Gagal menambahkan tabungan."
+            )
+
+            return jsonify(
+                status=False
+            ), 500
 
         # ========================================================
         # HITUNG PROGRESS
         # ========================================================
 
-        persen = round(
-            (
-                target.terkumpul /
-                target.target
-            ) * 100
-        ) if target.target else 0
+        persen = 0
 
-        persen = min(persen, 100)
+        if target.target:
+
+            persen = round(
+                (
+                    target.terkumpul /
+                    target.target
+                ) * 100
+            )
+
+        persen = min(
+            persen,
+            100
+        )
+
+        # ========================================================
+        # HITUNG SISA
+        # ========================================================
 
         sisa = max(
-            target.target - target.terkumpul,
+            target.target -
+            target.terkumpul,
             0
         )
 
@@ -2749,22 +3766,26 @@ https://www.chatsaku.com
             sender,
             f"""💚 *Tabungan Berhasil*
 
+    ━━━━━━━━━━━━━━━━━━
+
     🎯 *{target.nama}*
 
-    ➕ Ditabung
+    ➕ *Ditabung*
     Rp {nominal:,.0f}
 
-    💰 Terkumpul
+    💰 *Terkumpul*
     Rp {target.terkumpul:,.0f}
 
-    🎯 Target
+    🎯 *Target*
     Rp {target.target:,.0f}
 
-    📊 Progress
+    📊 *Progress*
     {persen}%
 
-    💵 Sisa
+    💵 *Sisa*
     Rp {sisa:,.0f}
+
+    ━━━━━━━━━━━━━━━━━━
 
     Semangat terus menabung! 🚀
 
@@ -2772,16 +3793,24 @@ https://www.chatsaku.com
         )
 
         return jsonify({
-            "status": True,
-            "intent": "tabung",
-            "action": "add",
-            "nama": target.nama,
-            "nominal": nominal,
-            "terkumpul": target.terkumpul,
-            "target": target.target,
-            "progress": persen
-        })
 
+            "status": True,
+
+            "intent": "tabung",
+
+            "action": "add",
+
+            "nama": target.nama,
+
+            "nominal": nominal,
+
+            "terkumpul": target.terkumpul,
+
+            "target": target.target,
+
+            "progress": persen
+
+        })
     # # ============================================================
     # # TARGET TABUNGAN - NLP ROUTER
     # # ============================================================
