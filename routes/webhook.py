@@ -609,7 +609,10 @@ https://www.chatsaku.com
         try:
             lama = int(args[4])
         except:
-            kirim_wa(sender, "Durasi harus berupa angka (hari).")
+            kirim_wa(
+                sender,
+                "Durasi harus berupa angka (hari)."
+            )
             return jsonify(status=True)
 
         cek = User.query.filter_by(
@@ -625,47 +628,88 @@ https://www.chatsaku.com
 
             return jsonify(status=True)
 
+        # ==========================
+        # HITUNG PERIODE LANGGANAN
+        # ==========================
+
         mulai = date.today()
+
         akhir = mulai + timedelta(days=lama)
 
+        # ==========================
+        # BUAT USER
+        # ==========================
+
         user = User(
-
             nama=nama,
-
             nomor_wa=nomor,
-
             paket=paket,
-
             aktif=True,
-
             mulai_langganan=mulai,
-
             akhir_langganan=akhir
-
         )
 
         db.session.add(user)
-
         db.session.commit()
+
+        # ==========================
+        # PESAN KE ADMIN
+        # ==========================
 
         kirim_wa(
             sender,
             f"""✅ *User Berhasil Ditambahkan*
 
-    👤 Nama
+    👤 *Nama*
     {nama}
 
-    📱 Nomor
+    📱 *Nomor*
     {nomor}
 
-    🎁 Paket
+    🎁 *Paket*
     {paket}
 
-    📅 Mulai
+    ⏳ *Durasi*
+    {lama} Hari
+
+    📅 *Mulai*
     {mulai.strftime('%d-%m-%Y')}
 
-    📅 Berakhir
+    📅 *Berakhir*
     {akhir.strftime('%d-%m-%Y')}
+
+    🚀 User sudah dapat menggunakan ChatSaku.
+    """
+        )
+
+        # ==========================
+        # PESAN KE USER
+        # ==========================
+
+        kirim_wa(
+            nomor,
+            f"""🎉 *Selamat, Akun ChatSaku Anda Aktif!*
+
+    Halo *{nama}* 👋
+
+    Nomor WhatsApp Anda sekarang sudah dapat menggunakan *ChatSaku*.
+
+    🎁 *Paket:* {paket}
+
+    📅 *Periode Aktif*
+    Mulai: {mulai.strftime('%d-%m-%Y')}
+    Berakhir: {akhir.strftime('%d-%m-%Y')}
+
+    Selama periode tersebut, Anda dapat menggunakan fitur ChatSaku sesuai dengan paket *{paket}* Anda.
+
+    💬 Cukup kirim transaksi melalui WhatsApp dan biarkan ChatSaku membantu mencatat keuangan Anda.
+
+    Contoh:
+    _"Makan siang 25 ribu"_
+
+    Selamat menggunakan *ChatSaku*! 💚
+
+    🌐 www.chatsaku.com
     """
         )
 
