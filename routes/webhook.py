@@ -2610,50 +2610,119 @@ https://www.chatsaku.com
 
 
     # ============================================================
-    # PRIORITAS TARGET
+    # PRIORITAS 1
+    # TARGET CREATE
+    #
+    # Hanya jika:
+    # - ada deadline
+    # - ada nominal
+    # - merupakan kalimat target/menabung
     # ============================================================
 
-    if target_nlp:
-
-        action = target_nlp.get("action")
-
-        print("🎯 TARGET ACTION :", action)
-
-        # ========================================================
-        # NORMALISASI DATA
-        # ========================================================
+    if (
+        target_nlp
+        and target_nlp.get("action") == "create"
+    ):
 
         intent = "target"
 
         nlp["intent"] = "target"
-        nlp["action"] = action
-
+        nlp["action"] = "create"
         nlp["nama"] = target_nlp.get("nama")
         nlp["nominal"] = target_nlp.get("nominal")
         nlp["deadline"] = target_nlp.get("deadline")
 
+        print("🎯 FINAL TARGET CREATE")
 
     # ============================================================
-    # JIKA BUKAN TARGET
-    # MAKA CEK TABUNG
+    # PRIORITAS 2
+    # TARGET LIST
     # ============================================================
 
-    elif tabung_nlp:
+    elif (
+        target_nlp
+        and target_nlp.get("action") == "list"
+    ):
+
+        intent = "target"
+
+        nlp["intent"] = "target"
+        nlp["action"] = "list"
+        nlp["nama"] = None
+        nlp["nominal"] = None
+        nlp["deadline"] = None
+
+        print("🎯 FINAL TARGET LIST")
+
+    # ============================================================
+    # PRIORITAS 3
+    # TARGET DETAIL
+    # ============================================================
+
+    elif (
+        target_nlp
+        and target_nlp.get("action") == "detail"
+    ):
+
+        intent = "target"
+
+        nlp["intent"] = "target"
+        nlp["action"] = "detail"
+        nlp["nama"] = target_nlp.get("nama")
+        nlp["nominal"] = None
+        nlp["deadline"] = None
+
+        print("🎯 FINAL TARGET DETAIL")
+
+    # ============================================================
+    # PRIORITAS 4
+    # TARGET DELETE
+    # ============================================================
+
+    elif (
+        target_nlp
+        and target_nlp.get("action") == "delete"
+    ):
+
+        intent = "target"
+
+        nlp["intent"] = "target"
+        nlp["action"] = "delete"
+        nlp["nama"] = target_nlp.get("nama")
+        nlp["nominal"] = None
+        nlp["deadline"] = None
+
+        print("🎯 FINAL TARGET DELETE")
+
+    # ============================================================
+    # PRIORITAS 5
+    # TABUNG
+    #
+    # Contoh:
+    # saya mau menabung motor 5000000
+    # tabung motor 500000
+    # nabung motor 500 ribu
+    # ============================================================
+
+    elif (
+        tabung_nlp
+        and tabung_nlp.get("action") == "add"
+    ):
 
         intent = "tabung"
 
         nlp["intent"] = "tabung"
         nlp["action"] = "add"
-
         nlp["nama"] = tabung_nlp.get("nama")
         nlp["nominal"] = tabung_nlp.get("nominal")
+        nlp["deadline"] = None
 
-        print("💰 INTENT TABUNG TERDETEKSI")
+        print("💰 FINAL TABUNG ADD")
 
+    else:
 
-    # ============================================================
-    # DEBUG AKHIR
-    # ============================================================
+        print("⚠️ Tidak ada normalisasi target/tabung")
+
 
     print("========================================")
     print("🧠 INTENT FINAL")
