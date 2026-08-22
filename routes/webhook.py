@@ -261,7 +261,7 @@ def _parse_nominal_chat_saku(value):
         return None
 
 # ============================================================
-# NLP REMINDER
+# DETEKSI REMINDER NLP
 # ============================================================
 
 def deteksi_reminder_nlp(message, data=None):
@@ -280,33 +280,38 @@ def deteksi_reminder_nlp(message, data=None):
         data = {}
 
     # ========================================================
-    # 1. LIST REMINDER
+    # ACTION LIST
     # ========================================================
 
     pola_list = [
 
         r'^reminder$',
 
-        r'^reminder saya$',
-        r'^reminder saya apa$',
-        r'^reminder saya apa saja$',
+        r'^list\s+reminder$',
+        r'^list\s+reminder\s+saya$',
 
-        r'^saya punya reminder$',
-        r'^saya punya reminder apa$',
-        r'^saya punya reminder apa aja$',
-        r'^saya punya reminder apa saja$',
+        r'^daftar\s+reminder$',
+        r'^daftar\s+reminder\s+saya$',
 
-        r'^apa reminder saya$',
-        r'^apa saja reminder saya$',
+        r'^lihat\s+reminder$',
+        r'^lihat\s+reminder\s+saya$',
 
-        r'^list reminder$',
-        r'^daftar reminder$',
+        r'^cek\s+reminder$',
+        r'^cek\s+reminder\s+saya$',
 
-        r'^lihat reminder$',
-        r'^lihat semua reminder$',
+        r'^reminder\s+saya$',
+        r'^reminder\s+saya\s+apa$',
+        r'^reminder\s+saya\s+apa\s+saja$',
 
-        r'^cek reminder$',
-        r'^cek semua reminder$'
+        r'^saya\s+punya\s+reminder$',
+        r'^saya\s+punya\s+reminder\s+apa$',
+        r'^saya\s+punya\s+reminder\s+apa\s+saja$',
+
+        r'^apa\s+reminder\s+saya$',
+        r'^apa\s+reminder\s+saya\s+saja$',
+
+        r'^reminder\s+apa$',
+        r'^reminder\s+apa\s+saja$'
     ]
 
     for pola in pola_list:
@@ -326,16 +331,18 @@ def deteksi_reminder_nlp(message, data=None):
             }
 
     # ========================================================
-    # 2. HAPUS REMINDER
+    # ACTION DELETE
     # ========================================================
 
     pola_delete = [
 
         r'^hapus\s+reminder\s+(.+)$',
+
         r'^hapuskan\s+reminder\s+(.+)$',
+
         r'^hapusreminder\s+(.+)$',
 
-        r'^hapus\s+reminder\s+tagihan\s+(.+)$'
+        r'^hapus\s+reminder\s*:\s*(.+)$'
     ]
 
     for pola in pola_delete:
@@ -359,76 +366,162 @@ def deteksi_reminder_nlp(message, data=None):
             }
 
     # ========================================================
-    # 3. NLP UTAMA
+    # CREATE REMINDER
+    # ========================================================
+
+    pola_create = [
+
+        r'^reminder\s+',
+
+        r'^buat\s+reminder\s+',
+
+        r'^buatkan\s+reminder\s+',
+
+        r'^tambah\s+reminder\s+',
+
+        r'^set\s+reminder\s+',
+
+        r'^saya\s+ingin\s+reminder\s+',
+
+        r'^saya\s+mau\s+reminder\s+'
+    ]
+
+    ada_create = any(
+        re.search(
+            pola,
+            text_lower,
+            re.IGNORECASE
+        )
+        for pola in pola_create
+    )
+
+    # ========================================================
+    # NLP UTAMA
+    #
+    # Kalau NLP sudah mengatakan reminder,
+    # tetapi bukan list/delete, anggap CREATE.
     # ========================================================
 
     if data.get("intent") == "reminder":
 
-        action = data.get(
-            "action",
-            "create"
+        ada_list_word = any(
+            kata in text_lower
+            for kata in [
+                "list reminder",
+                "daftar reminder",
+                "lihat reminder",
+                "cek reminder",
+                "reminder saya",
+                "punya reminder",
+                "reminder apa"
+            ]
         )
 
-        # Jangan biarkan NLP utama
-        # mengubah perintah list/delete menjadi create
-
-        if action in (
-            "list",
-            "delete"
-        ):
+        if ada_list_word:
 
             return {
                 "intent": "reminder",
-                "action": action,
-                "nama": data.get("nama"),
-                "tanggal": data.get("tanggal"),
-                "nominal": data.get("nominal")
+                "action": "list",
+                "nama": None,
+                "tanggal": None,
+                "nominal": None
             }
 
-    # ========================================================
-    # 4. DETEKSI PERINTAH REMINDER
-    # ========================================================
+        if not ada_create:
 
-    if not re.search(
-        r'\b(reminder|pengingat|tagihan)\b',
-        text_lower,
-        re.IGNORECASE
-    ):
+            ada_create = True
 
+    if not ada_create:
         return None
 
     # ========================================================
-    # 5. TANGGAL
-    #
-    # Contoh:
-    #
-    # reminder listrik 20 500000
-    # reminder listrik tanggal 20 500 ribu
-    # reminder listrik tgl 20 500 ribu
+    # NAMA
+    # ========================================================
+
+    nama = text
+
+    # Hapus prefix
+    nama = re.sub(
+        r'^buatkan\s+reminder\s+',
+        '',
+        nama,
+        flags=re.IGNORECASE
+    )
+
+    nama = re.sub(
+        r'^buat\s+reminder\s+',
+        '',
+        nama,
+        flags=re.IGNORECASE
+    )
+
+    nama = re.sub(
+        r'^tambah\s+reminder\s+',
+        '',
+        nama,
+        flags=re.IGNORECASE
+    )
+
+    nama = re.sub(
+        r'^set\s+reminder\s+',
+        '',
+        nama,
+        flags=re.IGNORECASE
+    )
+
+    nama = re.sub(
+        r'^reminder\s+',
+        '',
+        nama,
+        flags=re.IGNORECASE
+    )
+
+    nama = re.sub(
+        r'^saya\s+(ingin|mau)\s+reminder\s+',
+        '',
+        nama,
+        flags=re.IGNORECASE
+    )
+
+    # ========================================================
+    # TANGGAL
     # ========================================================
 
     tanggal = None
 
-    tanggal_match = re.search(
-        r'\b(?:tanggal|tgl|tgl\.)?\s*(\d{1,2})\b',
-        text_lower,
+    match_tanggal = re.search(
+        r'\b(?:tanggal|tgl|tanggl)?\s*(\d{1,2})\b',
+        nama,
         re.IGNORECASE
     )
 
-    if tanggal_match:
+    if match_tanggal:
 
         try:
 
-            tanggal = int(
-                tanggal_match.group(1)
+            kandidat = int(
+                match_tanggal.group(1)
             )
 
-        except Exception:
+            if 1 <= kandidat <= 31:
 
+                tanggal = kandidat
+
+                nama = re.sub(
+                    r'\b(?:tanggal|tgl|tanggl)?\s*'
+                    + str(kandidat)
+                    + r'\b',
+                    '',
+                    nama,
+                    count=1,
+                    flags=re.IGNORECASE
+                )
+
+        except Exception:
             tanggal = None
 
     # ========================================================
-    # 6. NOMINAL SATUAN
+    # NOMINAL
     # ========================================================
 
     nominal = None
@@ -436,7 +529,7 @@ def deteksi_reminder_nlp(message, data=None):
     pola_uang = re.search(
         r'(\d+(?:[.,]\d+)?)\s*'
         r'(juta|jt|ribu|rb|miliar|milyar)\b',
-        text_lower,
+        nama,
         re.IGNORECASE
     )
 
@@ -445,8 +538,10 @@ def deteksi_reminder_nlp(message, data=None):
         try:
 
             angka = float(
-                pola_uang.group(1)
-                .replace(",", ".")
+                pola_uang.group(1).replace(
+                    ",",
+                    "."
+                )
             )
 
             satuan = (
@@ -481,120 +576,86 @@ def deteksi_reminder_nlp(message, data=None):
                     angka * 1000000000
                 )
 
+            # Hapus nominal dari nama
+            nama = re.sub(
+                re.escape(
+                    pola_uang.group(0)
+                ),
+                '',
+                nama,
+                count=1,
+                flags=re.IGNORECASE
+            )
+
         except Exception as e:
 
             print(
-                "❌ ERROR NOMINAL REMINDER:",
+                "❌ ERROR PARSE NOMINAL REMINDER:",
                 repr(e)
             )
 
     # ========================================================
-    # 7. FALLBACK NOMINAL
+    # FALLBACK NOMINAL ANGKA BIASA
     # ========================================================
 
     if not nominal:
 
-        angka = re.findall(
+        angka_list = re.findall(
             r'(?:rp\s*)?[\d.,]+',
-            text_lower,
+            nama,
             re.IGNORECASE
         )
 
-        for angka_text in reversed(angka):
+        if angka_list:
 
-            try:
+            for angka_text in reversed(
+                angka_list
+            ):
 
-                kandidat = normalize_nominal(
-                    angka_text
-                )
+                try:
 
-                if kandidat and kandidat > 0:
-
-                    # Jangan ambil tanggal
-                    if not re.fullmatch(
-                        r'\d{1,2}[-/.]\d{1,2}[-/.]\d{4}',
+                    kandidat = normalize_nominal(
                         angka_text
-                    ):
+                    )
+
+                    if kandidat and kandidat > 0:
 
                         nominal = kandidat
+
+                        nama = nama.replace(
+                            angka_text,
+                            '',
+                            1
+                        )
+
                         break
 
-            except Exception:
-
-                pass
+                except Exception:
+                    pass
 
     # ========================================================
-    # 8. NAMA REMINDER
+    # BERSIHKAN NAMA
     # ========================================================
 
-    nama = text
-
-    # Hapus nominal satuan
-
     nama = re.sub(
-        r'\b\d+(?:[.,]\d+)?\s*'
-        r'(?:juta|jt|ribu|rb|miliar|milyar)\b',
+        r'\b(tanggal|tgl)\b',
         '',
         nama,
         flags=re.IGNORECASE
     )
-
-    # Hapus nominal angka
-
-    nama = re.sub(
-        r'(?:rp\s*)?[\d.,]+',
-        '',
-        nama,
-        flags=re.IGNORECASE
-    )
-
-    # Hapus tanggal
-
-    nama = re.sub(
-        r'\b(?:tanggal|tgl|tgl\.)?\s*\d{1,2}\b',
-        '',
-        nama,
-        flags=re.IGNORECASE
-    )
-
-    # Hapus kata pembuka
-
-    nama = re.sub(
-        r'^reminder\s*',
-        '',
-        nama,
-        flags=re.IGNORECASE
-    )
-
-    nama = re.sub(
-        r'^pengingat\s*',
-        '',
-        nama,
-        flags=re.IGNORECASE
-    )
-
-    nama = re.sub(
-        r'^tagihan\s*',
-        '',
-        nama,
-        flags=re.IGNORECASE
-    )
-
-    # Hapus kata tanggal
-
-    nama = re.sub(
-        r'\b(tanggal|tgl|jatuh tempo|sebesar)\b',
-        '',
-        nama,
-        flags=re.IGNORECASE
-    )
-
-    # Rapikan
 
     nama = re.sub(
         r'\s+',
         ' ',
         nama
+    ).strip()
+
+    # Hapus kata penghubung di ujung
+    nama = re.sub(
+        r'\b(sebesar|rp)\b',
+        '',
+        nama,
+        flags=re.IGNORECASE
     ).strip()
 
     return {
@@ -607,10 +668,10 @@ def deteksi_reminder_nlp(message, data=None):
 
 
     # ============================================================
-    # NORMALISASI INTENT REMINDER
+    # NORMALISASI REMINDER NLP
     #
-    # PENTING:
-    # BLOK INI HARUS DIJALANKAN SEBELUM TARGET
+    # LETAKKAN SETELAH NLP UTAMA
+    # DAN SEBELUM HANDLER REMINDER
     # ============================================================
 
     reminder_nlp = deteksi_reminder_nlp(
@@ -627,29 +688,46 @@ def deteksi_reminder_nlp(message, data=None):
 
     if reminder_nlp:
 
-        intent = "reminder"
-
         nlp["intent"] = "reminder"
 
-        nlp["action"] = (
-            reminder_nlp.get("action")
+        nlp["action"] = reminder_nlp.get(
+            "action"
         )
 
-        nlp["nama"] = (
-            reminder_nlp.get("nama")
+        nlp["nama"] = reminder_nlp.get(
+            "nama"
         )
 
-        nlp["tanggal"] = (
-            reminder_nlp.get("tanggal")
+        nlp["tanggal"] = reminder_nlp.get(
+            "tanggal"
         )
 
-        nlp["nominal"] = (
-            reminder_nlp.get("nominal")
+        nlp["nominal"] = reminder_nlp.get(
+            "nominal"
+        )
+
+        intent = "reminder"
+
+        print("🔔 INTENT REMINDER DINORMALISASI")
+
+        print(
+            "ACTION  :",
+            nlp.get("action")
         )
 
         print(
-            "🔔 INTENT DIUBAH MENJADI REMINDER:",
-            nlp
+            "NAMA    :",
+            nlp.get("nama")
+        )
+
+        print(
+            "TANGGAL :",
+            nlp.get("tanggal")
+        )
+
+        print(
+            "NOMINAL :",
+            nlp.get("nominal")
         )
 
 
@@ -670,62 +748,34 @@ def deteksi_reminder_nlp(message, data=None):
 
             kirim_wa(
                 sender,
-                """🔒 *Reminder tersedia di paket PRO.*
-
-    Upgrade sekarang agar dapat:
-
-    ✅ Budget Bulanan
-    ✅ Reminder
-    ✅ Target Tabungan
-    ✅ Hutang Piutang
-    ✅ AI Insight
-    ✅ Dashboard Lengkap
-
-    🌐 www.chatsaku.com
-
-    _ChatSaku Finance Assistant_"""
+                "🔒 Reminder tersedia di paket PRO."
             )
 
             return jsonify(
                 status=True
             )
 
-        # ========================================================
-        # OWNER
-        # ========================================================
+        action = nlp.get(
+            "action"
+        )
 
         nomor_owner = get_owner_number(
             sender
         )
 
-        action = nlp.get(
-            "action"
-        )
-
-        nama = nlp.get(
-            "nama"
-        )
-
-        tanggal = nlp.get(
-            "tanggal"
-        )
-
-        nominal = nlp.get(
-            "nominal"
-        )
-
         print("========================================")
         print("🔔 PROSES REMINDER")
-        print("SENDER   :", sender)
-        print("OWNER    :", nomor_owner)
-        print("ACTION   :", action)
-        print("NAMA     :", nama)
-        print("TANGGAL  :", tanggal)
-        print("NOMINAL  :", nominal)
+        print("SENDER  :", sender)
+        print("OWNER   :", nomor_owner)
+        print("ACTION  :", action)
+        print("NAMA    :", nlp.get("nama"))
+        print("TANGGAL :", nlp.get("tanggal"))
+        print("NOMINAL :", nlp.get("nominal"))
         print("========================================")
 
+
         # ========================================================
-        # LIST
+        # LIST REMINDER
         # ========================================================
 
         if action == "list":
@@ -741,23 +791,34 @@ def deteksi_reminder_nlp(message, data=None):
 
                 kirim_wa(
                     sender,
-                    """📭 *Belum ada reminder.*
+                    """🔔 *REMINDER*
 
-    Contoh:
+    📭 Belum ada reminder.
 
-    🔔 reminder listrik tanggal 20 500 ribu
+    Contoh membuat reminder:
+
+    *reminder listrik tanggal 20 500 ribu*
 
     _ChatSaku Finance Assistant_"""
                 )
 
-                return jsonify(
-                    status=True
-                )
+                return jsonify({
+                    "status": True,
+                    "intent": "reminder",
+                    "action": "list"
+                })
 
             pesan = (
                 "🔔 *DAFTAR REMINDER*\n"
                 "━━━━━━━━━━━━━━━━━━\n\n"
             )
+
+            if nomor_owner != sender:
+
+                pesan += (
+                    "👁 *Mode Viewer*\n"
+                    "Data reminder milik owner akun.\n\n"
+                )
 
             total = 0
 
@@ -766,21 +827,23 @@ def deteksi_reminder_nlp(message, data=None):
                 1
             ):
 
-                total += (
+                nominal_reminder = (
                     r.nominal or 0
                 )
 
+                total += nominal_reminder
+
                 pesan += (
-                    f"*{i}. {r.nama.title()}*\n"
+                    f"*{i}. {str(r.nama).title()}*\n\n"
                     f"📅 Jatuh Tempo : "
                     f"Tanggal {r.tanggal}\n"
                     f"💰 Nominal : "
-                    f"Rp {(r.nominal or 0):,.0f}\n\n"
+                    f"Rp {nominal_reminder:,.0f}\n\n"
+                    "━━━━━━━━━━━━━━━━━━\n\n"
                 )
 
             pesan += (
-                "━━━━━━━━━━━━━━━━━━\n"
-                f"💵 *Total Tagihan*\n"
+                f"💵 *Total Reminder*\n"
                 f"Rp {total:,.0f}\n\n"
                 "_ChatSaku Finance Assistant_"
             )
@@ -790,15 +853,36 @@ def deteksi_reminder_nlp(message, data=None):
                 pesan
             )
 
-            return jsonify(
-                status=True
-            )
+            return jsonify({
+                "status": True,
+                "intent": "reminder",
+                "action": "list"
+            })
+
 
         # ========================================================
-        # DELETE
+        # DELETE REMINDER
         # ========================================================
 
         if action == "delete":
+
+            if not has_feature(
+                sender,
+                "hapusreminder"
+            ):
+
+                kirim_wa(
+                    sender,
+                    """🔒 *Fitur Hapus Reminder tersedia pada paket PRO dan PREMIUM.*
+
+    Upgrade sekarang untuk mengelola reminder.
+
+    🌐 www.chatsaku.com"""
+                )
+
+                return jsonify(
+                    status=True
+                )
 
             if is_viewer(sender):
 
@@ -815,6 +899,10 @@ def deteksi_reminder_nlp(message, data=None):
                     status=True
                 )
 
+            nama = nlp.get(
+                "nama"
+            )
+
             if not nama:
 
                 kirim_wa(
@@ -823,7 +911,11 @@ def deteksi_reminder_nlp(message, data=None):
 
     Contoh:
 
-    *hapus reminder listrik*"""
+    *hapus reminder listrik*
+
+    atau:
+
+    *hapusreminder listrik*"""
                 )
 
                 return jsonify(
@@ -836,10 +928,26 @@ def deteksi_reminder_nlp(message, data=None):
 
             reminder = Reminder.query.filter_by(
                 nomor_wa=nomor_owner,
-                nama=nama
-            ).first()
+                aktif=True
+            ).all()
 
-            if not reminder:
+            reminder_found = None
+
+            nama_lower = nama.lower()
+
+            for item in reminder:
+
+                if (
+                    str(
+                        item.nama
+                    ).strip().lower()
+                    == nama_lower
+                ):
+
+                    reminder_found = item
+                    break
+
+            if not reminder_found:
 
                 kirim_wa(
                     sender,
@@ -852,61 +960,49 @@ def deteksi_reminder_nlp(message, data=None):
 
     *reminder*
 
-    untuk melihat semua reminder."""
+    untuk melihat semua reminder.
+
+    _ChatSaku Finance Assistant_"""
                 )
 
                 return jsonify(
                     status=True
                 )
 
-            try:
+            nama_reminder = (
+                reminder_found.nama
+            )
 
-                db.session.delete(
-                    reminder
-                )
+            # Soft delete
+            reminder_found.aktif = False
 
-                db.session.commit()
-
-            except Exception as e:
-
-                db.session.rollback()
-
-                print(
-                    "❌ ERROR DELETE REMINDER:",
-                    repr(e)
-                )
-
-                kirim_wa(
-                    sender,
-                    "❌ Gagal menghapus reminder."
-                )
-
-                return jsonify(
-                    status=False
-                ), 500
+            db.session.commit()
 
             kirim_wa(
                 sender,
                 f"""🗑️ *Reminder Berhasil Dihapus*
 
-    📄 {nama.title()}
+    🔔 Reminder:
+    *{nama_reminder}*
+
+    Reminder sudah tidak aktif.
 
     _ChatSaku Finance Assistant_"""
             )
 
-            return jsonify(
-                status=True
-            )
+            return jsonify({
+                "status": True,
+                "intent": "reminder",
+                "action": "delete",
+                "nama": nama_reminder
+            })
+
 
         # ========================================================
-        # CREATE / UPDATE
+        # CREATE REMINDER
         # ========================================================
 
         if action == "create":
-
-            # ----------------------------------------------------
-            # VIEWER
-            # ----------------------------------------------------
 
             if is_viewer(sender):
 
@@ -923,9 +1019,21 @@ def deteksi_reminder_nlp(message, data=None):
                     status=True
                 )
 
-            # ----------------------------------------------------
+            nama = nlp.get(
+                "nama"
+            )
+
+            tanggal = nlp.get(
+                "tanggal"
+            )
+
+            nominal = nlp.get(
+                "nominal"
+            )
+
+            # ====================================================
             # VALIDASI NAMA
-            # ----------------------------------------------------
+            # ====================================================
 
             if not nama:
 
@@ -935,18 +1043,18 @@ def deteksi_reminder_nlp(message, data=None):
 
     Contoh:
 
-    🔔 *reminder listrik tanggal 20 500 ribu*
+    *reminder listrik tanggal 20 500 ribu*
 
-    🔔 *reminder internet tanggal 25 350 ribu*"""
+    *reminder internet tanggal 10 350 ribu*"""
                 )
 
                 return jsonify(
                     status=True
                 )
 
-            # ----------------------------------------------------
+            # ====================================================
             # VALIDASI TANGGAL
-            # ----------------------------------------------------
+            # ====================================================
 
             try:
 
@@ -955,17 +1063,13 @@ def deteksi_reminder_nlp(message, data=None):
                 )
 
             except (
-                TypeError,
-                ValueError
+                ValueError,
+                TypeError
             ):
 
-                tanggal = None
+                tanggal = 0
 
-            if (
-                tanggal is None
-                or tanggal < 1
-                or tanggal > 31
-            ):
+            if tanggal < 1 or tanggal > 31:
 
                 kirim_wa(
                     sender,
@@ -975,16 +1079,16 @@ def deteksi_reminder_nlp(message, data=None):
 
     Contoh:
 
-    🔔 *reminder listrik tanggal 20 500 ribu*"""
+    *reminder listrik tanggal 20 500 ribu*"""
                 )
 
                 return jsonify(
                     status=True
                 )
 
-            # ----------------------------------------------------
+            # ====================================================
             # VALIDASI NOMINAL
-            # ----------------------------------------------------
+            # ====================================================
 
             try:
 
@@ -1004,57 +1108,94 @@ def deteksi_reminder_nlp(message, data=None):
 
     Contoh:
 
-    🔔 *reminder listrik tanggal 20 500 ribu*
+    *reminder listrik tanggal 20 500 ribu*
 
-    🔔 *reminder internet tanggal 25 350000*"""
+    *reminder internet tanggal 10 350 ribu*"""
                 )
 
                 return jsonify(
                     status=True
                 )
 
-            # ----------------------------------------------------
+            # ====================================================
             # NORMALISASI NAMA
-            # ----------------------------------------------------
+            # ====================================================
 
             nama = str(
                 nama
             ).strip()
 
-            # ----------------------------------------------------
+            nama = re.sub(
+                r'\s+',
+                ' ',
+                nama
+            ).strip()
+
+            # ====================================================
             # CARI REMINDER
-            # ----------------------------------------------------
+            # ====================================================
 
             reminder = Reminder.query.filter_by(
                 nomor_wa=nomor_owner,
-                nama=nama
-            ).first()
+                aktif=True
+            ).all()
+
+            reminder_found = None
+
+            nama_lower = nama.lower()
+
+            for item in reminder:
+
+                if (
+                    str(
+                        item.nama
+                    ).strip().lower()
+                    == nama_lower
+                ):
+
+                    reminder_found = item
+                    break
+
+            # ====================================================
+            # UPDATE
+            # ====================================================
+
+            if reminder_found:
+
+                reminder_found.tanggal = tanggal
+
+                reminder_found.nominal = nominal
+
+                reminder_found.aktif = True
+
+                status_text = "Diperbarui"
+
+            # ====================================================
+            # CREATE
+            # ====================================================
+
+            else:
+
+                reminder_found = Reminder(
+
+                    nomor_wa=nomor_owner,
+
+                    nama=nama,
+
+                    tanggal=tanggal,
+
+                    nominal=nominal,
+
+                    aktif=True
+                )
+
+                db.session.add(
+                    reminder_found
+                )
+
+                status_text = "Dibuat"
 
             try:
-
-                if reminder:
-
-                    reminder.tanggal = tanggal
-                    reminder.nominal = nominal
-                    reminder.aktif = True
-
-                    status = "Diperbarui"
-
-                else:
-
-                    reminder = Reminder(
-                        nomor_wa=nomor_owner,
-                        nama=nama,
-                        tanggal=tanggal,
-                        nominal=nominal,
-                        aktif=True
-                    )
-
-                    db.session.add(
-                        reminder
-                    )
-
-                    status = "Dibuat"
 
                 db.session.commit()
 
@@ -1069,20 +1210,24 @@ def deteksi_reminder_nlp(message, data=None):
 
                 kirim_wa(
                     sender,
-                    "❌ Gagal menyimpan reminder."
+                    """❌ *Gagal menyimpan reminder.*
+
+    Silakan coba kembali beberapa saat lagi.
+
+    _ChatSaku Finance Assistant_"""
                 )
 
                 return jsonify(
                     status=False
                 ), 500
 
-            # ----------------------------------------------------
+            # ====================================================
             # RESPONSE
-            # ----------------------------------------------------
+            # ====================================================
 
             kirim_wa(
                 sender,
-                f"""🔔 *Reminder {status}*
+                f"""🔔 *Reminder {status_text}*
 
     ━━━━━━━━━━━━━━━━━━
 
@@ -1097,17 +1242,27 @@ def deteksi_reminder_nlp(message, data=None):
 
     ━━━━━━━━━━━━━━━━━━
 
-    Ketik *reminder* untuk melihat seluruh reminder.
+    Ketik:
+
+    *reminder*
+
+    untuk melihat seluruh reminder.
 
     _ChatSaku Finance Assistant_"""
             )
 
-            return jsonify(
-                status=True
-            )
+            return jsonify({
+                "status": True,
+                "intent": "reminder",
+                "action": "create",
+                "nama": nama,
+                "tanggal": tanggal,
+                "nominal": nominal
+            })
+
 
         # ========================================================
-        # FALLBACK
+        # ACTION TIDAK DIKENALI
         # ========================================================
 
         kirim_wa(
@@ -1117,10 +1272,14 @@ def deteksi_reminder_nlp(message, data=None):
     Contoh:
 
     🔔 *reminder*
+    🔔 *list reminder saya*
+    🔔 *saya punya reminder apa aja*
 
-    🔔 *reminder listrik tanggal 20 500 ribu*
+    ➕ *reminder listrik tanggal 20 500 ribu*
 
-    🗑️ *hapus reminder listrik*"""
+    🗑️ *hapus reminder listrik*
+
+    _ChatSaku Finance Assistant_"""
         )
 
         return jsonify(
