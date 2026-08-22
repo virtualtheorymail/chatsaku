@@ -1577,44 +1577,33 @@ def deteksi_target_nlp(message, data=None):
     pola_list = [
 
         r'\btarget saya apa\b',
-
         r'\btarget saya apa saja\b',
 
         r'\bapa target saya\b',
-
         r'\bapa saja target saya\b',
 
         r'\bsaya punya target apa\b',
-
         r'\bsaya punya target apa saja\b',
 
         r'\bsaya punya list target\b',
-
         r'\bsaya punya list target apa\b',
+        r'\bsaya punya daftar target\b',
+        r'\bsaya punya daftar target apa\b',
 
         r'\blist target\b',
-
         r'\bdaftar target\b',
-
-        r'\blihat semua target\b',
-
-        r'\blihat target saya\b',
-
         r'\blihat target\b',
-
+        r'\blihat semua target\b',
+        r'\bcek target\b',
         r'\bcek semua target\b',
 
-        r'\bcek target saya\b',
-
         r'\btarget saya\b',
-
         r'\btarget tabungan saya\b',
-
         r'\btabungan saya\b',
 
         r'\bpunya target apa\b',
-
-        r'\bpunya target apa saja\b'
+        r'\bsaya punya target apa\b',
+        r'\bsaya punya target apa saja\b'
     ]
 
     for pola in pola_list:
@@ -1640,21 +1629,66 @@ def deteksi_target_nlp(message, data=None):
             }
 
     # ========================================================
-    # ACTION DELETE
+    # ACTION: HAPUS TARGET
     # ========================================================
 
     pola_delete = [
 
-        r'^hapus\s+target\s+tabungan\s+(.+)$',
-
+        # hapus target laptop
         r'^hapus\s+target\s+(.+)$',
 
+        # hapuskan target laptop
         r'^hapuskan\s+target\s+(.+)$',
 
+        # hapus target tabungan laptop
+        r'^hapus\s+target\s+tabungan\s+(.+)$',
+
+        # hapustarget laptop
         r'^hapustarget\s+(.+)$',
 
-        r'^hapus\s+(.+)$'
+        # hapus target: laptop
+        r'^hapus\s+target\s*:\s*(.+)$'
     ]
+
+    for pola in pola_delete:
+
+        match = re.search(
+            pola,
+            text_lower,
+            re.IGNORECASE
+        )
+
+        if match:
+
+            nama = match.group(1).strip()
+
+            # ================================================
+            # BERSIHKAN NAMA
+            # ================================================
+
+            nama = re.sub(
+                r'^(target|tabungan)\s+',
+                '',
+                nama,
+                flags=re.IGNORECASE
+            ).strip()
+
+            if not nama:
+                return {
+                    "intent": "target",
+                    "action": "delete",
+                    "nama": None,
+                    "nominal": None,
+                    "deadline": None
+                }
+
+            return {
+                "intent": "target",
+                "action": "delete",
+                "nama": nama,
+                "nominal": None,
+                "deadline": None
+            }
 
     for pola in pola_delete:
 
@@ -4263,15 +4297,32 @@ https://www.chatsaku.com
         )
 
     # ============================================================
+    # ============================================================
     # NORMALISASI TARGET / TABUNG
-    # LETAKKAN SETELAH NLP UTAMA
-    # DAN SEBELUM HANDLER intent target/tabung
+    # ============================================================
+    # LETAKKAN SETELAH:
+    #
+    # nlp = hasil NLP utama
+    # intent = nlp.get("intent")
+    #
+    # DAN SEBELUM HANDLER:
+    # if intent == "target":
+    # if intent == "tabung":
+    # ============================================================
+
+
+    # ============================================================
+    # 1. DETEKSI TARGET NLP
     # ============================================================
 
     target_nlp = deteksi_target_nlp(
         message,
         nlp
     )
+
+    # ============================================================
+    # 2. DETEKSI TABUNG NLP
+    # ============================================================
 
     tabung_nlp = deteksi_tabung_nlp(
         message,
@@ -4285,42 +4336,74 @@ https://www.chatsaku.com
 
 
     # ============================================================
-    # PRIORITAS TARGET
+    # 3. PRIORITAS TARGET
+    # ============================================================
+    #
+    # Jika target_nlp menghasilkan action:
+    #
+    # list
+    # detail
+    # delete
+    # create
+    #
+    # maka gunakan hasil tersebut.
     # ============================================================
 
     if target_nlp:
 
-        action_target = target_nlp.get(
-            "action"
-        )
+        target_action = target_nlp.get("action")
 
-        intent = "target"
+        # --------------------------------------------------------
+        # LIST / DETAIL / DELETE
+        # --------------------------------------------------------
 
-        nlp["intent"] = "target"
+        if target_action in (
+            "list",
+            "detail",
+            "delete"
+        ):
 
-        nlp["action"] = action_target
+            intent = "target"
 
-        nlp["nama"] = target_nlp.get(
-            "nama"
-        )
+            nlp["intent"] = "target"
+            nlp["action"] = target_action
+            nlp["nama"] = target_nlp.get("nama")
+            nlp["nominal"] = target_nlp.get("nominal")
+            nlp["deadline"] = target_nlp.get("deadline")
 
-        nlp["nominal"] = target_nlp.get(
-            "nominal"
-        )
+        # --------------------------------------------------------
+        # CREATE TARGET
+        # --------------------------------------------------------
 
-        nlp["deadline"] = target_nlp.get(
-            "deadline"
-        )
+        elif target_action == "create":
 
-        print(
-            "🎯 TARGET OVERRIDE:",
-            target_nlp
-        )
+            intent = "target"
+
+            nlp["intent"] = "target"
+            nlp["action"] = "create"
+            nlp["nama"] = target_nlp.get("nama")
+            nlp["nominal"] = target_nlp.get("nominal")
+            nlp["deadline"] = target_nlp.get("deadline")
+
+            print("🎯 INTENT DIUBAH MENJADI TARGET CREATE")
 
 
     # ============================================================
-    # PRIORITAS TABUNG
-    # HANYA JIKA BUKAN TARGET
+    # 4. JIKA BUKAN TARGET → CEK TABUNG
+    # ============================================================
+    #
+    # Contoh:
+    #
+    # saya mau menabung motor 5000000
+    #
+    # Tidak ada deadline.
+    #
+    # Maka:
+    #
+    # intent = tabung
+    # action = add
+    #
+    # BUKAN target.
     # ============================================================
 
     elif tabung_nlp:
@@ -4328,21 +4411,11 @@ https://www.chatsaku.com
         intent = "tabung"
 
         nlp["intent"] = "tabung"
-
         nlp["action"] = "add"
+        nlp["nama"] = tabung_nlp.get("nama")
+        nlp["nominal"] = tabung_nlp.get("nominal")
 
-        nlp["nama"] = tabung_nlp.get(
-            "nama"
-        )
-
-        nlp["nominal"] = tabung_nlp.get(
-            "nominal"
-        )
-
-        print(
-            "💰 TABUNG OVERRIDE:",
-            tabung_nlp
-        )
+        print("💰 INTENT DIUBAH MENJADI TABUNG ADD")
 
 
     # ============================================================
@@ -4363,7 +4436,6 @@ https://www.chatsaku.com
     # ============================================================
     # ============================================================
     # HANDLER TARGET
-    # LIST / DETAIL / DELETE / CREATE
     # ============================================================
     # ============================================================
 
@@ -4400,13 +4472,19 @@ https://www.chatsaku.com
                 status=True
             )
 
+
         # ========================================================
         # ACTION
         # ========================================================
 
-        action = nlp.get(
-            "action"
-        )
+        action = nlp.get("action")
+
+        print("========================================")
+        print("🎯 TARGET HANDLER")
+        print("ACTION :", action)
+        print("NAMA   :", nlp.get("nama"))
+        print("========================================")
+
 
         # ========================================================
         # OWNER
@@ -4416,8 +4494,11 @@ https://www.chatsaku.com
             sender
         )
 
+
         # ========================================================
-        # LIST TARGET
+        # ========================================================
+        # ACTION LIST
+        # ========================================================
         # ========================================================
 
         if action == "list":
@@ -4425,7 +4506,14 @@ https://www.chatsaku.com
             data_target = TargetPembelian.query.filter_by(
                 nomor_wa=nomor_owner,
                 aktif=True
+            ).order_by(
+                TargetPembelian.deadline.asc()
             ).all()
+
+
+            # ----------------------------------------------------
+            # TIDAK ADA TARGET
+            # ----------------------------------------------------
 
             if not data_target:
 
@@ -4446,6 +4534,11 @@ https://www.chatsaku.com
                     status=True
                 )
 
+
+            # ----------------------------------------------------
+            # RESPONSE
+            # ----------------------------------------------------
+
             text_response = (
                 "🎯 *TARGET TABUNGAN*\n\n"
             )
@@ -4456,6 +4549,7 @@ https://www.chatsaku.com
                     "👁 *Mode Viewer*\n"
                     "Data milik owner akun.\n\n"
                 )
+
 
             for i, target in enumerate(
                 data_target,
@@ -4483,7 +4577,8 @@ https://www.chatsaku.com
                 )
 
                 sisa = max(
-                    target_nominal - terkumpul,
+                    target_nominal -
+                    terkumpul,
                     0
                 )
 
@@ -4496,6 +4591,7 @@ https://www.chatsaku.com
                             "%d-%m-%Y"
                         )
                     )
+
 
                 text_response += f"""*{i}. {target.nama}*
 
@@ -4518,6 +4614,7 @@ https://www.chatsaku.com
 
     """
 
+
             text_response += (
                 "_ChatSaku Finance Assistant_"
             )
@@ -4535,7 +4632,9 @@ https://www.chatsaku.com
 
 
         # ========================================================
-        # DELETE TARGET
+        # ========================================================
+        # ACTION DELETE
+        # ========================================================
         # ========================================================
 
         if action == "delete":
@@ -4556,6 +4655,10 @@ https://www.chatsaku.com
 
     atau:
 
+    *hapus laptop*
+
+    atau:
+
     *hapustarget laptop*"""
                 )
 
@@ -4563,40 +4666,154 @@ https://www.chatsaku.com
                     status=True
                 )
 
+
+            # ----------------------------------------------------
+            # BERSIHKAN NAMA DELETE
+            # ----------------------------------------------------
+
             nama = str(
                 nama
             ).strip()
 
-            target = TargetPembelian.query.filter_by(
-                nomor_wa=nomor_owner,
-                nama=nama,
-                aktif=True
-            ).first()
 
-            # ====================================================
-            # FALLBACK CASE INSENSITIVE
-            # ====================================================
+            # Hapus kata "target"
+            nama = re.sub(
+                r'\btarget\b',
+                '',
+                nama,
+                flags=re.IGNORECASE
+            )
+
+
+            # Hapus kata pembuka
+            nama = re.sub(
+                r'^(saya|aku|kami)\s+',
+                '',
+                nama,
+                flags=re.IGNORECASE
+            )
+
+
+            # ----------------------------------------------------
+            # KASUS:
+            #
+            # hapus saya ingin membuat target leptop
+            #
+            # menjadi:
+            #
+            # leptop
+            # ----------------------------------------------------
+
+            nama = re.sub(
+                r'\b(saya|aku|kami)\b',
+                '',
+                nama,
+                flags=re.IGNORECASE
+            )
+
+            nama = re.sub(
+                r'\b(ingin|mau|akan)\b',
+                '',
+                nama,
+                flags=re.IGNORECASE
+            )
+
+            nama = re.sub(
+                r'\b(membuat|buat|bikin|buatkan)\b',
+                '',
+                nama,
+                flags=re.IGNORECASE
+            )
+
+            nama = re.sub(
+                r'\b(target|tabungan)\b',
+                '',
+                nama,
+                flags=re.IGNORECASE
+            )
+
+
+            nama = re.sub(
+                r'\s+',
+                ' ',
+                nama
+            ).strip()
+
+
+            if not nama:
+
+                kirim_wa(
+                    sender,
+                    """❌ *Nama target belum ditemukan.*
+
+    Contoh:
+
+    *hapus target laptop*"""
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+
+            print("========================================")
+            print("🗑 DELETE TARGET")
+            print("NAMA ASLI :", nlp.get("nama"))
+            print("NAMA FINAL:", nama)
+            print("========================================")
+
+
+            # ----------------------------------------------------
+            # CARI TARGET
+            # ----------------------------------------------------
+
+            semua_target = TargetPembelian.query.filter_by(
+                nomor_wa=nomor_owner,
+                aktif=True
+            ).all()
+
+            target = None
+
+            nama_lower = nama.lower()
+
+
+            for item in semua_target:
+
+                item_nama = str(
+                    item.nama or ""
+                ).strip().lower()
+
+                if item_nama == nama_lower:
+
+                    target = item
+                    break
+
+
+            # ----------------------------------------------------
+            # FALLBACK CONTAINS
+            # ----------------------------------------------------
 
             if not target:
 
-                semua_target = TargetPembelian.query.filter_by(
-                    nomor_wa=nomor_owner,
-                    aktif=True
-                ).all()
-
-                nama_lower = nama.lower()
-
                 for item in semua_target:
 
+                    item_nama = str(
+                        item.nama or ""
+                    ).strip().lower()
+
                     if (
-                        str(
-                            item.nama
-                        ).strip().lower()
-                        == nama_lower
+                        nama_lower in item_nama
+                        or
+                        item_nama in nama_lower
                     ):
 
                         target = item
                         break
+
+
+            # ----------------------------------------------------
+            # TIDAK DITEMUKAN
+            # ----------------------------------------------------
 
             if not target:
 
@@ -4620,12 +4837,17 @@ https://www.chatsaku.com
                     status=True
                 )
 
+
+            # ----------------------------------------------------
+            # HAPUS
+            # ----------------------------------------------------
+
             nama_target = target.nama
 
-            # Soft delete lebih aman
             target.aktif = False
 
             db.session.commit()
+
 
             kirim_wa(
                 sender,
@@ -4648,7 +4870,9 @@ https://www.chatsaku.com
 
 
         # ========================================================
-        # DETAIL TARGET
+        # ========================================================
+        # ACTION DETAIL
+        # ========================================================
         # ========================================================
 
         if action == "detail":
@@ -4676,40 +4900,59 @@ https://www.chatsaku.com
                     status=True
                 )
 
+
             nama = str(
                 nama
             ).strip()
 
-            target = TargetPembelian.query.filter_by(
-                nomor_wa=nomor_owner,
-                nama=nama,
-                aktif=True
-            ).first()
 
-            # ====================================================
-            # FALLBACK CASE INSENSITIVE
-            # ====================================================
+            # ----------------------------------------------------
+            # CARI TARGET
+            # ----------------------------------------------------
+
+            semua_target = TargetPembelian.query.filter_by(
+                nomor_wa=nomor_owner,
+                aktif=True
+            ).all()
+
+            target = None
+
+            nama_lower = nama.lower()
+
+
+            for item in semua_target:
+
+                item_nama = str(
+                    item.nama or ""
+                ).strip().lower()
+
+                if item_nama == nama_lower:
+
+                    target = item
+                    break
+
+
+            # ----------------------------------------------------
+            # FALLBACK CONTAINS
+            # ----------------------------------------------------
 
             if not target:
 
-                semua_target = TargetPembelian.query.filter_by(
-                    nomor_wa=nomor_owner,
-                    aktif=True
-                ).all()
-
-                nama_lower = nama.lower()
-
                 for item in semua_target:
 
+                    item_nama = str(
+                        item.nama or ""
+                    ).strip().lower()
+
                     if (
-                        str(
-                            item.nama
-                        ).strip().lower()
-                        == nama_lower
+                        nama_lower in item_nama
+                        or
+                        item_nama in nama_lower
                     ):
 
                         target = item
                         break
+
 
             if not target:
 
@@ -4730,6 +4973,11 @@ https://www.chatsaku.com
                 return jsonify(
                     status=True
                 )
+
+
+            # ----------------------------------------------------
+            # HITUNG
+            # ----------------------------------------------------
 
             terkumpul = (
                 target.terkumpul or 0
@@ -4752,9 +5000,11 @@ https://www.chatsaku.com
             )
 
             sisa = max(
-                target_nominal - terkumpul,
+                target_nominal -
+                terkumpul,
                 0
             )
+
 
             deadline_text = "-"
 
@@ -4766,6 +5016,7 @@ https://www.chatsaku.com
                     )
                 )
 
+
             viewer_info = ""
 
             if nomor_owner != sender:
@@ -4773,6 +5024,7 @@ https://www.chatsaku.com
                 viewer_info = (
                     "\n👁 *Mode Viewer*\n"
                 )
+
 
             kirim_wa(
                 sender,
@@ -4817,7 +5069,9 @@ https://www.chatsaku.com
 
 
         # ========================================================
-        # CREATE TARGET
+        # ========================================================
+        # ACTION CREATE
+        # ========================================================
         # ========================================================
 
         if action == "create":
@@ -4834,9 +5088,10 @@ https://www.chatsaku.com
                 "deadline"
             )
 
-            # ====================================================
-            # VALIDASI NAMA
-            # ====================================================
+
+            # ----------------------------------------------------
+            # NAMA
+            # ----------------------------------------------------
 
             if not nama:
 
@@ -4855,15 +5110,29 @@ https://www.chatsaku.com
                     status=True
                 )
 
-            # ====================================================
-            # VALIDASI NOMINAL
-            # ====================================================
 
-            nominal = parse_nominal_finance(
-                str(nominal)
-            ) if nominal else parse_nominal_finance(
-                message
-            )
+            # ----------------------------------------------------
+            # NOMINAL
+            # ----------------------------------------------------
+
+            try:
+
+                if nominal:
+
+                    nominal = int(
+                        float(nominal)
+                    )
+
+                else:
+
+                    nominal = parse_nominal_finance(
+                        message
+                    )
+
+            except Exception:
+
+                nominal = None
+
 
             if not nominal or nominal <= 0:
 
@@ -4882,9 +5151,10 @@ https://www.chatsaku.com
                     status=True
                 )
 
-            # ====================================================
+
+            # ----------------------------------------------------
             # DEADLINE
-            # ====================================================
+            # ----------------------------------------------------
 
             if isinstance(
                 deadline,
@@ -4895,11 +5165,13 @@ https://www.chatsaku.com
                     deadline
                 )
 
+
             if not deadline:
 
                 deadline = parse_deadline_finance(
                     message
                 )
+
 
             if not deadline:
 
@@ -4924,9 +5196,10 @@ https://www.chatsaku.com
                     status=True
                 )
 
-            # ====================================================
+
+            # ----------------------------------------------------
             # DEADLINE TIDAK BOLEH LEWAT
-            # ====================================================
+            # ----------------------------------------------------
 
             if deadline < date.today():
 
@@ -4947,13 +5220,15 @@ https://www.chatsaku.com
                     status=True
                 )
 
-            # ====================================================
-            # NORMALISASI NAMA
-            # ====================================================
+
+            # ----------------------------------------------------
+            # CLEAN NAMA
+            # ----------------------------------------------------
 
             nama = clean_target_name(
                 nama
             )
+
 
             if not nama:
 
@@ -4970,19 +5245,21 @@ https://www.chatsaku.com
                     status=True
                 )
 
-            # ====================================================
+
+            # ----------------------------------------------------
             # OWNER
-            # ====================================================
+            # ----------------------------------------------------
 
             nomor_owner = get_owner_number(
                 sender
             )
 
-            # ====================================================
-            # CEK TARGET DUPLIKAT
-            # ====================================================
 
-            cek = TargetPembelian.query.filter_by(
+            # ----------------------------------------------------
+            # CEK DUPLIKAT
+            # ----------------------------------------------------
+
+            semua_target = TargetPembelian.query.filter_by(
                 nomor_wa=nomor_owner,
                 aktif=True
             ).all()
@@ -4991,17 +5268,19 @@ https://www.chatsaku.com
 
             target_sama = None
 
-            for item in cek:
+
+            for item in semua_target:
 
                 if (
                     str(
-                        item.nama
+                        item.nama or ""
                     ).strip().lower()
                     == nama_lower
                 ):
 
                     target_sama = item
                     break
+
 
             if target_sama:
 
@@ -5015,6 +5294,23 @@ https://www.chatsaku.com
                         )
                     )
 
+
+                terkumpul_lama = (
+                    target_sama.terkumpul or 0
+                )
+
+                target_lama = (
+                    target_sama.target or 0
+                )
+
+                progress_lama = round(
+                    (
+                        terkumpul_lama /
+                        target_lama
+                    ) * 100
+                ) if target_lama else 0
+
+
                 kirim_wa(
                     sender,
                     f"""⚠️ *Target tersebut sudah ada.*
@@ -5023,13 +5319,13 @@ https://www.chatsaku.com
     {target_sama.nama}
 
     💰 *Target*
-    Rp {(target_sama.target or 0):,.0f}
+    Rp {target_lama:,.0f}
 
     💵 *Terkumpul*
-    Rp {(target_sama.terkumpul or 0):,.0f}
+    Rp {terkumpul_lama:,.0f}
 
     📊 *Progress*
-    {round(((target_sama.terkumpul or 0) / target_sama.target) * 100) if target_sama.target else 0}%
+    {progress_lama}%
 
     📅 *Deadline*
     {deadline_lama}
@@ -5043,24 +5339,19 @@ https://www.chatsaku.com
                     status=True
                 )
 
-            # ====================================================
+
+            # ----------------------------------------------------
             # CREATE DATABASE
-            # ====================================================
+            # ----------------------------------------------------
 
             try:
 
                 target = TargetPembelian(
-
                     nomor_wa=nomor_owner,
-
                     nama=nama,
-
                     target=nominal,
-
                     deadline=deadline,
-
                     terkumpul=0,
-
                     aktif=True
                 )
 
@@ -5069,6 +5360,7 @@ https://www.chatsaku.com
                 )
 
                 db.session.commit()
+
 
             except Exception as e:
 
@@ -5092,9 +5384,10 @@ https://www.chatsaku.com
                     status=False
                 ), 500
 
-            # ====================================================
+
+            # ----------------------------------------------------
             # RESPONSE
-            # ====================================================
+            # ----------------------------------------------------
 
             kirim_wa(
                 sender,
@@ -5128,6 +5421,7 @@ https://www.chatsaku.com
     _ChatSaku Finance Assistant_"""
             )
 
+
             return jsonify({
 
                 "status": True,
@@ -5145,6 +5439,32 @@ https://www.chatsaku.com
                 )
 
             })
+
+
+        # ========================================================
+        # ACTION TIDAK DIKENALI
+        # ========================================================
+
+        kirim_wa(
+            sender,
+            """❌ *Perintah target tidak dikenali.*
+
+    Contoh:
+
+    🎯 *target*
+
+    🎯 *target laptop*
+
+    🎯 *target laptop 12000000 31-12-2026*
+
+    🗑 *hapus target laptop*
+
+    _ChatSaku Finance Assistant_"""
+        )
+
+        return jsonify(
+            status=True
+        )
 
 
     # ============================================================
