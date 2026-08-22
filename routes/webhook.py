@@ -469,7 +469,7 @@ https://www.chatsaku.com
     # =====================================================
     valid_command = (
         cmd == "saldo"
-        or cmd == "hariini"
+        or cmd == "hari ini"
         or cmd == "insight"
         or cmd == "dashboard"
         or cmd == "viewer"
@@ -1906,7 +1906,7 @@ _ChatSaku Finance Assistant_
     # =========================
     # HARI INI
     # =========================
-    if cmd == "hariini":
+    if cmd == "hari ini":
 
         nomor = get_owner_number(sender)
 
@@ -3289,7 +3289,7 @@ Mencatat pemasukan & pengeluaran hanya dengan chat.
 • saldo
    Melihat saldo terbaru.
 
-• hariini
+• hari ini
    Ringkasan transaksi hari ini.
 
 • dashboard
