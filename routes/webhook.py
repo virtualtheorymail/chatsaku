@@ -2222,6 +2222,42 @@ https://www.chatsaku.com
         return jsonify(status=True)
 
     # ============================================================
+    # NORMALISASI INTENT TARGET
+    # ============================================================
+
+    target_nlp = deteksi_target_nlp(
+        message,
+        nlp
+    )
+
+    print("========================================")
+    print("🎯 DETEKSI TARGET NLP")
+    print("MESSAGE :", message)
+    print("RESULT  :", target_nlp)
+    print("========================================")
+
+    if target_nlp:
+
+        # Jika ada deadline, ini adalah PEMBUATAN TARGET
+        if target_nlp.get("deadline"):
+
+            intent = "target"
+
+            nlp["intent"] = "target"
+            nlp["action"] = "create"
+            nlp["nama"] = target_nlp.get("nama")
+            nlp["nominal"] = target_nlp.get("nominal")
+            nlp["deadline"] = target_nlp.get("deadline")
+
+            print("🎯 INTENT DIUBAH MENJADI TARGET")
+
+        else:
+
+            # Tidak ada deadline → jangan ubah
+            # tetap mengikuti intent NLP utama
+            print("💰 BUKAN TARGET, LANJUT KE INTENT:", intent)
+
+    # ============================================================
     # TARGET / BUAT TARGET TABUNGAN
     # NLP INTENT = target
     # ============================================================
