@@ -15,6 +15,7 @@ from itsdangerous import SignatureExpired
 
 from utils.duplicate import is_duplicate
 from utils.helper import *
+from nlp_router import parse_message
 
 webhook_bp = Blueprint("webhook", __name__)
 
@@ -464,6 +465,9 @@ https://www.chatsaku.com
 
         return jsonify(status=True)
 
+    nlp = parse_message(message)
+
+    intent = nlp["intent"]
     # =====================================================
     # HANYA RESPON COMMAND YANG DIKENAL
     # =====================================================
@@ -1522,7 +1526,8 @@ _ChatSaku Finance Assistant_"""
     # =========================
     # SALDO
     # =========================
-    if cmd == "saldo":
+    # if cmd == "saldo":
+    if intent == "saldo":
 
         nomor = get_owner_number(sender)
 
