@@ -3456,14 +3456,33 @@ https://www.chatsaku.com
     print("MESSAGE :", message)
     print("========================================")
 
+
+    # ============================================================
+    # PARSE NLP UTAMA
+    # ============================================================
+
     try:
 
-        nlp = parse_message(message)
+        nlp = parse_message(
+            message
+        )
+
+        if not isinstance(
+            nlp,
+            dict
+        ):
+
+            nlp = {
+                "intent": None,
+                "nominal": None,
+                "keterangan": message
+            }
 
         print("========================================")
         print("🧠 PARSE NLP SELESAI")
         print("NLP :", nlp)
         print("========================================")
+
 
     except Exception as e:
 
@@ -3475,20 +3494,286 @@ https://www.chatsaku.com
 
         nlp = {
             "intent": None,
+            "action": None,
+            "nama": None,
             "nominal": None,
+            "deadline": None,
             "keterangan": message
         }
 
 
-    intent = nlp.get("intent")
+    # ============================================================
+    # PASTIKAN FIELD NLP ADA
+    # ============================================================
+
+    if "intent" not in nlp:
+        nlp["intent"] = None
+
+    if "action" not in nlp:
+        nlp["action"] = None
+
+    if "nama" not in nlp:
+        nlp["nama"] = None
+
+    if "nominal" not in nlp:
+        nlp["nominal"] = None
+
+    if "deadline" not in nlp:
+        nlp["deadline"] = None
+
+    if "keterangan" not in nlp:
+        nlp["keterangan"] = message
+
+
+    # ============================================================
+    # NORMALISASI HUTANG NLP
+    #
+    # INI WAJIB SEBELUM:
+    #
+    # intent = nlp.get("intent")
+    #
+    # dan sebelum:
+    #
+    # if not intent:
+    #
+    # ============================================================
+
+    print("========================================")
+    print("💳 CEK HUTANG NLP")
+    print("MESSAGE :", message)
+    print("========================================")
+
+
+    try:
+
+        hutang_nlp = deteksi_hutang_nlp(
+            message,
+            nlp
+        )
+
+    except Exception as e:
+
+        print("========================================")
+        print("❌ ERROR deteksi_hutang_nlp()")
+        print("ERROR :", repr(e))
+        print("========================================")
+
+        hutang_nlp = None
 
 
     print("========================================")
-    print("🤖 NLP RESULT")
+    print("💳 HUTANG NLP RESULT")
+    print("RESULT :", hutang_nlp)
+    print("========================================")
+
+
+    if hutang_nlp:
+
+        nlp["intent"] = hutang_nlp.get(
+            "intent"
+        )
+
+        nlp["action"] = hutang_nlp.get(
+            "action"
+        )
+
+        nlp["nama"] = hutang_nlp.get(
+            "nama"
+        )
+
+        nlp["nominal"] = hutang_nlp.get(
+            "nominal"
+        )
+
+        nlp["keterangan"] = hutang_nlp.get(
+            "keterangan"
+        )
+
+        print("========================================")
+        print("💳 HUTANG BERHASIL DINORMALISASI")
+        print("INTENT     :", nlp.get("intent"))
+        print("ACTION     :", nlp.get("action"))
+        print("NAMA       :", nlp.get("nama"))
+        print("NOMINAL    :", nlp.get("nominal"))
+        print("KETERANGAN :", nlp.get("keterangan"))
+        print("========================================")
+
+
+    # ============================================================
+    # NORMALISASI TARGET NLP
+    # ============================================================
+
+    print("========================================")
+    print("🎯 CEK TARGET NLP")
+    print("MESSAGE :", message)
+    print("========================================")
+
+
+    try:
+
+        target_nlp = deteksi_target_nlp(
+            message,
+            nlp
+        )
+
+    except Exception as e:
+
+        print("========================================")
+        print("❌ ERROR deteksi_target_nlp()")
+        print("ERROR :", repr(e))
+        print("========================================")
+
+        target_nlp = None
+
+
+    print("========================================")
+    print("🎯 TARGET NLP RESULT")
+    print("RESULT :", target_nlp)
+    print("========================================")
+
+
+    if target_nlp:
+
+        nlp["intent"] = target_nlp.get(
+            "intent"
+        )
+
+        nlp["action"] = target_nlp.get(
+            "action"
+        )
+
+        nlp["nama"] = target_nlp.get(
+            "nama"
+        )
+
+        nlp["nominal"] = target_nlp.get(
+            "nominal"
+        )
+
+        nlp["deadline"] = target_nlp.get(
+            "deadline"
+        )
+
+        print("========================================")
+        print("🎯 TARGET BERHASIL DINORMALISASI")
+        print("INTENT   :", nlp.get("intent"))
+        print("ACTION   :", nlp.get("action"))
+        print("NAMA     :", nlp.get("nama"))
+        print("NOMINAL  :", nlp.get("nominal"))
+        print("DEADLINE :", nlp.get("deadline"))
+        print("========================================")
+
+
+    # ============================================================
+    # NORMALISASI REMINDER NLP
+    # ============================================================
+
+    print("========================================")
+    print("🔔 CEK REMINDER NLP")
+    print("MESSAGE :", message)
+    print("========================================")
+
+
+    try:
+
+        reminder_nlp = deteksi_reminder_nlp(
+            message,
+            nlp
+        )
+
+    except Exception as e:
+
+        print("========================================")
+        print("❌ ERROR deteksi_reminder_nlp()")
+        print("ERROR :", repr(e))
+        print("========================================")
+
+        reminder_nlp = None
+
+
+    print("========================================")
+    print("🔔 REMINDER NLP RESULT")
+    print("RESULT :", reminder_nlp)
+    print("========================================")
+
+
+    if reminder_nlp:
+
+        nlp["intent"] = reminder_nlp.get(
+            "intent"
+        )
+
+        nlp["action"] = reminder_nlp.get(
+            "action"
+        )
+
+        nlp["nama"] = reminder_nlp.get(
+            "nama"
+        )
+
+        nlp["nominal"] = reminder_nlp.get(
+            "nominal"
+        )
+
+        nlp["tanggal"] = reminder_nlp.get(
+            "tanggal"
+        )
+
+        nlp["keterangan"] = reminder_nlp.get(
+            "keterangan"
+        )
+
+        print("========================================")
+        print("🔔 REMINDER BERHASIL DINORMALISASI")
+        print("INTENT     :", nlp.get("intent"))
+        print("ACTION     :", nlp.get("action"))
+        print("NAMA       :", nlp.get("nama"))
+        print("NOMINAL    :", nlp.get("nominal"))
+        print("TANGGAL    :", nlp.get("tanggal"))
+        print("KETERANGAN :", nlp.get("keterangan"))
+        print("========================================")
+
+
+    # ============================================================
+    # INTENT FINAL
+    # ============================================================
+
+    intent = nlp.get(
+        "intent"
+    )
+
+    action = nlp.get(
+        "action"
+    )
+
+
+    print("========================================")
+    print("🤖 NLP RESULT FINAL")
     print("TEXT   :", message)
     print("INTENT :", intent)
+    print("ACTION :", action)
     print("DATA   :", nlp)
     print("========================================")
+
+
+    # ============================================================
+    # IGNORE NON COMMAND
+    #
+    # HARUS PALING BAWAH
+    # ============================================================
+
+    if not intent:
+
+        print("========================================")
+        print("🚫 IGNORE NON COMMAND")
+        print("MESSAGE :", message)
+        print("INTENT  :", intent)
+        print("DATA    :", nlp)
+        print("========================================")
+
+        return jsonify(
+            status=True
+        )
 
 
     # ============================================================
