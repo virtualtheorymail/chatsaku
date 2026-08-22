@@ -3304,6 +3304,7 @@ def deteksi_hutang_nlp(message, data=None):
 
 # ============================================================
 # DETEKSI PIUTANG NLP
+# KHUSUS PIUTANG - TIDAK DIGABUNG DENGAN HUTANG
 # ============================================================
 
 def deteksi_piutang_nlp(message, data=None):
@@ -3312,6 +3313,9 @@ def deteksi_piutang_nlp(message, data=None):
         return None
 
     text = str(message).strip()
+
+    if not text:
+        return None
 
     text_lower = re.sub(
         r'\s+',
@@ -3323,52 +3327,11 @@ def deteksi_piutang_nlp(message, data=None):
         data = {}
 
     # ========================================================
-    # ACTION LIST
+    # PENTING
+    # Fungsi ini HANYA menangani PIUTANG.
+    #
+    # Jangan gunakan kata "hutang" sebagai trigger piutang.
     # ========================================================
-
-    pola_list = [
-
-        r'^piutang$',
-
-        r'^list piutang$',
-        r'^daftar piutang$',
-
-        r'^lihat piutang$',
-        r'^lihat semua piutang$',
-
-        r'^cek piutang$',
-        r'^cek semua piutang$',
-
-        r'^piutang saya$',
-        r'^piutang saya apa$',
-        r'^piutang saya apa saja$',
-
-        r'^saya punya piutang$',
-        r'^saya punya piutang apa$',
-        r'^saya punya piutang apa saja$',
-
-        r'^saya punya list piutang$',
-        r'^saya punya daftar piutang$',
-
-        r'^apa piutang saya$',
-        r'^apa saja piutang saya$'
-    ]
-
-    for pola in pola_list:
-
-        if re.search(
-            pola,
-            text_lower,
-            re.IGNORECASE
-        ):
-
-            return {
-                "intent": "piutang",
-                "action": "list",
-                "nama": None,
-                "nominal": None,
-                "keterangan": None
-            }
 
     # ========================================================
     # ACTION DELETE
@@ -3383,6 +3346,7 @@ def deteksi_piutang_nlp(message, data=None):
         r'^hapus\s+piutang\s*:\s*(.+)$',
 
         r'^hapuspiutang\s+(.+)$'
+
     ]
 
     for pola in pola_delete:
@@ -3397,15 +3361,153 @@ def deteksi_piutang_nlp(message, data=None):
 
             nama = match.group(1).strip()
 
-            if nama:
+            # Jangan bawa kata tambahan ke nama
+            nama = re.sub(
+                r'\s+',
+                ' ',
+                nama
+            ).strip()
 
-                return {
-                    "intent": "piutang",
-                    "action": "delete",
-                    "nama": nama,
-                    "nominal": None,
-                    "keterangan": None
-                }
+            return {
+
+                "intent": "piutang",
+
+                "action": "delete",
+
+                "nama": nama,
+
+                "nominal": None,
+
+                "keterangan": None
+
+            }
+
+    # ========================================================
+    # ACTION LIST
+    # ========================================================
+
+    pola_list = [
+
+        r'^piutang$',
+
+        r'^list\s+piutang$',
+
+        r'^daftar\s+piutang$',
+
+        r'^lihat\s+piutang$',
+
+        r'^cek\s+piutang$',
+
+        r'^lihat\s+semua\s+piutang$',
+
+        r'^cek\s+semua\s+piutang$',
+
+        r'^piutang\s+saya$',
+
+        r'^list\s+piutang\s+saya$',
+
+        r'^daftar\s+piutang\s+saya$',
+
+        r'^lihat\s+piutang\s+saya$',
+
+        r'^cek\s+piutang\s+saya$',
+
+        r'^saya\s+punya\s+piutang\s+apa$',
+
+        r'^saya\s+punya\s+piutang\s+apa\s+saja$',
+
+        r'^piutang\s+saya\s+apa$',
+
+        r'^piutang\s+saya\s+apa\s+saja$',
+
+        r'^apa\s+piutang\s+saya$',
+
+        r'^apa\s+saja\s+piutang\s+saya$'
+
+    ]
+
+    for pola in pola_list:
+
+        if re.search(
+            pola,
+            text_lower,
+            re.IGNORECASE
+        ):
+
+            return {
+
+                "intent": "piutang",
+
+                "action": "list",
+
+                "nama": None,
+
+                "nominal": None,
+
+                "keterangan": None
+
+            }
+
+    # ========================================================
+    # DETEKSI CREATE
+    #
+    # Contoh:
+    #
+    # piutang budi 500000
+    #
+    # catat piutang budi 500000
+    #
+    # catat piutang ke budi 500000
+    #
+    # saya punya piutang ke budi 500000
+    #
+    # catat piutang ke mia beli baso 4000
+    # ========================================================
+
+    pola_create = [
+
+        r'^piutang\s+',
+
+        r'^catat\s+piutang\s+',
+
+        r'^buat\s+piutang\s+',
+
+        r'^buatkan\s+piutang\s+',
+
+        r'^tambahkan\s+piutang\s+',
+
+        r'^tambah\s+piutang\s+',
+
+        r'^saya\s+punya\s+piutang\s+',
+
+        r'^saya\s+memiliki\s+piutang\s+',
+
+        r'^ada\s+piutang\s+'
+
+    ]
+
+    ada_create = any(
+        re.search(
+            pola,
+            text_lower,
+            re.IGNORECASE
+        )
+        for pola in pola_create
+    )
+
+    if not ada_create:
+
+        # ====================================================
+        # FALLBACK DARI NLP UTAMA
+        # ====================================================
+
+        if data.get("intent") == "piutang":
+
+            ada_create = True
+
+        else:
+
+            return None
 
     # ========================================================
     # NOMINAL
@@ -3419,212 +3521,292 @@ def deteksi_piutang_nlp(message, data=None):
             text
         )
 
-    except Exception as e:
+    except Exception:
 
-        print(
-            "❌ ERROR PARSE NOMINAL PIUTANG:",
-            repr(e)
-        )
+        try:
 
-        nominal = None
+            nominal = normalize_nominal(
+                text
+            )
+
+        except Exception:
+
+            nominal = None
 
     # ========================================================
-    # CREATE PIUTANG
+    # NAMA
     # ========================================================
 
-    pola_create = [
+    nama = None
 
-        r'^piutang\s+',
+    # --------------------------------------------------------
+    # Pola:
+    #
+    # catat piutang ke mia beli baso 4000
+    # piutang ke budi 500000
+    # --------------------------------------------------------
 
-        r'^piutang\s+ke\s+',
-
-        r'^saya\s+punya\s+piutang\s+',
-
-        r'^saya\s+memberi\s+piutang\s+',
-
-        r'^saya\s+memberikan\s+piutang\s+',
-
-        r'^saya\s+meminjamkan\s+',
-
-        r'^saya\s+kasih\s+pinjaman\s+',
-
-        r'^saya\s+memberi\s+pinjaman\s+',
-
-        r'^saya\s+memberikan\s+pinjaman\s+',
-
-        r'^kasih\s+pinjaman\s+',
-
-        r'^beri\s+pinjaman\s+',
-
-        r'^memberi\s+pinjaman\s+',
-
-        r'^memberikan\s+pinjaman\s+'
-    ]
-
-    ada_create = any(
-        re.search(
-            pola,
-            text_lower,
-            re.IGNORECASE
-        )
-        for pola in pola_create
+    match_ke = re.search(
+        r'\bpiutang\s+ke\s+(.+)',
+        text_lower,
+        re.IGNORECASE
     )
 
+    if match_ke:
+
+        nama_text = match_ke.group(1).strip()
+
+        # Hapus nominal dari belakang
+        if nominal:
+
+            nama_text = re.sub(
+                r'(?:rp\s*)?'
+                r'\d+(?:[.,]\d+)?'
+                r'\s*(?:ribu|rb|juta|jt|miliar|milyar)?\s*$',
+                '',
+                nama_text,
+                flags=re.IGNORECASE
+            ).strip()
+
+        # Ambil nama sebelum keterangan.
+        #
+        # Contoh:
+        # mia beli baso
+        #
+        # nama = mia
+        # keterangan = beli baso
+        #
+        # Untuk pola "ke", kata pertama dianggap nama.
+        parts = nama_text.split()
+
+        if parts:
+
+            nama = parts[0]
+
+    # --------------------------------------------------------
+    # Pola tanpa "ke":
+    #
+    # piutang budi 500000
+    # catat piutang budi 500000 makan
+    # --------------------------------------------------------
+
+    if not nama:
+
+        pola_nama = [
+
+            r'^piutang\s+(.+)$',
+
+            r'^catat\s+piutang\s+(.+)$',
+
+            r'^buat\s+piutang\s+(.+)$',
+
+            r'^buatkan\s+piutang\s+(.+)$',
+
+            r'^tambahkan\s+piutang\s+(.+)$',
+
+            r'^tambah\s+piutang\s+(.+)$',
+
+            r'^saya\s+punya\s+piutang\s+(.+)$',
+
+            r'^saya\s+memiliki\s+piutang\s+(.+)$',
+
+            r'^ada\s+piutang\s+(.+)$'
+
+        ]
+
+        for pola in pola_nama:
+
+            match = re.search(
+                pola,
+                text_lower,
+                re.IGNORECASE
+            )
+
+            if not match:
+                continue
+
+            nama_text = match.group(1).strip()
+
+            # Hapus nominal
+            if nominal:
+
+                nama_text = re.sub(
+                    r'(?:rp\s*)?'
+                    r'\d+(?:[.,]\d+)?'
+                    r'\s*(?:ribu|rb|juta|jt|miliar|milyar)?',
+                    '',
+                    nama_text,
+                    flags=re.IGNORECASE
+                )
+
+            nama_text = re.sub(
+                r'\s+',
+                ' ',
+                nama_text
+            ).strip()
+
+            parts = nama_text.split()
+
+            if parts:
+
+                nama = parts[0]
+
+            break
+
     # ========================================================
-    # NLP UTAMA SUDAH PIUTANG
+    # KETERANGAN
     # ========================================================
 
-    if data.get("intent") == "piutang":
+    keterangan = ""
 
-        # Jangan menganggap kalimat list sebagai create
-        if any(
-            kata in text_lower
-            for kata in [
-                "list piutang",
-                "daftar piutang",
-                "lihat piutang",
-                "cek piutang",
-                "piutang saya",
-                "punya piutang apa",
-                "piutang apa"
-            ]
-        ):
+    # --------------------------------------------------------
+    # Pola "ke":
+    #
+    # catat piutang ke mia beli baso 4000
+    #
+    # nama = mia
+    # keterangan = beli baso
+    # --------------------------------------------------------
 
-            return {
-                "intent": "piutang",
-                "action": "list",
-                "nama": None,
-                "nominal": None,
-                "keterangan": None
-            }
+    match_ke = re.search(
+        r'\bpiutang\s+ke\s+(.+)',
+        text_lower,
+        re.IGNORECASE
+    )
 
-        # Jika action dari NLP utama sudah ada
-        if data.get("action") in (
-            "list",
-            "create",
-            "delete"
-        ):
+    if match_ke:
 
-            return {
-                "intent": "piutang",
-                "action": data.get("action"),
-                "nama": data.get("nama"),
-                "nominal": data.get("nominal"),
-                "keterangan": data.get("keterangan")
-            }
+        isi = match_ke.group(1).strip()
 
-    # ========================================================
-    # CREATE
-    # ========================================================
-
-    if ada_create and nominal:
-
-        nama = text
-
-        # ====================================================
-        # HAPUS NOMINAL
-        # ====================================================
-
-        nama = re.sub(
-            r'(?:rp\s*)?[\d.,]+\s*'
-            r'(?:juta|jt|ribu|rb|miliar|milyar)?',
+        # Hapus nominal
+        isi = re.sub(
+            r'(?:rp\s*)?'
+            r'\d+(?:[.,]\d+)?'
+            r'\s*(?:ribu|rb|juta|jt|miliar|milyar)?\s*$',
             '',
-            nama,
+            isi,
+            flags=re.IGNORECASE
+        ).strip()
+
+        parts = isi.split()
+
+        if len(parts) > 1:
+
+            keterangan = " ".join(
+                parts[1:]
+            )
+
+    else:
+
+        # ----------------------------------------------------
+        # Pola biasa:
+        #
+        # piutang budi 500000 makan
+        #
+        # Ambil semua kata setelah nama dan nominal
+        # sebagai keterangan.
+        # ----------------------------------------------------
+
+        cleaned = text_lower
+
+        # Hapus prefix
+        cleaned = re.sub(
+            r'^(catat|buat|buatkan|tambahkan|tambah)\s+',
+            '',
+            cleaned,
             flags=re.IGNORECASE
         )
 
-        # ====================================================
-        # HAPUS KATA PEMBUKA
-        # ====================================================
-
-        pola_hapus = [
-
-            r'^piutang\s+ke\s+',
-
+        cleaned = re.sub(
             r'^piutang\s+',
+            '',
+            cleaned,
+            flags=re.IGNORECASE
+        )
 
-            r'^saya\s+punya\s+piutang\s+',
+        cleaned = re.sub(
+            r'^ke\s+',
+            '',
+            cleaned,
+            flags=re.IGNORECASE
+        )
 
-            r'^saya\s+memberi\s+piutang\s+',
+        # Hapus nama
+        if nama:
 
-            r'^saya\s+memberikan\s+piutang\s+',
-
-            r'^saya\s+meminjamkan\s+',
-
-            r'^saya\s+kasih\s+pinjaman\s+',
-
-            r'^saya\s+memberi\s+pinjaman\s+',
-
-            r'^saya\s+memberikan\s+pinjaman\s+',
-
-            r'^kasih\s+pinjaman\s+',
-
-            r'^beri\s+pinjaman\s+',
-
-            r'^memberi\s+pinjaman\s+',
-
-            r'^memberikan\s+pinjaman\s+'
-        ]
-
-        for pola in pola_hapus:
-
-            nama = re.sub(
-                pola,
+            cleaned = re.sub(
+                r'^' + re.escape(nama) + r'\b',
                 '',
-                nama,
+                cleaned,
                 flags=re.IGNORECASE
             )
 
-        nama = re.sub(
+        # Hapus nominal
+        cleaned = re.sub(
+            r'(?:rp\s*)?'
+            r'\d+(?:[.,]\d+)?'
+            r'\s*(?:ribu|rb|juta|jt|miliar|milyar)?',
+            '',
+            cleaned,
+            flags=re.IGNORECASE
+        )
+
+        cleaned = re.sub(
             r'\s+',
             ' ',
-            nama
+            cleaned
         ).strip()
 
-        if not nama:
+        keterangan = cleaned
 
-            return {
-                "intent": "piutang",
-                "action": "create",
-                "nama": None,
-                "nominal": nominal,
-                "keterangan": None
-            }
+    # ========================================================
+    # BERSIHKAN KETERANGAN
+    # ========================================================
 
-        # ====================================================
-        # KETERANGAN
-        # ====================================================
+    keterangan = re.sub(
+        r'^(ke|untuk|karena)\s+',
+        '',
+        keterangan,
+        flags=re.IGNORECASE
+    ).strip()
 
-        keterangan = ""
+    # ========================================================
+    # VALIDASI
+    # ========================================================
 
-        # Ambil kata setelah nama secara sederhana.
-        # Untuk format:
-        # piutang agus 300000 makan bersama
-        #
-        # nama = agus
-        # keterangan = makan bersama
-
-        words = nama.split()
-
-        if len(words) > 1:
-
-            nama_orang = words[0]
-
-            keterangan = " ".join(
-                words[1:]
-            )
-
-            nama = nama_orang
+    if not nama:
 
         return {
+
             "intent": "piutang",
+
             "action": "create",
-            "nama": nama,
+
+            "nama": None,
+
             "nominal": nominal,
+
             "keterangan": keterangan or None
+
         }
 
-    return None
+    # ========================================================
+    # RETURN
+    # ========================================================
+
+    return {
+
+        "intent": "piutang",
+
+        "action": "create",
+
+        "nama": nama.strip(),
+
+        "nominal": nominal,
+
+        "keterangan": keterangan or None
+
+    }
 
 def refresh_summary_after_transaction(tanggal_transaksi):
     """
@@ -10336,7 +10518,8 @@ _ChatSaku Finance Assistant_
 
 
     # ============================================================
-    # NORMALISASI INTENT PIUTANG
+    # NORMALISASI INTENT PIUTANG NLP
+    # KHUSUS PIUTANG
     # ============================================================
 
     piutang_nlp = deteksi_piutang_nlp(
@@ -10345,7 +10528,7 @@ _ChatSaku Finance Assistant_
     )
 
     print("========================================")
-    print("📥 DETEKSI PIUTANG NLP")
+    print("📥 PIUTANG NLP")
     print("MESSAGE :", message)
     print("RESULT  :", piutang_nlp)
     print("========================================")
@@ -10355,26 +10538,13 @@ _ChatSaku Finance Assistant_
         intent = "piutang"
 
         nlp["intent"] = "piutang"
-
-        nlp["action"] = piutang_nlp.get(
-            "action"
-        )
-
-        nlp["nama"] = piutang_nlp.get(
-            "nama"
-        )
-
-        nlp["nominal"] = piutang_nlp.get(
-            "nominal"
-        )
-
-        nlp["keterangan"] = piutang_nlp.get(
-            "keterangan"
-        )
+        nlp["action"] = piutang_nlp.get("action")
+        nlp["nama"] = piutang_nlp.get("nama")
+        nlp["nominal"] = piutang_nlp.get("nominal")
+        nlp["keterangan"] = piutang_nlp.get("keterangan")
 
         print("========================================")
-        print("📥 INTENT PIUTANG DINORMALISASI")
-        print("INTENT     :", intent)
+        print("📥 INTENT PIUTANG DIUBAH")
         print("ACTION     :", nlp.get("action"))
         print("NAMA       :", nlp.get("nama"))
         print("NOMINAL    :", nlp.get("nominal"))
