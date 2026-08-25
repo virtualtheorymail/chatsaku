@@ -16,7 +16,7 @@ from itsdangerous import SignatureExpired
 from utils.duplicate import is_duplicate
 from utils.helper import *
 from routes.nlp_router import parse_message
-from routes.nlp import deteksi_user_nlp
+from routes.nlp import *
 import re
 
 webhook_bp = Blueprint("webhook", __name__)
@@ -4640,6 +4640,74 @@ https://www.chatsaku.com
         print("PAKET  :", nlp.get("paket"))
         print("DURASI :", nlp.get("durasi"))
         print("ERROR  :", nlp.get("error"))
+        print("========================================")
+
+    # ============================================================
+    # NORMALISASI BAYAR HUTANG NLP
+    # ============================================================
+
+    print("========================================")
+    print("💰 CEK BAYAR HUTANG NLP")
+    print("MESSAGE :", message)
+    print("========================================")
+
+    try:
+
+        bayarhutang_nlp = deteksi_bayarhutang_nlp(
+            message,
+            nlp
+        )
+
+    except Exception as e:
+
+        print("========================================")
+        print("❌ ERROR deteksi_bayarhutang_nlp()")
+        print("ERROR :", repr(e))
+        print("========================================")
+
+        bayarhutang_nlp = None
+
+
+    print("========================================")
+    print("💰 BAYAR HUTANG NLP RESULT")
+    print("RESULT :", bayarhutang_nlp)
+    print("========================================")
+
+
+    if bayarhutang_nlp:
+
+        nlp["intent"] = bayarhutang_nlp.get(
+            "intent"
+        )
+
+        nlp["action"] = bayarhutang_nlp.get(
+            "action"
+        )
+
+        nlp["nama"] = bayarhutang_nlp.get(
+            "nama"
+        )
+
+        nlp["nominal"] = bayarhutang_nlp.get(
+            "nominal"
+        )
+
+        nlp["keterangan"] = bayarhutang_nlp.get(
+            "keterangan"
+        )
+
+        nlp["error"] = bayarhutang_nlp.get(
+            "error"
+        )
+
+        print("========================================")
+        print("💰 BAYAR HUTANG BERHASIL DINORMALISASI")
+        print("INTENT     :", nlp.get("intent"))
+        print("ACTION     :", nlp.get("action"))
+        print("NAMA       :", nlp.get("nama"))
+        print("NOMINAL    :", nlp.get("nominal"))
+        print("KETERANGAN :", nlp.get("keterangan"))
+        print("ERROR      :", nlp.get("error"))
         print("========================================")
 
 
