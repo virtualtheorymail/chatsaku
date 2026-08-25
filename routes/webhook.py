@@ -11806,8 +11806,16 @@ _ChatSaku Finance Assistant_
         # = LUNAS SELURUHNYA
         # ========================================================
 
-        if not nominal_bayar:
+        nominal_bayar = nlp.get("nominal")
 
+        print("========================================")
+        print("💰 NOMINAL BAYAR DARI NLP")
+        print("NAMA    :", nlp.get("nama"))
+        print("NOMINAL :", nominal_bayar)
+        print("========================================")
+
+        if nominal_bayar is None:
+            # Tidak ada nominal = lunasi seluruh hutang
             nominal_bayar = nominal_hutang
 
         else:

@@ -191,21 +191,15 @@ def deteksi_bayarhutang_nlp(
     print("========================================")
 
     # ========================================================
-    # ACTION LIST
+    # LIST
     # ========================================================
 
     pola_list = [
-
         r'^bayarhutang$',
-
         r'^bayar\s+hutang$',
-
         r'^list\s+bayar\s+hutang$',
-
         r'^daftar\s+bayar\s+hutang$',
-
         r'^lihat\s+bayar\s+hutang$'
-
     ]
 
     for pola in pola_list:
@@ -216,80 +210,141 @@ def deteksi_bayarhutang_nlp(
             re.IGNORECASE
         ):
 
-            print("💰 BAYAR HUTANG LIST TERDETEKSI")
-
             return {
-
                 "intent": "bayarhutang",
-
                 "action": "list",
-
                 "nama": None,
-
                 "nominal": None,
-
                 "keterangan": None
-
             }
 
     # ========================================================
-    # ACTION PAY
+    # BAYAR
     # ========================================================
 
     pola_bayar = [
-
         r'^bayarhutang\s+(.+)$',
-
         r'^bayar\s+hutang\s+(.+)$',
-
         r'^bayarkan\s+hutang\s+(.+)$',
-
         r'^saya\s+bayar\s+hutang\s+(.+)$',
-
         r'^aku\s+bayar\s+hutang\s+(.+)$',
-
         r'^kami\s+bayar\s+hutang\s+(.+)$',
-
         r'^sudah\s+bayar\s+hutang\s+(.+)$',
-
         r'^telah\s+bayar\s+hutang\s+(.+)$',
-
         r'^lunasi\s+hutang\s+(.+)$',
-
         r'^lunas\s+hutang\s+(.+)$'
-
     ]
+
+    match_bayar = None
 
     for pola in pola_bayar:
 
-        match = re.search(
+        match_bayar = re.search(
             pola,
             text_lower,
             re.IGNORECASE
         )
 
-        if not match:
-            continue
+        if match_bayar:
+            break
 
-        # ====================================================
-        # ISI SETELAH PREFIX
-        #
-        # bayar hutang mia 4000
-        #
-        # menjadi:
-        #
-        # mia 4000
-        # ====================================================
+    if not match_bayar:
+        return None
 
-        isi = match.group(1).strip()
+    # ========================================================
+    # ISI
+    #
+    # bayar hutang ucup 1000
+    #
+    # isi = ucup 1000
+    # ========================================================
 
-        print("ISI :", isi)
+    isi = match_bayar.group(1).strip()
 
-        # ====================================================
-        # NOMINAL
-        # ====================================================
+    print("ISI :", isi)
 
-        nominal = None
+    # ========================================================
+    # NOMINAL
+    #
+    # PRIORITAS:
+    # Ambil nominal PALING AKHIR
+    # ========================================================
+
+    nominal = None
+
+    pola_nominal_akhir = re.search(
+        r'(?:rp\s*)?'
+        r'(\d+(?:[.,]\d+)?)'
+        r'\s*(juta|jt|ribu|rb|miliar|milyar)?'
+        r'\s*$',
+        isi,
+        re.IGNORECASE
+    )
+
+    if pola_nominal_akhir:
+
+        angka_text = pola_nominal_akhir.group(1)
+        satuan = pola_nominal_akhir.group(2)
+
+        try:
+
+            angka_text = angka_text.replace(
+                ",",
+                "."
+            )
+
+            angka_float = float(
+                angka_text
+            )
+
+            if satuan:
+
+                satuan = satuan.lower()
+
+                if satuan in ["ribu", "rb"]:
+
+                    nominal = int(
+                        angka_float * 1000
+                    )
+
+                elif satuan in ["juta", "jt"]:
+
+                    nominal = int(
+                        angka_float * 1000000
+                    )
+
+                elif satuan in ["miliar", "milyar"]:
+
+                    nominal = int(
+                        angka_float * 1000000000
+                    )
+
+                else:
+
+                    nominal = int(
+                        angka_float
+                    )
+
+            else:
+
+                nominal = int(
+                    angka_float
+                )
+
+        except Exception as e:
+
+            print(
+                "❌ ERROR PARSE NOMINAL:",
+                repr(e)
+            )
+
+            nominal = None
+
+    # ========================================================
+    # FALLBACK NOMINAL
+    # ========================================================
+
+    if nominal is None:
 
         try:
 
@@ -297,12 +352,7 @@ def deteksi_bayarhutang_nlp(
                 isi
             )
 
-        except Exception as e:
-
-            print(
-                "⚠️ parse_nominal_finance gagal:",
-                repr(e)
-            )
+        except Exception:
 
             try:
 
@@ -310,138 +360,85 @@ def deteksi_bayarhutang_nlp(
                     isi
                 )
 
-            except Exception as e2:
-
-                print(
-                    "⚠️ normalize_nominal gagal:",
-                    repr(e2)
-                )
+            except Exception:
 
                 nominal = None
 
-        # ====================================================
-        # NAMA
-        # ====================================================
+    # ========================================================
+    # NAMA
+    # ========================================================
 
-        nama = isi
+    nama = isi
 
-        # ----------------------------------------------------
-        # Hapus nominal di belakang
-        #
-        # mia 4000
-        # mia 4.000
-        # mia 4 ribu
-        # mia 4rb
-        # mia 2 juta
-        # ----------------------------------------------------
+    # Hapus nominal dari belakang
 
-        nama = re.sub(
-            r'\s+(?:rp\s*)?'
-            r'\d+(?:[.,]\d+)?'
-            r'\s*(?:ribu|rb|juta|jt|miliar|milyar)?'
-            r'\s*$',
-            '',
-            nama,
-            flags=re.IGNORECASE
-        ).strip()
+    nama = re.sub(
+        r'\s+(?:rp\s*)?'
+        r'\d+(?:[.,]\d+)?'
+        r'\s*(?:juta|jt|ribu|rb|miliar|milyar)?'
+        r'\s*$',
+        '',
+        nama,
+        flags=re.IGNORECASE
+    ).strip()
 
-        # ----------------------------------------------------
-        # Jika masih ada kata "hutang"
-        #
-        # hutang mia
-        #
-        # menjadi:
-        #
-        # mia
-        # ----------------------------------------------------
+    # Hapus kata hutang
 
-        nama = re.sub(
-            r'^hutang\s+',
-            '',
-            nama,
-            flags=re.IGNORECASE
-        ).strip()
+    nama = re.sub(
+        r'^hutang\s+',
+        '',
+        nama,
+        flags=re.IGNORECASE
+    ).strip()
 
-        # ----------------------------------------------------
-        # Hapus ke / kepada
-        #
-        # kepada mia
-        # ke mia
-        # ----------------------------------------------------
+    # Hapus ke / kepada
 
-        nama = re.sub(
-            r'^(ke|kepada)\s+',
-            '',
-            nama,
-            flags=re.IGNORECASE
-        ).strip()
+    nama = re.sub(
+        r'^(ke|kepada)\s+',
+        '',
+        nama,
+        flags=re.IGNORECASE
+    ).strip()
 
-        # ----------------------------------------------------
-        # Bersihkan spasi
-        # ----------------------------------------------------
+    nama = re.sub(
+        r'\s+',
+        ' ',
+        nama
+    ).strip()
 
-        nama = re.sub(
-            r'\s+',
-            ' ',
-            nama
-        ).strip()
+    # ========================================================
+    # VALIDASI
+    # ========================================================
 
-        # ====================================================
-        # VALIDASI NAMA
-        # ====================================================
+    if not nama:
 
-        if not nama:
-
-            print(
-                "❌ NAMA BAYAR HUTANG TIDAK DITEMUKAN"
-            )
-
-            return {
-
-                "intent": "bayarhutang",
-
-                "action": "pay",
-
-                "nama": None,
-
-                "nominal": nominal,
-
-                "keterangan": None,
-
-                "error": "nama"
-
-            }
-
-        # ====================================================
-        # RETURN
-        # ====================================================
-
-        result = {
-
+        return {
             "intent": "bayarhutang",
-
             "action": "pay",
-
-            "nama": nama,
-
+            "nama": None,
             "nominal": nominal,
-
-            "keterangan": None
-
+            "keterangan": None,
+            "error": "nama"
         }
 
-        print("========================================")
-        print("💰 BAYAR HUTANG TERDETEKSI")
-        print("INTENT  :", result["intent"])
-        print("ACTION  :", result["action"])
-        print("NAMA    :", result["nama"])
-        print("NOMINAL :", result["nominal"])
-        print("========================================")
-
-        return result
-
     # ========================================================
-    # TIDAK TERDETEKSI
+    # HASIL
     # ========================================================
 
-    return None
+    result = {
+        "intent": "bayarhutang",
+        "action": "pay",
+        "nama": nama,
+        "nominal": nominal,
+        "keterangan": None
+    }
+
+    print("========================================")
+    print("💰 BAYAR HUTANG TERDETEKSI")
+    print("INTENT  :", result["intent"])
+    print("ACTION  :", result["action"])
+    print("NAMA    :", result["nama"])
+    print("NOMINAL :", result["nominal"])
+    print("========================================")
+
+    return result
