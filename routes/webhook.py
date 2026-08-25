@@ -3829,6 +3829,8 @@ def deteksi_user_nlp(message, nlp):
     # ========================================================
 
     pola_list_user = [
+        "user",
+        "users",
         "list user",
         "daftar user",
         "lihat user",
@@ -3845,10 +3847,7 @@ def deteksi_user_nlp(message, nlp):
         "pengguna chatsaku"
     ]
 
-    if any(
-        pola in text
-        for pola in pola_list_user
-    ):
+    if text in pola_list_user:
 
         print("👤 USER NLP TERDETEKSI")
         print("ACTION : list")
