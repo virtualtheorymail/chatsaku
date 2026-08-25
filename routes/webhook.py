@@ -3808,10 +3808,6 @@ def deteksi_piutang_nlp(message, data=None):
 
     }
 
-# ============================================================
-# DETEKSI USER NLP
-# ============================================================
-
 def deteksi_user_nlp(message, nlp):
 
     if not message:
@@ -3820,12 +3816,12 @@ def deteksi_user_nlp(message, nlp):
     text = message.lower().strip()
 
     print("========================================")
-    print("👤 DETEKSI USER NLP")
+    print("👤 CEK USER NLP")
     print("TEXT :", text)
     print("========================================")
 
     # ========================================================
-    # LIST / LIHAT USER
+    # LIST USER
     # ========================================================
 
     pola_list_user = [
@@ -3849,15 +3845,11 @@ def deteksi_user_nlp(message, nlp):
 
     if text in pola_list_user:
 
-        print("👤 USER NLP TERDETEKSI")
+        print("👤 USER TERDETEKSI")
         print("ACTION : list")
 
         return {
-            "action": "list",
-            "nomor": None,
-            "nama": None,
-            "paket": None,
-            "durasi": None
+            "action": "list"
         }
 
     # ========================================================
@@ -3874,104 +3866,62 @@ def deteksi_user_nlp(message, nlp):
         "daftarkan pengguna"
     ]
 
-    pola_ditemukan = None
-
     for pola in pola_tambah_user:
 
         if text.startswith(pola):
 
-            pola_ditemukan = pola
-            break
+            clean = text[len(pola):].strip()
 
-    if pola_ditemukan:
+            parts = clean.split()
 
-        # --------------------------------------------
-        # Ambil isi setelah perintah
-        # --------------------------------------------
+            if len(parts) < 4:
 
-        data_text = text[
-            len(pola_ditemukan):
-        ].strip()
+                return {
+                    "action": "add",
+                    "error": "format"
+                }
 
-        parts = data_text.split()
+            nomor = parts[0]
 
-        # Minimal:
-        #
-        # nomor nama paket durasi
-        #
-        # contoh:
-        # 628123456789 bambang premium 30
+            # Cari paket
+            paket_index = None
 
-        if len(parts) < 4:
+            for i, part in enumerate(parts):
 
-            return {
-                "action": "add",
-                "error": "format"
-            }
+                if part.upper() in FEATURES:
 
-        nomor = parts[0]
+                    paket_index = i
+                    break
 
-        # --------------------------------------------
-        # CARI PAKET
-        # --------------------------------------------
+            if paket_index is None:
 
-        paket_index = None
+                return {
+                    "action": "add",
+                    "error": "paket"
+                }
 
-        for i, part in enumerate(parts):
+            nama = " ".join(
+                parts[1:paket_index]
+            )
 
-            if part.upper() in FEATURES:
+            paket = parts[paket_index].upper()
 
-                paket_index = i
-                break
+            if paket_index + 1 >= len(parts):
 
-        if paket_index is None:
+                return {
+                    "action": "add",
+                    "error": "durasi"
+                }
 
-            return {
-                "action": "add",
-                "error": "paket"
-            }
-
-        # --------------------------------------------
-        # NAMA
-        # --------------------------------------------
-
-        if paket_index <= 1:
+            durasi = parts[paket_index + 1]
 
             return {
                 "action": "add",
-                "error": "format"
+                "nomor": nomor,
+                "nama": nama,
+                "paket": paket,
+                "durasi": durasi
             }
-
-        nama = " ".join(
-            parts[1:paket_index]
-        )
-
-        paket = parts[
-            paket_index
-        ].upper()
-
-        # --------------------------------------------
-        # DURASI
-        # --------------------------------------------
-
-        if paket_index + 1 >= len(parts):
-
-            return {
-                "action": "add",
-                "error": "durasi"
-            }
-
-        durasi = parts[
-            paket_index + 1
-        ]
-
-        return {
-            "action": "add",
-            "nomor": nomor,
-            "nama": nama,
-            "paket": paket,
-            "durasi": durasi
-        }
 
     return None
 
@@ -5202,13 +5152,11 @@ https://www.chatsaku.com
 
         print("========================================")
         print("👤 INTENT USER DINORMALISASI")
-        print("INTENT   :", nlp.get("intent"))
-        print("ACTION   :", nlp.get("action"))
-        print("NOMOR    :", nlp.get("nomor"))
-        print("NAMA     :", nlp.get("nama"))
-        print("PAKET    :", nlp.get("paket"))
-        print("DURASI   :", nlp.get("durasi"))
-        print("ERROR    :", nlp.get("error"))
+        print("INTENT :", nlp.get("intent"))
+        print("ACTION :", nlp.get("action"))
+        print("NAMA   :", nlp.get("nama"))
+        print("PAKET  :", nlp.get("paket"))
+        print("DURASI :", nlp.get("durasi"))
         print("========================================")
 
     # ======================================
