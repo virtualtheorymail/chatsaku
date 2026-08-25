@@ -3808,52 +3808,64 @@ def deteksi_piutang_nlp(message, data=None):
 
     }
 
-# ==========================================
+# ============================================================
 # DETEKSI USER NLP
-# ==========================================
+# ============================================================
 
-def deteksi_user_nlp(message):
+def deteksi_user_nlp(message, nlp):
 
     if not message:
         return None
 
     text = message.lower().strip()
 
-    # ======================================
-    # LIST / LIHAT USER
-    # ======================================
+    print("========================================")
+    print("👤 DETEKSI USER NLP")
+    print("TEXT :", text)
+    print("========================================")
 
-    pola_list = [
-        "daftar user",
+    # ========================================================
+    # LIST / LIHAT USER
+    # ========================================================
+
+    pola_list_user = [
         "list user",
+        "daftar user",
         "lihat user",
         "lihat pengguna",
         "daftar pengguna",
         "list pengguna",
         "semua user",
         "semua pengguna",
-        "user chatsaku",
-        "pengguna chatsaku",
         "cek user",
         "cek pengguna",
         "tampilkan user",
         "tampilkan pengguna",
-        "siapa saja user",
-        "siapa saja pengguna"
+        "user chatsaku",
+        "pengguna chatsaku"
     ]
 
-    if any(pola in text for pola in pola_list):
+    if any(
+        pola in text
+        for pola in pola_list_user
+    ):
+
+        print("👤 USER NLP TERDETEKSI")
+        print("ACTION : list")
 
         return {
-            "intent": "user",
-            "action": "list"
+            "action": "list",
+            "nomor": None,
+            "nama": None,
+            "paket": None,
+            "durasi": None
         }
 
-    # ======================================
+    # ========================================================
     # TAMBAH USER
-    # ======================================
+    # ========================================================
 
-    pola_tambah = [
+    pola_tambah_user = [
         "adduser",
         "tambah user",
         "tambah pengguna",
@@ -3863,42 +3875,46 @@ def deteksi_user_nlp(message):
         "daftarkan pengguna"
     ]
 
-    if any(pola in text for pola in pola_tambah):
+    pola_ditemukan = None
 
-        # ----------------------------------
-        # NORMALISASI
-        # ----------------------------------
+    for pola in pola_tambah_user:
 
-        # Hilangkan command di depan
-        clean = text
+        if text.startswith(pola):
 
-        for pola in pola_tambah:
+            pola_ditemukan = pola
+            break
 
-            if clean.startswith(pola):
+    if pola_ditemukan:
 
-                clean = clean[len(pola):].strip()
-                break
+        # --------------------------------------------
+        # Ambil isi setelah perintah
+        # --------------------------------------------
 
-        parts = clean.split()
+        data_text = text[
+            len(pola_ditemukan):
+        ].strip()
+
+        parts = data_text.split()
 
         # Minimal:
+        #
         # nomor nama paket durasi
         #
+        # contoh:
         # 628123456789 bambang premium 30
 
         if len(parts) < 4:
 
             return {
-                "intent": "user",
                 "action": "add",
                 "error": "format"
             }
 
         nomor = parts[0]
 
-        # ----------------------------------
-        # PAKET
-        # ----------------------------------
+        # --------------------------------------------
+        # CARI PAKET
+        # --------------------------------------------
 
         paket_index = None
 
@@ -3912,19 +3928,17 @@ def deteksi_user_nlp(message):
         if paket_index is None:
 
             return {
-                "intent": "user",
                 "action": "add",
                 "error": "paket"
             }
 
-        # ----------------------------------
+        # --------------------------------------------
         # NAMA
-        # ----------------------------------
+        # --------------------------------------------
 
         if paket_index <= 1:
 
             return {
-                "intent": "user",
                 "action": "add",
                 "error": "format"
             }
@@ -3933,24 +3947,26 @@ def deteksi_user_nlp(message):
             parts[1:paket_index]
         )
 
-        paket = parts[paket_index].upper()
+        paket = parts[
+            paket_index
+        ].upper()
 
-        # ----------------------------------
+        # --------------------------------------------
         # DURASI
-        # ----------------------------------
+        # --------------------------------------------
 
         if paket_index + 1 >= len(parts):
 
             return {
-                "intent": "user",
                 "action": "add",
                 "error": "durasi"
             }
 
-        durasi = parts[paket_index + 1]
+        durasi = parts[
+            paket_index + 1
+        ]
 
         return {
-            "intent": "user",
             "action": "add",
             "nomor": nomor,
             "nama": nama,
@@ -5187,7 +5203,7 @@ https://www.chatsaku.com
 
         print("========================================")
         print("👤 INTENT USER DINORMALISASI")
-        print("INTENT   :", intent)
+        print("INTENT   :", nlp.get("intent"))
         print("ACTION   :", nlp.get("action"))
         print("NOMOR    :", nlp.get("nomor"))
         print("NAMA     :", nlp.get("nama"))
