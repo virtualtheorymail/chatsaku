@@ -3808,6 +3808,158 @@ def deteksi_piutang_nlp(message, data=None):
 
     }
 
+# ==========================================
+# DETEKSI USER NLP
+# ==========================================
+
+def deteksi_user_nlp(message):
+
+    if not message:
+        return None
+
+    text = message.lower().strip()
+
+    # ======================================
+    # LIST / LIHAT USER
+    # ======================================
+
+    pola_list = [
+        "daftar user",
+        "list user",
+        "lihat user",
+        "lihat pengguna",
+        "daftar pengguna",
+        "list pengguna",
+        "semua user",
+        "semua pengguna",
+        "user chatsaku",
+        "pengguna chatsaku",
+        "cek user",
+        "cek pengguna",
+        "tampilkan user",
+        "tampilkan pengguna",
+        "siapa saja user",
+        "siapa saja pengguna"
+    ]
+
+    if any(pola in text for pola in pola_list):
+
+        return {
+            "intent": "user",
+            "action": "list"
+        }
+
+    # ======================================
+    # TAMBAH USER
+    # ======================================
+
+    pola_tambah = [
+        "adduser",
+        "tambah user",
+        "tambah pengguna",
+        "buat user",
+        "buat pengguna",
+        "daftarkan user",
+        "daftarkan pengguna"
+    ]
+
+    if any(pola in text for pola in pola_tambah):
+
+        # ----------------------------------
+        # NORMALISASI
+        # ----------------------------------
+
+        # Hilangkan command di depan
+        clean = text
+
+        for pola in pola_tambah:
+
+            if clean.startswith(pola):
+
+                clean = clean[len(pola):].strip()
+                break
+
+        parts = clean.split()
+
+        # Minimal:
+        # nomor nama paket durasi
+        #
+        # 628123456789 bambang premium 30
+
+        if len(parts) < 4:
+
+            return {
+                "intent": "user",
+                "action": "add",
+                "error": "format"
+            }
+
+        nomor = parts[0]
+
+        # ----------------------------------
+        # PAKET
+        # ----------------------------------
+
+        paket_index = None
+
+        for i, part in enumerate(parts):
+
+            if part.upper() in FEATURES:
+
+                paket_index = i
+                break
+
+        if paket_index is None:
+
+            return {
+                "intent": "user",
+                "action": "add",
+                "error": "paket"
+            }
+
+        # ----------------------------------
+        # NAMA
+        # ----------------------------------
+
+        if paket_index <= 1:
+
+            return {
+                "intent": "user",
+                "action": "add",
+                "error": "format"
+            }
+
+        nama = " ".join(
+            parts[1:paket_index]
+        )
+
+        paket = parts[paket_index].upper()
+
+        # ----------------------------------
+        # DURASI
+        # ----------------------------------
+
+        if paket_index + 1 >= len(parts):
+
+            return {
+                "intent": "user",
+                "action": "add",
+                "error": "durasi"
+            }
+
+        durasi = parts[paket_index + 1]
+
+        return {
+            "intent": "user",
+            "action": "add",
+            "nomor": nomor,
+            "nama": nama,
+            "paket": paket,
+            "durasi": durasi
+        }
+
+    return None
+
 def refresh_summary_after_transaction(tanggal_transaksi):
     """
     Refresh MonthlySummary setelah transaksi ditambah,
@@ -4988,10 +5140,67 @@ https://www.chatsaku.com
 
         })
 
+    # ============================================================
+    # NORMALISASI INTENT USER NLP
+    # ============================================================
+
+    user_nlp = deteksi_user_nlp(
+        message,
+        nlp
+    )
+
+    print("========================================")
+    print("👤 USER NLP")
+    print("MESSAGE :", message)
+    print("RESULT  :", user_nlp)
+    print("========================================")
+
+    if user_nlp:
+
+        intent = "user"
+
+        nlp["intent"] = "user"
+
+        nlp["action"] = user_nlp.get(
+            "action"
+        )
+
+        nlp["nomor"] = user_nlp.get(
+            "nomor"
+        )
+
+        nlp["nama"] = user_nlp.get(
+            "nama"
+        )
+
+        nlp["paket"] = user_nlp.get(
+            "paket"
+        )
+
+        nlp["durasi"] = user_nlp.get(
+            "durasi"
+        )
+
+        nlp["error"] = user_nlp.get(
+            "error"
+        )
+
+        print("========================================")
+        print("👤 INTENT USER DINORMALISASI")
+        print("INTENT   :", intent)
+        print("ACTION   :", nlp.get("action"))
+        print("NOMOR    :", nlp.get("nomor"))
+        print("NAMA     :", nlp.get("nama"))
+        print("PAKET    :", nlp.get("paket"))
+        print("DURASI   :", nlp.get("durasi"))
+        print("ERROR    :", nlp.get("error"))
+        print("========================================")
+
     # ======================================
-    # List User
+    # USER - LIST
     # ======================================
-    if cmd == "user":
+
+    if intent == "user" and action == "list":
 
         if not is_admin(sender):
             return jsonify(status=True)
@@ -5017,12 +5226,18 @@ https://www.chatsaku.com
 
         for i, u in enumerate(users, 1):
 
-            status = "🟢 Aktif" if u.aktif else "🔴 Nonaktif"
+            status = (
+                "🟢 Aktif"
+                if u.aktif
+                else "🔴 Nonaktif"
+            )
 
             expired = "-"
 
             if u.akhir_langganan:
-                expired = u.akhir_langganan.strftime("%d-%m-%Y")
+                expired = u.akhir_langganan.strftime(
+                    "%d-%m-%Y"
+                )
 
             text += (
                 f"*{i}. {u.nama}*\n"
@@ -5032,9 +5247,10 @@ https://www.chatsaku.com
                 f"📅 Expired : {expired}\n\n"
             )
 
-            # Hindari pesan WA terlalu panjang
             if len(text) > 3300:
+
                 kirim_wa(sender, text)
+
                 text = ""
 
         if text:
@@ -5043,55 +5259,104 @@ https://www.chatsaku.com
         return jsonify(status=True)
 
     # ======================================
-    # Tambah User
+    # USER - ADD
     # ======================================
 
-    if cmd.startswith("adduser "):
+    if intent == "user" and action == "add":
 
         if not is_admin(sender):
             return jsonify(status=True)
 
-        args = message.split()
+        error = parsed.get("error")
 
-        if len(args) < 5:
+        if error == "format":
 
             kirim_wa(
                 sender,
-                """Format:
+                """❌ Format tambah user belum benar.
 
-    adduser 628123456789 Bambang PREMIUM 30
+    Contoh:
+
+    *tambah user 628123456789 Bambang PREMIUM 30*
+
+    atau:
+
+    *adduser 628123456789 Bambang PREMIUM 30*
 
     Paket:
     • STARTER
     • PRO
     • PREMIUM
-    """
+
+    30 = durasi dalam hari"""
             )
 
             return jsonify(status=True)
 
-        nomor = normalize_wa(args[1])
+        if error == "paket":
 
-        nama = args[2]
+            kirim_wa(
+                sender,
+                """❌ Paket tidak dikenali.
 
-        paket = args[3].upper()
+    Paket yang tersedia:
+
+    • STARTER
+    • PRO
+    • PREMIUM"""
+            )
+
+            return jsonify(status=True)
+
+        if error == "durasi":
+
+            kirim_wa(
+                sender,
+                "❌ Durasi langganan belum diberikan."
+            )
+
+            return jsonify(status=True)
+
+        nomor = normalize_wa(
+            parsed["nomor"]
+        )
+
+        nama = parsed["nama"]
+
+        paket = parsed["paket"].upper()
+
+        try:
+
+            lama = int(parsed["durasi"])
+
+        except (ValueError, TypeError):
+
+            kirim_wa(
+                sender,
+                "❌ Durasi harus berupa angka dalam hari."
+            )
+
+            return jsonify(status=True)
 
         if paket not in FEATURES:
 
             kirim_wa(
                 sender,
-                "Paket hanya:\nSTARTER\nPRO\nPREMIUM"
+                "❌ Paket hanya:\n"
+                "STARTER\n"
+                "PRO\n"
+                "PREMIUM"
             )
 
             return jsonify(status=True)
 
-        try:
-            lama = int(args[4])
-        except:
+        if lama <= 0:
+
             kirim_wa(
                 sender,
-                "Durasi harus berupa angka (hari)."
+                "❌ Durasi harus lebih dari 0 hari."
             )
+
             return jsonify(status=True)
 
         cek = User.query.filter_by(
@@ -5107,17 +5372,19 @@ https://www.chatsaku.com
 
             return jsonify(status=True)
 
-        # ==========================
-        # HITUNG PERIODE LANGGANAN
-        # ==========================
+        # ==================================
+        # PERIODE LANGGANAN
+        # ==================================
 
         mulai = date.today()
 
-        akhir = mulai + timedelta(days=lama)
+        akhir = mulai + timedelta(
+            days=lama
+        )
 
-        # ==========================
+        # ==================================
         # BUAT USER
-        # ==========================
+        # ==================================
 
         user = User(
             nama=nama,
@@ -5131,9 +5398,9 @@ https://www.chatsaku.com
         db.session.add(user)
         db.session.commit()
 
-        # ==========================
-        # PESAN KE ADMIN
-        # ==========================
+        # ==================================
+        # PESAN ADMIN
+        # ==================================
 
         kirim_wa(
             sender,
@@ -5157,13 +5424,12 @@ https://www.chatsaku.com
     📅 *Berakhir*
     {akhir.strftime('%d-%m-%Y')}
 
-    🚀 User sudah dapat menggunakan ChatSaku.
-    """
+    🚀 User sudah dapat menggunakan ChatSaku."""
         )
 
-        # ==========================
-        # PESAN KE USER
-        # ==========================
+        # ==================================
+        # PESAN USER
+        # ==================================
 
         kirim_wa(
             nomor,
@@ -5188,8 +5454,7 @@ https://www.chatsaku.com
 
     Selamat menggunakan *ChatSaku*! 💚
 
-    🌐 www.chatsaku.com
-    """
+    🌐 www.chatsaku.com"""
         )
 
         return jsonify(status=True)
