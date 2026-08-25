@@ -3852,7 +3852,13 @@ def deteksi_user_nlp(
         print("👤 USER LIST TERDETEKSI")
 
         return {
-            "action": "list"
+            "intent": "user",
+            "action": "list",
+            "nomor": None,
+            "nama": None,
+            "paket": None,
+            "durasi": None,
+            "error": None
         }
 
     # ========================================================
@@ -3939,11 +3945,13 @@ def deteksi_user_nlp(
             ]
 
             return {
+                "intent": "user",
                 "action": "add",
                 "nomor": nomor,
                 "nama": nama,
                 "paket": paket,
-                "durasi": durasi
+                "durasi": durasi,
+                "error": None
             }
 
     return None
@@ -4560,6 +4568,102 @@ https://www.chatsaku.com
         print("KETERANGAN :", nlp.get("keterangan"))
         print("========================================")
 
+    # ============================================================
+    # NORMALISASI INTENT USER NLP
+    # ============================================================
+
+    print("========================================")
+    print("👤 CEK USER NLP")
+    print("MESSAGE :", message)
+    print("========================================")
+
+    try:
+
+        user_nlp = deteksi_user_nlp(
+            message,
+            nlp
+        )
+
+    except Exception as e:
+
+        print("========================================")
+        print("❌ ERROR deteksi_user_nlp()")
+        print("ERROR :", repr(e))
+        print("========================================")
+
+        user_nlp = None
+
+
+    print("========================================")
+    print("👤 USER NLP RESULT")
+    print("RESULT :", user_nlp)
+    print("========================================")
+
+
+    if user_nlp:
+
+        nlp["intent"] = user_nlp.get(
+            "intent",
+            "user"
+        )
+
+        nlp["action"] = user_nlp.get(
+            "action"
+        )
+
+        nlp["nomor"] = user_nlp.get(
+            "nomor"
+        )
+
+        nlp["nama"] = user_nlp.get(
+            "nama"
+        )
+
+        nlp["paket"] = user_nlp.get(
+            "paket"
+        )
+
+        nlp["durasi"] = user_nlp.get(
+            "durasi"
+        )
+
+        nlp["error"] = user_nlp.get(
+            "error"
+        )
+
+        print("========================================")
+        print("👤 USER BERHASIL DINORMALISASI")
+        print("INTENT :", nlp.get("intent"))
+        print("ACTION :", nlp.get("action"))
+        print("NOMOR  :", nlp.get("nomor"))
+        print("NAMA   :", nlp.get("nama"))
+        print("PAKET  :", nlp.get("paket"))
+        print("DURASI :", nlp.get("durasi"))
+        print("ERROR  :", nlp.get("error"))
+        print("========================================")
+
+
+    # ============================================================
+    # INTENT FINAL
+    # ============================================================
+
+    intent = nlp.get(
+        "intent"
+    )
+
+    action = nlp.get(
+        "action"
+    )
+
+
+    print("========================================")
+    print("🤖 NLP RESULT FINAL")
+    print("TEXT   :", message)
+    print("INTENT :", intent)
+    print("ACTION :", action)
+    print("DATA   :", nlp)
+    print("========================================")
+
 
     # ============================================================
     # INTENT FINAL
@@ -5008,6 +5112,10 @@ https://www.chatsaku.com
 
             cmd = "help"
 
+        elif intent == "user":
+
+            cmd = "user"
+
 
         # ========================================================
         # MASUK
@@ -5128,61 +5236,6 @@ https://www.chatsaku.com
 
         })
 
-    # ============================================================
-    # NORMALISASI INTENT USER NLP
-    # ============================================================
-
-    user_nlp = deteksi_user_nlp(
-        message,
-        nlp
-    )
-
-    print("========================================")
-    print("👤 USER NLP")
-    print("MESSAGE :", message)
-    print("RESULT  :", user_nlp)
-    print("========================================")
-
-    if user_nlp:
-
-        intent = "user"
-
-        nlp["intent"] = "user"
-
-        nlp["action"] = user_nlp.get(
-            "action"
-        )
-
-        nlp["nomor"] = user_nlp.get(
-            "nomor"
-        )
-
-        nlp["nama"] = user_nlp.get(
-            "nama"
-        )
-
-        nlp["paket"] = user_nlp.get(
-            "paket"
-        )
-
-        nlp["durasi"] = user_nlp.get(
-            "durasi"
-        )
-
-        nlp["error"] = user_nlp.get(
-            "error"
-        )
-
-        print("========================================")
-        print("👤 INTENT USER DINORMALISASI")
-        print("INTENT   :", intent)
-        print("ACTION   :", nlp.get("action"))
-        print("NOMOR    :", nlp.get("nomor"))
-        print("NAMA     :", nlp.get("nama"))
-        print("PAKET    :", nlp.get("paket"))
-        print("DURASI   :", nlp.get("durasi"))
-        print("ERROR    :", nlp.get("error"))
-        print("========================================")
 
     # ============================================================
     # USER NLP
