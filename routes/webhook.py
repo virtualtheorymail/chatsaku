@@ -4711,6 +4711,69 @@ https://www.chatsaku.com
         print("========================================")
 
     # ============================================================
+    # NORMALISASI INTENT PAKET NLP
+    # ============================================================
+
+    print("========================================")
+    print("📦 CEK PAKET NLP")
+    print("MESSAGE :", message)
+    print("========================================")
+
+    try:
+
+        paket_nlp = deteksi_paket_nlp(
+            message,
+            nlp
+        )
+
+    except Exception as e:
+
+        print("========================================")
+        print("❌ ERROR deteksi_paket_nlp()")
+        print("ERROR :", repr(e))
+        print("========================================")
+
+        paket_nlp = None
+
+
+    print("========================================")
+    print("📦 PAKET NLP RESULT")
+    print("RESULT :", paket_nlp)
+    print("========================================")
+
+
+    if paket_nlp:
+
+        nlp["intent"] = paket_nlp.get(
+            "intent"
+        )
+
+        nlp["action"] = paket_nlp.get(
+            "action"
+        )
+
+        nlp["nomor"] = paket_nlp.get(
+            "nomor"
+        )
+
+        nlp["paket"] = paket_nlp.get(
+            "paket"
+        )
+
+        nlp["error"] = paket_nlp.get(
+            "error"
+        )
+
+        print("========================================")
+        print("📦 INTENT PAKET DINORMALISASI")
+        print("INTENT :", nlp.get("intent"))
+        print("ACTION :", nlp.get("action"))
+        print("NOMOR  :", nlp.get("nomor"))
+        print("PAKET  :", nlp.get("paket"))
+        print("ERROR  :", nlp.get("error"))
+        print("========================================")
+
+    # ============================================================
     # NORMALISASI BAYAR HUTANG NLP
     # ============================================================
 
@@ -5921,10 +5984,36 @@ https://www.chatsaku.com
         )
 
     # ============================================================
-    # GANTI PAKET USER
+    # PAKET USER NLP
+    #
+    # ACTION:
+    #
+    # list
+    # update
     # ============================================================
 
     if intent == "paket":
+
+        action = nlp.get("action")
+
+        nomor = nlp.get("nomor")
+
+        paket = nlp.get("paket")
+
+        error = nlp.get("error")
+
+        print("========================================")
+        print("📦 PROSES PAKET")
+        print("SENDER :", sender)
+        print("ACTION :", action)
+        print("NOMOR  :", nomor)
+        print("PAKET  :", paket)
+        print("ERROR  :", error)
+        print("========================================")
+
+        # ========================================================
+        # ADMIN ONLY
+        # ========================================================
 
         if not is_admin(sender):
 
@@ -5932,35 +6021,49 @@ https://www.chatsaku.com
                 status=True
             )
 
-        nomor = nlp.get(
-            "nomor"
-        )
-
-        paket = nlp.get(
-            "paket"
-        )
-
-        error = nlp.get(
-            "error"
-        )
-
         # ========================================================
-        # VALIDASI NOMOR
+        # LIST PAKET
         # ========================================================
 
-        if not nomor:
+        if action == "list":
 
             kirim_wa(
                 sender,
-                """❌ Nomor user belum ditemukan.
+                """📦 *PAKET CHATSAKU*
 
-    Contoh:
+    ━━━━━━━━━━━━━━━━━━
 
-    paket 628123456789 PREMIUM
+    🟢 *STARTER*
 
-    atau:
+    • Catat transaksi
+    • Dashboard
 
-    ganti paket 628123456789 PREMIUM"""
+
+    🔵 *PRO*
+
+    • Catat transaksi
+    • Dashboard
+    • Budget
+    • Reminder
+    • Hutang & Piutang
+    • Export Excel
+
+
+    🟣 *PREMIUM*
+
+    • Semua fitur PRO
+    • AI Insight
+    • Statistik
+    • Export Excel
+    • Export PDF
+    • Target Tabungan
+    • Laporan Keuangan
+    • Fitur Premium lainnya
+
+    ━━━━━━━━━━━━━━━━━━
+
+    💚 *ChatSaku Finance Assistant*
+    """
             )
 
             return jsonify(
@@ -5971,94 +6074,88 @@ https://www.chatsaku.com
         # VALIDASI PAKET
         # ========================================================
 
-        if not paket:
+        if action == "update":
 
-            kirim_wa(
-                sender,
-                """❌ Paket belum ditemukan.
+            if error == "paket":
+
+                kirim_wa(
+                    sender,
+                    """❌ Paket tidak valid.
 
     Paket tersedia:
 
     • STARTER
     • PRO
     • PREMIUM
+    """
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+            # ====================================================
+            # NOMOR WA
+            # ====================================================
+
+            if not nomor:
+
+                kirim_wa(
+                    sender,
+                    """❌ Nomor WhatsApp tidak ditemukan.
 
     Contoh:
 
-    paket 628123456789 PREMIUM"""
+    paket 628123456789 PREMIUM
+    """
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+            nomor = normalize_wa(
+                nomor
             )
 
-            return jsonify(
-                status=True
-            )
+            # ====================================================
+            # CARI USER
+            # ====================================================
 
-        paket = paket.upper()
+            user = User.query.filter_by(
+                nomor_wa=nomor
+            ).first()
 
-        if paket not in FEATURES:
+            if not user:
+
+                kirim_wa(
+                    sender,
+                    "❌ User tidak ditemukan."
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+            # ====================================================
+            # SIMPAN PAKET
+            # ====================================================
+
+            paket_lama = user.paket
+
+            user.paket = paket
+
+            user.aktif = True
+
+            db.session.commit()
+
+            # ====================================================
+            # NOTIFIKASI ADMIN
+            # ====================================================
 
             kirim_wa(
                 sender,
-                """❌ Paket tidak valid.
-
-    Paket tersedia:
-
-    • STARTER
-    • PRO
-    • PREMIUM"""
-            )
-
-            return jsonify(
-                status=True
-            )
-
-        # ========================================================
-        # NORMALIZE NOMOR
-        # ========================================================
-
-        nomor = normalize_wa(
-            nomor
-        )
-
-        # ========================================================
-        # CARI USER
-        # ========================================================
-
-        user = User.query.filter_by(
-            nomor_wa=nomor
-        ).first()
-
-        if not user:
-
-            kirim_wa(
-                sender,
-                f"""❌ User tidak ditemukan.
-
-    📱 Nomor:
-    {nomor}"""
-            )
-
-            return jsonify(
-                status=True
-            )
-
-        # ========================================================
-        # UPDATE
-        # ========================================================
-
-        paket_lama = user.paket
-
-        user.paket = paket
-        user.aktif = True
-
-        db.session.commit()
-
-        # ========================================================
-        # RESPONSE
-        # ========================================================
-
-        kirim_wa(
-            sender,
-            f"""✅ *Paket Berhasil Diubah*
+                f"""✅ *Paket Berhasil Diubah*
 
     👤 *Nama*
     {user.nama}
@@ -6074,8 +6171,29 @@ https://www.chatsaku.com
 
     🟢 Status
     Aktif
+    """
+            )
 
-    _ChatSaku Finance Assistant_"""
+            return jsonify(
+                status=True
+            )
+
+        # ========================================================
+        # ACTION TIDAK DIKENALI
+        # ========================================================
+
+        kirim_wa(
+            sender,
+            """❌ Perintah paket tidak dikenali.
+
+    Contoh:
+
+    📦 paket
+    untuk melihat daftar paket
+
+    🔄 paket 628123456789 PREMIUM
+    untuk mengganti paket user.
+    """
         )
 
         return jsonify(

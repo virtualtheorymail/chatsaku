@@ -765,3 +765,145 @@ def deteksi_admin_user_nlp(
         }
 
     return None
+
+
+# ============================================================
+# DETEKSI PAKET USER NLP
+# ============================================================
+
+def deteksi_paket_nlp(message, nlp=None):
+
+    if not message:
+        return None
+
+    text = str(message).strip()
+
+    if not text:
+        return None
+
+    text_lower = re.sub(
+        r'\s+',
+        ' ',
+        text.lower()
+    ).strip()
+
+    print("========================================")
+    print("📦 CEK PAKET NLP")
+    print("MESSAGE :", message)
+    print("========================================")
+
+    # ========================================================
+    # LIST / INFO PAKET
+    # ========================================================
+
+    pola_list = [
+        r'^paket$',
+        r'^list paket$',
+        r'^daftar paket$',
+        r'^lihat paket$',
+        r'^cek paket$',
+        r'^paket apa saja$',
+        r'^ada paket apa saja$',
+        r'^pilihan paket$',
+        r'^lihat semua paket$'
+    ]
+
+    for pola in pola_list:
+
+        if re.fullmatch(
+            pola,
+            text_lower,
+            re.IGNORECASE
+        ):
+
+            print("📦 PAKET LIST TERDETEKSI")
+
+            return {
+                "intent": "paket",
+                "action": "list",
+                "nomor": None,
+                "paket": None
+            }
+
+    # ========================================================
+    # GANTI PAKET
+    #
+    # Contoh:
+    #
+    # paket 628123456789 PREMIUM
+    # ganti paket 628123456789 PREMIUM
+    # ubah paket 628123456789 PRO
+    # ubah paket user 628123456789 PRO
+    # ========================================================
+
+    pola_ganti = [
+
+        r'^paket\s+(\d+)\s+(\w+)$',
+
+        r'^ganti\s+paket\s+(\d+)\s+(\w+)$',
+
+        r'^ubah\s+paket\s+(\d+)\s+(\w+)$',
+
+        r'^ubah\s+paket\s+user\s+(\d+)\s+(\w+)$',
+
+        r'^ganti\s+paket\s+user\s+(\d+)\s+(\w+)$',
+
+        r'^set\s+paket\s+(\d+)\s+(\w+)$'
+    ]
+
+    for pola in pola_ganti:
+
+        match = re.fullmatch(
+            pola,
+            text_lower,
+            re.IGNORECASE
+        )
+
+        if not match:
+            continue
+
+        nomor = match.group(1)
+
+        paket = match.group(2).upper()
+
+        print("📦 GANTI PAKET TERDETEKSI")
+        print("NOMOR :", nomor)
+        print("PAKET :", paket)
+
+        # ====================================================
+        # VALIDASI PAKET
+        # ====================================================
+
+        if paket not in FEATURES:
+
+            return {
+                "intent": "paket",
+                "action": "update",
+                "nomor": nomor,
+                "paket": paket,
+                "error": "paket"
+            }
+
+        return {
+            "intent": "paket",
+            "action": "update",
+            "nomor": nomor,
+            "paket": paket,
+            "error": None
+        }
+
+    # ========================================================
+    # FALLBACK DARI NLP UTAMA
+    # ========================================================
+
+    if nlp and nlp.get("intent") == "paket":
+
+        return {
+            "intent": "paket",
+            "action": nlp.get("action"),
+            "nomor": nlp.get("nomor"),
+            "paket": nlp.get("paket"),
+            "error": nlp.get("error")
+        }
+
+    return None
