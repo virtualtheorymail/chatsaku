@@ -442,3 +442,326 @@ def deteksi_bayarhutang_nlp(
     print("========================================")
 
     return result
+
+
+# ============================================================
+# DETEKSI ADMIN USER NLP
+# ============================================================
+
+def deteksi_admin_user_nlp(
+    message,
+    data=None
+):
+
+    if not message:
+        return None
+
+    text = str(message).strip()
+
+    if not text:
+        return None
+
+    text_lower = re.sub(
+        r'\s+',
+        ' ',
+        text.lower()
+    ).strip()
+
+    if data is None:
+        data = {}
+
+    print("========================================")
+    print("👤 CEK ADMIN USER NLP")
+    print("MESSAGE :", message)
+    print("========================================")
+
+    # ========================================================
+    # DELETE USER
+    # ========================================================
+
+    pola_delete = [
+
+        r'^deluser\s+(.+)$',
+
+        r'^hapus\s+user\s+(.+)$',
+
+        r'^hapus\s+pengguna\s+(.+)$',
+
+        r'^hapuskan\s+user\s+(.+)$',
+
+        r'^hapuskan\s+pengguna\s+(.+)$',
+
+        r'^hapus\s+akun\s+(.+)$',
+
+        r'^hapuskan\s+akun\s+(.+)$'
+
+    ]
+
+    for pola in pola_delete:
+
+        match = re.search(
+            pola,
+            text_lower,
+            re.IGNORECASE
+        )
+
+        if not match:
+            continue
+
+        nomor = match.group(1).strip()
+
+        # ----------------------------------------------------
+        # Ambil nomor WA
+        # ----------------------------------------------------
+
+        match_nomor = re.search(
+            r'(?:\+?62|0)\d{8,15}',
+            nomor
+        )
+
+        if match_nomor:
+
+            nomor = match_nomor.group(0)
+
+        else:
+
+            nomor = None
+
+        return {
+
+            "intent": "deluser",
+
+            "action": "delete",
+
+            "nomor": nomor,
+
+            "nama": None,
+
+            "paket": None,
+
+            "error": (
+                None
+                if nomor
+                else "nomor"
+            )
+
+        }
+
+    # ========================================================
+    # GANTI PAKET
+    # ========================================================
+
+    pola_paket = [
+
+        r'^paket\s+(.+)$',
+
+        r'^ganti\s+paket\s+(.+)$',
+
+        r'^ubah\s+paket\s+(.+)$',
+
+        r'^ubah\s+paket\s+user\s+(.+)$',
+
+        r'^ganti\s+paket\s+user\s+(.+)$'
+
+    ]
+
+    for pola in pola_paket:
+
+        match = re.search(
+            pola,
+            text_lower,
+            re.IGNORECASE
+        )
+
+        if not match:
+            continue
+
+        isi = match.group(1).strip()
+
+        parts = isi.split()
+
+        nomor = None
+        paket = None
+
+        # ----------------------------------------------------
+        # Cari nomor
+        # ----------------------------------------------------
+
+        for part in parts:
+
+            if re.fullmatch(
+                r'(?:\+?62|0)\d{8,15}',
+                part
+            ):
+
+                nomor = part
+
+                break
+
+        # ----------------------------------------------------
+        # Cari paket
+        # ----------------------------------------------------
+
+        for part in parts:
+
+            if part.upper() in FEATURES:
+
+                paket = part.upper()
+
+                break
+
+        error = None
+
+        if not nomor:
+
+            error = "nomor"
+
+        elif not paket:
+
+            error = "paket"
+
+        return {
+
+            "intent": "paket",
+
+            "action": "package",
+
+            "nomor": nomor,
+
+            "nama": None,
+
+            "paket": paket,
+
+            "error": error
+
+        }
+
+    # ========================================================
+    # AKTIFKAN USER
+    # ========================================================
+
+    pola_aktif = [
+
+        r'^aktif\s+(.+)$',
+
+        r'^aktifkan\s+(.+)$',
+
+        r'^aktifkan\s+user\s+(.+)$',
+
+        r'^aktifkan\s+pengguna\s+(.+)$',
+
+        r'^nyalakan\s+user\s+(.+)$'
+
+    ]
+
+    for pola in pola_aktif:
+
+        match = re.search(
+            pola,
+            text_lower,
+            re.IGNORECASE
+        )
+
+        if not match:
+            continue
+
+        isi = match.group(1).strip()
+
+        match_nomor = re.search(
+            r'(?:\+?62|0)\d{8,15}',
+            isi
+        )
+
+        nomor = (
+            match_nomor.group(0)
+            if match_nomor
+            else None
+        )
+
+        return {
+
+            "intent": "aktif",
+
+            "action": "activate",
+
+            "nomor": nomor,
+
+            "nama": None,
+
+            "paket": None,
+
+            "error": (
+                None
+                if nomor
+                else "nomor"
+            )
+
+        }
+
+    # ========================================================
+    # NONAKTIFKAN USER
+    # ========================================================
+
+    pola_nonaktif = [
+
+        r'^nonaktif\s+(.+)$',
+
+        r'^nonaktifkan\s+(.+)$',
+
+        r'^nonaktifkan\s+user\s+(.+)$',
+
+        r'^nonaktifkan\s+pengguna\s+(.+)$',
+
+        r'^matikan\s+user\s+(.+)$',
+
+        r'^blokir\s+user\s+(.+)$',
+
+        r'^blokir\s+pengguna\s+(.+)$'
+
+    ]
+
+    for pola in pola_nonaktif:
+
+        match = re.search(
+            pola,
+            text_lower,
+            re.IGNORECASE
+        )
+
+        if not match:
+            continue
+
+        isi = match.group(1).strip()
+
+        match_nomor = re.search(
+            r'(?:\+?62|0)\d{8,15}',
+            isi
+        )
+
+        nomor = (
+            match_nomor.group(0)
+            if match_nomor
+            else None
+        )
+
+        return {
+
+            "intent": "nonaktif",
+
+            "action": "deactivate",
+
+            "nomor": nomor,
+
+            "nama": None,
+
+            "paket": None,
+
+            "error": (
+                None
+                if nomor
+                else "nomor"
+            )
+
+        }
+
+    return None

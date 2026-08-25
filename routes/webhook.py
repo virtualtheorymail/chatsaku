@@ -4643,6 +4643,74 @@ https://www.chatsaku.com
         print("========================================")
 
     # ============================================================
+    # NORMALISASI ADMIN USER NLP
+    # ============================================================
+
+    print("========================================")
+    print("👤 CEK ADMIN USER NLP")
+    print("MESSAGE :", message)
+    print("========================================")
+
+    try:
+
+        admin_user_nlp = deteksi_admin_user_nlp(
+            message,
+            nlp
+        )
+
+    except Exception as e:
+
+        print("========================================")
+        print("❌ ERROR deteksi_admin_user_nlp()")
+        print("ERROR :", repr(e))
+        print("========================================")
+
+        admin_user_nlp = None
+
+
+    print("========================================")
+    print("👤 ADMIN USER NLP RESULT")
+    print("RESULT :", admin_user_nlp)
+    print("========================================")
+
+
+    if admin_user_nlp:
+
+        nlp["intent"] = admin_user_nlp.get(
+            "intent"
+        )
+
+        nlp["action"] = admin_user_nlp.get(
+            "action"
+        )
+
+        nlp["nomor"] = admin_user_nlp.get(
+            "nomor"
+        )
+
+        nlp["nama"] = admin_user_nlp.get(
+            "nama"
+        )
+
+        nlp["paket"] = admin_user_nlp.get(
+            "paket"
+        )
+
+        nlp["error"] = admin_user_nlp.get(
+            "error"
+        )
+
+        print("========================================")
+        print("👤 ADMIN USER BERHASIL DINORMALISASI")
+        print("INTENT :", nlp.get("intent"))
+        print("ACTION :", nlp.get("action"))
+        print("NOMOR  :", nlp.get("nomor"))
+        print("NAMA   :", nlp.get("nama"))
+        print("PAKET  :", nlp.get("paket"))
+        print("ERROR  :", nlp.get("error"))
+        print("========================================")
+
+    # ============================================================
     # NORMALISASI BAYAR HUTANG NLP
     # ============================================================
 
@@ -5184,6 +5252,25 @@ https://www.chatsaku.com
 
             cmd = "user"
 
+        elif intent == "deluser":
+
+            cmd = "deluser"
+
+
+        elif intent == "paket":
+
+            cmd = "paket"
+
+
+        elif intent == "aktif":
+
+            cmd = "aktif"
+
+
+        elif intent == "nonaktif":
+
+            cmd = "nonaktif"
+
 
         # ========================================================
         # MASUK
@@ -5701,40 +5788,77 @@ https://www.chatsaku.com
             return jsonify(
                 status=True
             )
-    # ======================================
-    # Delete User
-    # ======================================
+    # ============================================================
+    # DELETE USER
+    # ============================================================
 
-    if cmd.startswith("deluser "):
+    if intent == "deluser":
 
         if not is_admin(sender):
-            return jsonify(status=True)
 
-        args = message.split()
+            return jsonify(
+                status=True
+            )
 
-        if len(args) != 2:
+        action = nlp.get(
+            "action"
+        )
+
+        nomor = nlp.get(
+            "nomor"
+        )
+
+        error = nlp.get(
+            "error"
+        )
+
+        # ========================================================
+        # VALIDASI
+        # ========================================================
+
+        if action != "delete" or not nomor:
 
             kirim_wa(
                 sender,
-                """Format:
+                """❌ Nomor user belum ditemukan.
+
+    Contoh:
 
     deluser 628123456789
-    """
+
+    atau:
+
+    hapus user 628123456789"""
             )
 
-            return jsonify(status=True)
+            return jsonify(
+                status=True
+            )
 
-        nomor = normalize_wa(args[1])
+        nomor = normalize_wa(
+            nomor
+        )
 
-        # Tidak boleh menghapus admin
-        if nomor == "6285872362212":
+        # ========================================================
+        # JANGAN HAPUS ADMIN
+        # ========================================================
+
+        if nomor == normalize_wa(
+            "6285872362212"
+        ):
 
             kirim_wa(
                 sender,
                 "❌ User admin tidak dapat dihapus."
             )
 
-            return jsonify(status=True)
+            return jsonify(
+                status=True
+            )
+
+        # ========================================================
+        # CARI USER
+        # ========================================================
 
         user = User.query.filter_by(
             nomor_wa=nomor
@@ -5744,71 +5868,160 @@ https://www.chatsaku.com
 
             kirim_wa(
                 sender,
-                "❌ User tidak ditemukan."
+                f"""❌ User tidak ditemukan.
+
+    📱 Nomor:
+    {nomor}"""
             )
 
-            return jsonify(status=True)
+            return jsonify(
+                status=True
+            )
 
-        db.session.delete(user)
+        # ========================================================
+        # SIMPAN DATA SEBELUM DELETE
+        # ========================================================
+
+        nama_user = user.nama
+        nomor_user = user.nomor_wa
+        paket_user = user.paket
+
+        # ========================================================
+        # DELETE
+        # ========================================================
+
+        db.session.delete(
+            user
+        )
 
         db.session.commit()
 
+        # ========================================================
+        # RESPONSE
+        # ========================================================
+
         kirim_wa(
             sender,
-            f"""✅ User berhasil dihapus
+            f"""✅ *User Berhasil Dihapus*
 
-    👤 Nama
-    {user.nama}
+    👤 *Nama*
+    {nama_user}
 
-    📱 Nomor
-    {user.nomor_wa}
+    📱 *Nomor*
+    {nomor_user}
 
-    🎁 Paket
-    {user.paket}
-    """
+    🎁 *Paket*
+    {paket_user}
+
+    _ChatSaku Finance Assistant_"""
         )
 
-        return jsonify(status=True)
+        return jsonify(
+            status=True
+        )
 
-    # ======================================
-    # Ganti Paket User
-    # ======================================
-    if cmd.startswith("paket "):
+    # ============================================================
+    # GANTI PAKET USER
+    # ============================================================
+
+    if intent == "paket":
 
         if not is_admin(sender):
-            return jsonify(status=True)
 
-        args = message.split()
+            return jsonify(
+                status=True
+            )
 
-        if len(args) != 3:
+        nomor = nlp.get(
+            "nomor"
+        )
+
+        paket = nlp.get(
+            "paket"
+        )
+
+        error = nlp.get(
+            "error"
+        )
+
+        # ========================================================
+        # VALIDASI NOMOR
+        # ========================================================
+
+        if not nomor:
 
             kirim_wa(
                 sender,
-                """Format:
+                """❌ Nomor user belum ditemukan.
+
+    Contoh:
 
     paket 628123456789 PREMIUM
-    """
+
+    atau:
+
+    ganti paket 628123456789 PREMIUM"""
             )
 
-            return jsonify(status=True)
+            return jsonify(
+                status=True
+            )
 
-        nomor = normalize_wa(args[1])
+        # ========================================================
+        # VALIDASI PAKET
+        # ========================================================
 
-        paket = args[2].upper()
+        if not paket:
+
+            kirim_wa(
+                sender,
+                """❌ Paket belum ditemukan.
+
+    Paket tersedia:
+
+    • STARTER
+    • PRO
+    • PREMIUM
+
+    Contoh:
+
+    paket 628123456789 PREMIUM"""
+            )
+
+            return jsonify(
+                status=True
+            )
+
+        paket = paket.upper()
 
         if paket not in FEATURES:
 
             kirim_wa(
                 sender,
-                """Paket tersedia:
+                """❌ Paket tidak valid.
+
+    Paket tersedia:
 
     • STARTER
     • PRO
-    • PREMIUM
-    """
+    • PREMIUM"""
             )
 
-            return jsonify(status=True)
+            return jsonify(
+                status=True
+            )
+
+        # ========================================================
+        # NORMALIZE NOMOR
+        # ========================================================
+
+        nomor = normalize_wa(
+            nomor
+        )
+
+        # ========================================================
+        # CARI USER
+        # ========================================================
 
         user = User.query.filter_by(
             nomor_wa=nomor
@@ -5818,10 +6031,19 @@ https://www.chatsaku.com
 
             kirim_wa(
                 sender,
-                "❌ User tidak ditemukan."
+                f"""❌ User tidak ditemukan.
+
+    📱 Nomor:
+    {nomor}"""
             )
 
-            return jsonify(status=True)
+            return jsonify(
+                status=True
+            )
+
+        # ========================================================
+        # UPDATE
+        # ========================================================
 
         paket_lama = user.paket
 
@@ -5830,50 +6052,74 @@ https://www.chatsaku.com
 
         db.session.commit()
 
+        # ========================================================
+        # RESPONSE
+        # ========================================================
+
         kirim_wa(
             sender,
-            f"""✅ Paket berhasil diubah
+            f"""✅ *Paket Berhasil Diubah*
 
-    👤 Nama
+    👤 *Nama*
     {user.nama}
 
-    📱 Nomor
+    📱 *Nomor*
     {user.nomor_wa}
 
-    📦 Paket Lama
+    📦 *Paket Lama*
     {paket_lama}
 
-    🎁 Paket Baru
+    🎁 *Paket Baru*
     {paket}
-    """
+
+    🟢 Status
+    Aktif
+
+    _ChatSaku Finance Assistant_"""
         )
 
-        return jsonify(status=True)
+        return jsonify(
+            status=True
+        )
 
-    # ======================================
-    # Aktifkan User
-    # ======================================
+    # ============================================================
+    # AKTIFKAN USER
+    # ============================================================
 
-    if cmd.startswith("aktif "):
+    if intent == "aktif":
 
         if not is_admin(sender):
-            return jsonify(status=True)
 
-        args = message.split()
+            return jsonify(
+                status=True
+            )
 
-        if len(args) != 2:
+        nomor = nlp.get(
+            "nomor"
+        )
+
+        if not nomor:
 
             kirim_wa(
                 sender,
-                """Format:
+                """❌ Nomor user belum ditemukan.
+
+    Contoh:
 
     aktif 628123456789
-    """
+
+    atau:
+
+    aktifkan user 628123456789"""
             )
 
-            return jsonify(status=True)
+            return jsonify(
+                status=True
+            )
 
-        nomor = normalize_wa(args[1])
+        nomor = normalize_wa(
+            nomor
+        )
 
         user = User.query.filter_by(
             nomor_wa=nomor
@@ -5886,20 +6132,28 @@ https://www.chatsaku.com
                 "❌ User tidak ditemukan."
             )
 
-            return jsonify(status=True)
+            return jsonify(
+                status=True
+            )
 
         if user.aktif:
 
             kirim_wa(
                 sender,
-                f"""ℹ️ User sudah aktif
+                f"""ℹ️ *User Sudah Aktif*
 
     👤 {user.nama}
     📱 {user.nomor_wa}
-    """
+    🎁 {user.paket}"""
             )
 
-            return jsonify(status=True)
+            return jsonify(
+                status=True
+            )
+
+        # ========================================================
+        # AKTIFKAN
+        # ========================================================
 
         user.aktif = True
 
@@ -5907,50 +6161,67 @@ https://www.chatsaku.com
 
         kirim_wa(
             sender,
-            f"""✅ User berhasil diaktifkan
+            f"""✅ *User Berhasil Diaktifkan*
 
-    👤 Nama
+    👤 *Nama*
     {user.nama}
 
-    📱 Nomor
+    📱 *Nomor*
     {user.nomor_wa}
 
-    🎁 Paket
+    🎁 *Paket*
     {user.paket}
 
-    🟢 Status
-    Aktif
-    """
+    🟢 *Status*
+    Aktif"""
         )
 
-        return jsonify(status=True)
+        return jsonify(
+            status=True
+        )
+    # ============================================================
+    # NONAKTIFKAN USER
+    # ============================================================
 
-    # ======================================
-    # Non Aktifkan User
-    # ======================================
-
-    if cmd.startswith("nonaktif "):
+    if intent == "nonaktif":
 
         if not is_admin(sender):
-            return jsonify(status=True)
 
-        args = message.split()
+            return jsonify(
+                status=True
+            )
 
-        if len(args) != 2:
+        nomor = nlp.get(
+            "nomor"
+        )
+
+        if not nomor:
 
             kirim_wa(
                 sender,
-                """Format:
+                """❌ Nomor user belum ditemukan.
+
+    Contoh:
 
     nonaktif 628123456789
-    """
+
+    atau:
+
+    nonaktifkan user 628123456789"""
             )
 
-            return jsonify(status=True)
+            return jsonify(
+                status=True
+            )
 
-        nomor = normalize_wa(args[1])
+        nomor = normalize_wa(
+            nomor
+        )
 
-        # Jangan sampai admin menonaktifkan dirinya sendiri
+        # ========================================================
+        # JANGAN NONAKTIFKAN ADMIN SENDIRI
+        # ========================================================
+
         if nomor == sender:
 
             kirim_wa(
@@ -5958,7 +6229,13 @@ https://www.chatsaku.com
                 "❌ Anda tidak dapat menonaktifkan akun admin sendiri."
             )
 
-            return jsonify(status=True)
+            return jsonify(
+                status=True
+            )
+
+        # ========================================================
+        # CARI USER
+        # ========================================================
 
         user = User.query.filter_by(
             nomor_wa=nomor
@@ -5971,44 +6248,60 @@ https://www.chatsaku.com
                 "❌ User tidak ditemukan."
             )
 
-            return jsonify(status=True)
+            return jsonify(
+                status=True
+            )
+
+        # ========================================================
+        # SUDAH NONAKTIF
+        # ========================================================
 
         if not user.aktif:
 
             kirim_wa(
                 sender,
-                f"""ℹ️ User sudah nonaktif
+                f"""ℹ️ *User Sudah Nonaktif*
 
     👤 {user.nama}
-    📱 {user.nomor_wa}
-    """
+    📱 {user.nomor_wa}"""
             )
 
-            return jsonify(status=True)
+            return jsonify(
+                status=True
+            )
+
+        # ========================================================
+        # NONAKTIFKAN
+        # ========================================================
 
         user.aktif = False
 
         db.session.commit()
 
+        # ========================================================
+        # RESPONSE
+        # ========================================================
+
         kirim_wa(
             sender,
-            f"""✅ User berhasil dinonaktifkan
+            f"""✅ *User Berhasil Dinonaktifkan*
 
-    👤 Nama
+    👤 *Nama*
     {user.nama}
 
-    📱 Nomor
+    📱 *Nomor*
     {user.nomor_wa}
 
-    🎁 Paket
+    🎁 *Paket*
     {user.paket}
 
-    🔴 Status
-    Nonaktif
-    """
+    🔴 *Status*
+    Nonaktif"""
         )
 
-        return jsonify(status=True)
+        return jsonify(
+            status=True
+        )
 
     # ============================================================
     # NORMALISASI INTENT REMINDER NLP
