@@ -3808,7 +3808,14 @@ def deteksi_piutang_nlp(message, data=None):
 
     }
 
-def deteksi_user_nlp(message, nlp):
+# ============================================================
+# DETEKSI USER NLP
+# ============================================================
+
+def deteksi_user_nlp(
+    message,
+    nlp
+):
 
     if not message:
         return None
@@ -3817,14 +3824,14 @@ def deteksi_user_nlp(message, nlp):
 
     print("========================================")
     print("👤 CEK USER NLP")
-    print("TEXT :", text)
+    print("MESSAGE :", message)
     print("========================================")
 
     # ========================================================
     # LIST USER
     # ========================================================
 
-    pola_list_user = [
+    if text in [
         "user",
         "users",
         "list user",
@@ -3838,15 +3845,10 @@ def deteksi_user_nlp(message, nlp):
         "cek user",
         "cek pengguna",
         "tampilkan user",
-        "tampilkan pengguna",
-        "user chatsaku",
-        "pengguna chatsaku"
-    ]
+        "tampilkan pengguna"
+    ]:
 
-    if text in pola_list_user:
-
-        print("👤 USER TERDETEKSI")
-        print("ACTION : list")
+        print("👤 USER LIST TERDETEKSI")
 
         return {
             "action": "list"
@@ -3856,7 +3858,7 @@ def deteksi_user_nlp(message, nlp):
     # TAMBAH USER
     # ========================================================
 
-    pola_tambah_user = [
+    pola_tambah = [
         "adduser",
         "tambah user",
         "tambah pengguna",
@@ -3866,13 +3868,18 @@ def deteksi_user_nlp(message, nlp):
         "daftarkan pengguna"
     ]
 
-    for pola in pola_tambah_user:
+    for pola in pola_tambah:
 
         if text.startswith(pola):
 
-            clean = text[len(pola):].strip()
+            data = text[
+                len(pola):
+            ].strip()
 
-            parts = clean.split()
+            parts = data.split()
+
+            # Minimal:
+            # nomor nama paket durasi
 
             if len(parts) < 4:
 
@@ -3883,7 +3890,10 @@ def deteksi_user_nlp(message, nlp):
 
             nomor = parts[0]
 
-            # Cari paket
+            # ==================================================
+            # CARI PAKET
+            # ==================================================
+
             paket_index = None
 
             for i, part in enumerate(parts):
@@ -3900,11 +3910,21 @@ def deteksi_user_nlp(message, nlp):
                     "error": "paket"
                 }
 
+            # ==================================================
+            # NAMA
+            # ==================================================
+
             nama = " ".join(
                 parts[1:paket_index]
             )
 
-            paket = parts[paket_index].upper()
+            paket = parts[
+                paket_index
+            ].upper()
+
+            # ==================================================
+            # DURASI
+            # ==================================================
 
             if paket_index + 1 >= len(parts):
 
@@ -3913,7 +3933,9 @@ def deteksi_user_nlp(message, nlp):
                     "error": "durasi"
                 }
 
-            durasi = parts[paket_index + 1]
+            durasi = parts[
+                paket_index + 1
+            ]
 
             return {
                 "action": "add",
@@ -5152,91 +5174,157 @@ https://www.chatsaku.com
 
         print("========================================")
         print("👤 INTENT USER DINORMALISASI")
-        print("INTENT :", nlp.get("intent"))
-        print("ACTION :", nlp.get("action"))
-        print("NAMA   :", nlp.get("nama"))
-        print("PAKET  :", nlp.get("paket"))
-        print("DURASI :", nlp.get("durasi"))
+        print("INTENT   :", intent)
+        print("ACTION   :", nlp.get("action"))
+        print("NOMOR    :", nlp.get("nomor"))
+        print("NAMA     :", nlp.get("nama"))
+        print("PAKET    :", nlp.get("paket"))
+        print("DURASI   :", nlp.get("durasi"))
+        print("ERROR    :", nlp.get("error"))
         print("========================================")
 
-    # ======================================
-    # USER - LIST
-    # ======================================
+    # ============================================================
+    # USER NLP
+    #
+    # ACTION:
+    #
+    # list
+    # add
+    # ============================================================
 
-    if intent == "user" and action == "list":
+    if intent == "user":
 
-        if not is_admin(sender):
-            return jsonify(status=True)
-
-        users = User.query.order_by(
-            User.created_at.desc()
-        ).all()
-
-        if not users:
-
-            kirim_wa(
-                sender,
-                "📭 Belum ada user."
-            )
-
-            return jsonify(status=True)
-
-        text = (
-            f"👥 *DAFTAR USER CHATSAKU*\n"
-            f"━━━━━━━━━━━━━━\n\n"
-            f"Total User : {len(users)}\n\n"
+        action = nlp.get(
+            "action"
         )
 
-        for i, u in enumerate(users, 1):
+        nomor = nlp.get(
+            "nomor"
+        )
 
-            status = (
-                "🟢 Aktif"
-                if u.aktif
-                else "🔴 Nonaktif"
-            )
+        nama = nlp.get(
+            "nama"
+        )
 
-            expired = "-"
+        paket = nlp.get(
+            "paket"
+        )
 
-            if u.akhir_langganan:
-                expired = u.akhir_langganan.strftime(
-                    "%d-%m-%Y"
-                )
+        durasi = nlp.get(
+            "durasi"
+        )
 
-            text += (
-                f"*{i}. {u.nama}*\n"
-                f"📱 {u.nomor_wa}\n"
-                f"💎 {u.paket}\n"
-                f"{status}\n"
-                f"📅 Expired : {expired}\n\n"
-            )
+        error = nlp.get(
+            "error"
+        )
 
-            if len(text) > 3300:
+        print("========================================")
+        print("👤 PROSES USER")
+        print("SENDER  :", sender)
+        print("ACTION  :", action)
+        print("NOMOR   :", nomor)
+        print("NAMA    :", nama)
+        print("PAKET   :", paket)
+        print("DURASI  :", durasi)
+        print("ERROR   :", error)
+        print("========================================")
 
-                kirim_wa(sender, text)
-
-                text = ""
-
-        if text:
-            kirim_wa(sender, text)
-
-        return jsonify(status=True)
-
-    # ======================================
-    # USER - ADD
-    # ======================================
-
-    if intent == "user" and action == "add":
+        # ========================================================
+        # CEK ADMIN
+        # ========================================================
 
         if not is_admin(sender):
-            return jsonify(status=True)
 
-        error = parsed.get("error")
+            return jsonify(
+                status=True
+            )
 
-        if error == "format":
+        # ========================================================
+        # LIST USER
+        # ========================================================
 
-            kirim_wa(
-                sender,
-                """❌ Format tambah user belum benar.
+        if action == "list":
+
+            users = User.query.order_by(
+                User.created_at.desc()
+            ).all()
+
+            if not users:
+
+                kirim_wa(
+                    sender,
+                    "📭 Belum ada user."
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+            text = (
+                f"👥 *DAFTAR USER CHATSAKU*\n"
+                f"━━━━━━━━━━━━━━\n\n"
+                f"Total User : {len(users)}\n\n"
+            )
+
+            for i, u in enumerate(
+                users,
+                1
+            ):
+
+                status = (
+                    "🟢 Aktif"
+                    if u.aktif
+                    else "🔴 Nonaktif"
+                )
+
+                expired = "-"
+
+                if u.akhir_langganan:
+
+                    expired = (
+                        u.akhir_langganan
+                        .strftime("%d-%m-%Y")
+                    )
+
+                text += (
+                    f"*{i}. {u.nama}*\n"
+                    f"📱 {u.nomor_wa}\n"
+                    f"💎 {u.paket}\n"
+                    f"{status}\n"
+                    f"📅 Expired : {expired}\n\n"
+                )
+
+                if len(text) > 3300:
+
+                    kirim_wa(
+                        sender,
+                        text
+                    )
+
+                    text = ""
+
+            if text:
+
+                kirim_wa(
+                    sender,
+                    text
+                )
+
+            return jsonify(
+                status=True
+            )
+
+        # ========================================================
+        # ADD USER
+        # ========================================================
+
+        if action == "add":
+
+            if error == "format":
+
+                kirim_wa(
+                    sender,
+                    """❌ Format tambah user belum benar.
 
     Contoh:
 
@@ -5252,122 +5340,145 @@ https://www.chatsaku.com
     • PREMIUM
 
     30 = durasi dalam hari"""
-            )
+                )
 
-            return jsonify(status=True)
+                return jsonify(
+                    status=True
+                )
 
-        if error == "paket":
+            if error == "paket":
 
-            kirim_wa(
-                sender,
-                """❌ Paket tidak dikenali.
+                kirim_wa(
+                    sender,
+                    """❌ Paket tidak dikenali.
 
-    Paket yang tersedia:
-
+    Paket:
     • STARTER
     • PRO
     • PREMIUM"""
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+            if error == "durasi":
+
+                kirim_wa(
+                    sender,
+                    "❌ Durasi belum diberikan."
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+            # ====================================================
+            # NORMALISASI NOMOR
+            # ====================================================
+
+            nomor = normalize_wa(
+                nomor
             )
 
-            return jsonify(status=True)
+            paket = paket.upper()
 
-        if error == "durasi":
+            try:
+
+                lama = int(
+                    durasi
+                )
+
+            except (
+                ValueError,
+                TypeError
+            ):
+
+                kirim_wa(
+                    sender,
+                    "❌ Durasi harus berupa angka."
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+            # ====================================================
+            # CEK PAKET
+            # ====================================================
+
+            if paket not in FEATURES:
+
+                kirim_wa(
+                    sender,
+                    "❌ Paket hanya:\n"
+                    "STARTER\n"
+                    "PRO\n"
+                    "PREMIUM"
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+            # ====================================================
+            # CEK USER
+            # ====================================================
+
+            cek = User.query.filter_by(
+                nomor_wa=nomor
+            ).first()
+
+            if cek:
+
+                kirim_wa(
+                    sender,
+                    "❌ User sudah terdaftar."
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+            # ====================================================
+            # PERIODE
+            # ====================================================
+
+            mulai = date.today()
+
+            akhir = (
+                mulai
+                + timedelta(
+                    days=lama
+                )
+            )
+
+            # ====================================================
+            # BUAT USER
+            # ====================================================
+
+            user = User(
+                nama=nama,
+                nomor_wa=nomor,
+                paket=paket,
+                aktif=True,
+                mulai_langganan=mulai,
+                akhir_langganan=akhir
+            )
+
+            db.session.add(
+                user
+            )
+
+            db.session.commit()
+
+            # ====================================================
+            # PESAN ADMIN
+            # ====================================================
 
             kirim_wa(
                 sender,
-                "❌ Durasi langganan belum diberikan."
-            )
-
-            return jsonify(status=True)
-
-        nomor = normalize_wa(
-            parsed["nomor"]
-        )
-
-        nama = parsed["nama"]
-
-        paket = parsed["paket"].upper()
-
-        try:
-
-            lama = int(parsed["durasi"])
-
-        except (ValueError, TypeError):
-
-            kirim_wa(
-                sender,
-                "❌ Durasi harus berupa angka dalam hari."
-            )
-
-            return jsonify(status=True)
-
-        if paket not in FEATURES:
-
-            kirim_wa(
-                sender,
-                "❌ Paket hanya:\n"
-                "STARTER\n"
-                "PRO\n"
-                "PREMIUM"
-            )
-
-            return jsonify(status=True)
-
-        if lama <= 0:
-
-            kirim_wa(
-                sender,
-                "❌ Durasi harus lebih dari 0 hari."
-            )
-
-            return jsonify(status=True)
-
-        cek = User.query.filter_by(
-            nomor_wa=nomor
-        ).first()
-
-        if cek:
-
-            kirim_wa(
-                sender,
-                "❌ User sudah terdaftar."
-            )
-
-            return jsonify(status=True)
-
-        # ==================================
-        # PERIODE LANGGANAN
-        # ==================================
-
-        mulai = date.today()
-
-        akhir = mulai + timedelta(
-            days=lama
-        )
-
-        # ==================================
-        # BUAT USER
-        # ==================================
-
-        user = User(
-            nama=nama,
-            nomor_wa=nomor,
-            paket=paket,
-            aktif=True,
-            mulai_langganan=mulai,
-            akhir_langganan=akhir
-        )
-
-        db.session.add(user)
-        db.session.commit()
-
-        # ==================================
-        # PESAN ADMIN
-        # ==================================
-
-        kirim_wa(
-            sender,
-            f"""✅ *User Berhasil Ditambahkan*
+                f"""✅ *User Berhasil Ditambahkan*
 
     👤 *Nama*
     {nama}
@@ -5388,15 +5499,15 @@ https://www.chatsaku.com
     {akhir.strftime('%d-%m-%Y')}
 
     🚀 User sudah dapat menggunakan ChatSaku."""
-        )
+            )
 
-        # ==================================
-        # PESAN USER
-        # ==================================
+            # ====================================================
+            # PESAN USER
+            # ====================================================
 
-        kirim_wa(
-            nomor,
-            f"""🎉 *Selamat, Akun ChatSaku Anda Aktif!*
+            kirim_wa(
+                nomor,
+                f"""🎉 *Selamat, Akun ChatSaku Anda Aktif!*
 
     Halo *{nama}* 👋
 
@@ -5418,9 +5529,11 @@ https://www.chatsaku.com
     Selamat menggunakan *ChatSaku*! 💚
 
     🌐 www.chatsaku.com"""
-        )
+            )
 
-        return jsonify(status=True)
+            return jsonify(
+                status=True
+            )
 
     # ======================================
     # Delete User
