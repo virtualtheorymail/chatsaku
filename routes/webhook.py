@@ -11685,15 +11685,11 @@ _ChatSaku Finance Assistant_
         # CEK FEATURE
         # ========================================================
 
-        if not has_feature(
-            sender,
-            "hutang"
-        ):
+        if not has_feature(sender, "hutang"):
 
             kirim_wa(
                 sender,
-                """
-    🔒 *Fitur hutang hanya tersedia pada paket PREMIUM.*
+                """🔒 *Fitur hutang hanya tersedia pada paket PREMIUM.*
 
     Upgrade sekarang agar dapat:
 
@@ -11708,27 +11704,19 @@ _ChatSaku Finance Assistant_
     """
             )
 
-            return jsonify(
-                status=True
-            )
+            return jsonify(status=True)
 
         # ========================================================
         # ACTION
         # ========================================================
 
-        action = nlp.get(
-            "action"
-        )
-
-        # ========================================================
-        # VALIDASI ACTION
-        # ========================================================
+        action = nlp.get("action")
 
         if action != "pay":
 
             kirim_wa(
                 sender,
-                """❌ Perintah bayar hutang tidak lengkap.
+                """❌ Format pembayaran hutang tidak dikenali.
 
     Contoh:
 
@@ -11736,31 +11724,20 @@ _ChatSaku Finance Assistant_
 
     atau
 
-    💰 bayarhutang mia"""
+    💰 bayar hutang mia 5000"""
             )
 
-            return jsonify(
-                status=True
-            )
+            return jsonify(status=True)
 
         # ========================================================
-        # AMBIL NAMA DARI NLP
-        #
-        # JANGAN menggunakan:
-        #
-        # message.split()
-        #
+        # DATA NLP
         # ========================================================
 
-        nama = nlp.get(
-            "nama"
-        )
+        nama = nlp.get("nama")
+        nominal_bayar = nlp.get("nominal")
 
         if nama:
-
-            nama = str(
-                nama
-            ).strip()
+            nama = str(nama).strip()
 
         # ========================================================
         # VALIDASI NAMA
@@ -11772,67 +11749,95 @@ _ChatSaku Finance Assistant_
                 sender,
                 """❌ Nama hutang belum ditemukan.
 
-    Gunakan:
-
-    💰 bayar hutang mia
-
     Contoh:
 
-    bayar hutang budi
-    bayar hutang mia"""
+    bayar hutang mia
+    bayar hutang budi 5000"""
             )
 
-            return jsonify(
-                status=True
-            )
-
-        # ========================================================
-        # DEBUG
-        # ========================================================
-
-        print("========================================")
-        print("🔎 CARI HUTANG")
-        print("SENDER :", sender)
-        print("NAMA   :", nama)
-        print("========================================")
+            return jsonify(status=True)
 
         # ========================================================
         # CARI HUTANG
         # ========================================================
 
+        print("========================================")
+        print("🔎 CARI HUTANG")
+        print("SENDER        :", sender)
+        print("NAMA          :", nama)
+        print("NOMINAL BAYAR :", nominal_bayar)
+        print("========================================")
+
         hutang = HutangPiutang.query.filter(
             HutangPiutang.nomor_wa == sender,
-
             HutangPiutang.tipe == "HUTANG",
-
-            HutangPiutang.nama.ilike(
-                nama
-            ),
-
+            HutangPiutang.nama.ilike(nama),
             HutangPiutang.status != "LUNAS"
-
         ).first()
 
         # ========================================================
-        # HUTANG TIDAK DITEMUKAN
+        # TIDAK DITEMUKAN
         # ========================================================
 
         if not hutang:
-
-            print("========================================")
-            print("❌ HUTANG TIDAK DITEMUKAN")
-            print("NAMA :", nama)
-            print("========================================")
 
             kirim_wa(
                 sender,
                 f"""❌ Hutang *{nama}* tidak ditemukan.
 
-    Pastikan nama sesuai dengan nama hutang yang tercatat.
+    Pastikan nama sesuai dengan nama hutang yang tercatat."""
+            )
 
-    Contoh:
+            return jsonify(status=True)
 
-    bayar hutang mia"""
+        # ========================================================
+        # NOMINAL HUTANG
+        # ========================================================
+
+        nominal_hutang = float(
+            hutang.nominal or 0
+        )
+
+        # ========================================================
+        # JIKA TIDAK ADA NOMINAL
+        #
+        # bayar hutang mia
+        #
+        # = LUNAS SELURUHNYA
+        # ========================================================
+
+        if not nominal_bayar:
+
+            nominal_bayar = nominal_hutang
+
+        else:
+
+            try:
+
+                nominal_bayar = float(
+                    nominal_bayar
+                )
+
+            except Exception:
+
+                kirim_wa(
+                    sender,
+                    "❌ Nominal pembayaran tidak valid."
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+        # ========================================================
+        # VALIDASI NOMINAL
+        # ========================================================
+
+        if nominal_bayar <= 0:
+
+            kirim_wa(
+                sender,
+                "❌ Nominal pembayaran harus lebih dari Rp0."
             )
 
             return jsonify(
@@ -11840,34 +11845,112 @@ _ChatSaku Finance Assistant_
             )
 
         # ========================================================
-        # LUNASKAN HUTANG
+        # PEMBAYARAN LEBIH BESAR DARI HUTANG
         # ========================================================
 
-        hutang.status = "LUNAS"
+        if nominal_bayar > nominal_hutang:
 
-        hutang.lunas_tanggal = sekarang()
+            kirim_wa(
+                sender,
+                f"""❌ *Nominal pembayaran terlalu besar.*
 
-        db.session.commit()
+    👤 Hutang : {hutang.nama}
+
+    💰 Total hutang:
+    Rp {nominal_hutang:,.0f}
+
+    💵 Pembayaran:
+    Rp {nominal_bayar:,.0f}
+
+    Pembayaran tidak boleh melebihi jumlah hutang."""
+            )
+
+            return jsonify(
+                status=True
+            )
 
         # ========================================================
-        # NOTIFIKASI
+        # HITUNG SISA
         # ========================================================
 
-        kirim_wa(
-            sender,
-            f"""✅ *Hutang Lunas*
+        sisa = nominal_hutang - nominal_bayar
+
+        print("========================================")
+        print("💰 PEMBAYARAN HUTANG")
+        print("HUTANG AWAL :", nominal_hutang)
+        print("DIBAYAR     :", nominal_bayar)
+        print("SISA        :", sisa)
+        print("========================================")
+
+        # ========================================================
+        # JIKA LUNAS
+        # ========================================================
+
+        if sisa <= 0:
+
+            hutang.nominal = 0
+            hutang.status = "LUNAS"
+            hutang.lunas_tanggal = sekarang()
+
+            db.session.commit()
+
+            kirim_wa(
+                sender,
+                f"""✅ *Hutang Lunas*
 
     👤 *Nama*
     {hutang.nama}
 
-    💰 *Nominal*
-    Rp {hutang.nominal:,.0f}
+    💰 *Pembayaran*
+    Rp {nominal_bayar:,.0f}
 
     📌 *Status*
     ✅ SUDAH LUNAS
 
     🕒 *Waktu*
     {sekarang().strftime("%d %b %Y %H:%M")}
+
+    _ChatSaku Finance Assistant_"""
+            )
+
+            return jsonify(
+                status=True
+            )
+
+        # ========================================================
+        # JIKA BELUM LUNAS
+        # ========================================================
+
+        hutang.nominal = sisa
+
+        hutang.status = "BELUM LUNAS"
+
+        db.session.commit()
+
+        # ========================================================
+        # NOTIFIKASI CICILAN
+        # ========================================================
+
+        kirim_wa(
+            sender,
+            f"""✅ *Pembayaran Hutang Berhasil*
+
+    👤 *Nama*
+    {hutang.nama}
+
+    💰 *Hutang Awal*
+    Rp {nominal_hutang:,.0f}
+
+    💵 *Dibayar*
+    Rp {nominal_bayar:,.0f}
+
+    📌 *Sisa Hutang*
+    Rp {sisa:,.0f}
+
+    🔄 *Status*
+    BELUM LUNAS
+
+    Silakan bayar kembali jika ingin melunasi seluruh hutang.
 
     _ChatSaku Finance Assistant_"""
         )
