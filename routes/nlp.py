@@ -443,6 +443,189 @@ def deteksi_bayarhutang_nlp(
 
     return result
 
+# ============================================================
+# DETEKSI BAYAR PIUTANG NLP
+# ============================================================
+
+def deteksi_bayarpiutang_nlp(message, nlp=None):
+
+    if not message:
+        return None
+
+    text = str(message).strip()
+
+    if not text:
+        return None
+
+    text_lower = re.sub(
+        r'\s+',
+        ' ',
+        text.lower()
+    ).strip()
+
+    print("========================================")
+    print("💰 CEK BAYAR PIUTANG NLP")
+    print("MESSAGE :", message)
+    print("========================================")
+
+    # ========================================================
+    # POLA BAYAR PIUTANG
+    # ========================================================
+
+    pola = [
+
+        r'^bayar\s+piutang\s+(.+)$',
+
+        r'^bayarpiutang\s+(.+)$',
+
+        r'^lunasi\s+piutang\s+(.+)$',
+
+        r'^lunaskan\s+piutang\s+(.+)$',
+
+        r'^piutang\s+(.+)\s+sudah\s+dibayar$',
+
+        r'^piutang\s+(.+)\s+sudah\s+lunas$',
+
+        r'^saya\s+bayar\s+piutang\s+(.+)$',
+
+        r'^saya\s+lunasi\s+piutang\s+(.+)$',
+
+        r'^bayar\s+piutang\s+ke\s+(.+)$',
+
+        r'^lunasi\s+piutang\s+ke\s+(.+)$'
+
+    ]
+
+    nama = None
+    nominal = None
+
+    # ========================================================
+    # CARI POLA
+    # ========================================================
+
+    for pola_item in pola:
+
+        match = re.search(
+            pola_item,
+            text_lower,
+            re.IGNORECASE
+        )
+
+        if not match:
+            continue
+
+        isi = match.group(1).strip()
+
+        # ====================================================
+        # AMBIL NOMINAL
+        # ====================================================
+
+        try:
+
+            nominal = parse_nominal_finance(
+                text
+            )
+
+        except Exception:
+
+            try:
+
+                nominal = normalize_nominal(
+                    text
+                )
+
+            except Exception:
+
+                nominal = None
+
+        # ====================================================
+        # HAPUS NOMINAL DARI TEXT
+        # ====================================================
+
+        isi = re.sub(
+            r'(?:rp\s*)?'
+            r'\d+(?:[.,]\d+)?'
+            r'\s*(?:ribu|rb|juta|jt|miliar|milyar)?',
+            '',
+            isi,
+            flags=re.IGNORECASE
+        )
+
+        isi = re.sub(
+            r'\s+',
+            ' ',
+            isi
+        ).strip()
+
+        # ====================================================
+        # HAPUS KATA "KE"
+        # ====================================================
+
+        isi = re.sub(
+            r'^ke\s+',
+            '',
+            isi,
+            flags=re.IGNORECASE
+        ).strip()
+
+        # ====================================================
+        # NAMA
+        #
+        # Contoh:
+        #
+        # bayar piutang mia
+        # -> mia
+        #
+        # bayar piutang mia 4000
+        # -> mia
+        #
+        # bayar piutang ke mia
+        # -> mia
+        # ====================================================
+
+        parts = isi.split()
+
+        if parts:
+
+            nama = parts[0].strip()
+
+        break
+
+    # ========================================================
+    # TIDAK TERDETEKSI
+    # ========================================================
+
+    if not nama:
+
+        return None
+
+    # ========================================================
+    # RETURN
+    # ========================================================
+
+    hasil = {
+
+        "intent": "bayarpiutang",
+
+        "action": "pay",
+
+        "nama": nama,
+
+        "nominal": nominal,
+
+        "keterangan": None
+
+    }
+
+    print("========================================")
+    print("💰 BAYAR PIUTANG TERDETEKSI")
+    print("INTENT   :", hasil["intent"])
+    print("ACTION   :", hasil["action"])
+    print("NAMA     :", hasil["nama"])
+    print("NOMINAL  :", hasil["nominal"])
+    print("========================================")
+
+    return hasil
 
 # ============================================================
 # DETEKSI ADMIN USER NLP

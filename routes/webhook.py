@@ -4841,6 +4841,69 @@ https://www.chatsaku.com
         print("ERROR      :", nlp.get("error"))
         print("========================================")
 
+    # ============================================================
+    # NORMALISASI INTENT BAYAR PIUTANG NLP
+    # ============================================================
+
+    print("========================================")
+    print("💰 CEK BAYAR PIUTANG NLP")
+    print("MESSAGE :", message)
+    print("========================================")
+
+    try:
+
+        bayarpiutang_nlp = deteksi_bayarpiutang_nlp(
+            message,
+            nlp
+        )
+
+    except Exception as e:
+
+        print("========================================")
+        print("❌ ERROR deteksi_bayarpiutang_nlp()")
+        print("ERROR :", repr(e))
+        print("========================================")
+
+        bayarpiutang_nlp = None
+
+
+    print("========================================")
+    print("💰 BAYAR PIUTANG NLP RESULT")
+    print("RESULT :", bayarpiutang_nlp)
+    print("========================================")
+
+
+    if bayarpiutang_nlp:
+
+        nlp["intent"] = bayarpiutang_nlp.get(
+            "intent"
+        )
+
+        nlp["action"] = bayarpiutang_nlp.get(
+            "action"
+        )
+
+        nlp["nama"] = bayarpiutang_nlp.get(
+            "nama"
+        )
+
+        nlp["nominal"] = bayarpiutang_nlp.get(
+            "nominal"
+        )
+
+        nlp["keterangan"] = bayarpiutang_nlp.get(
+            "keterangan"
+        )
+
+        print("========================================")
+        print("💰 INTENT BAYAR PIUTANG DINORMALISASI")
+        print("INTENT     :", nlp.get("intent"))
+        print("ACTION     :", nlp.get("action"))
+        print("NAMA       :", nlp.get("nama"))
+        print("NOMINAL    :", nlp.get("nominal"))
+        print("KETERANGAN :", nlp.get("keterangan"))
+        print("========================================")
+
 
     # ============================================================
     # INTENT FINAL
@@ -11979,17 +12042,49 @@ _ChatSaku Finance Assistant_
             status=True
         )
 
-    # =========================
-    # BAYAR PIUTANG
-    # =========================
+    # ============================================================
+    # BAYAR PIUTANG NLP
+    #
+    # ACTION:
+    #
+    # pay
+    # ============================================================
 
-    if cmd.startswith("bayarpiutang"):
+    if intent == "bayarpiutang":
 
-        if not has_feature(sender, "piutang"):
+        action = nlp.get(
+            "action"
+        )
 
-            kirim_wa(sender,
-    """
-    🔒 Fitur Piutang hanya tersedia pada paket PREMIUM.
+        nama = nlp.get(
+            "nama"
+        )
+
+        nominal_bayar = nlp.get(
+            "nominal"
+        )
+
+        print("========================================")
+        print("💰 PROSES BAYAR PIUTANG")
+        print("SENDER        :", sender)
+        print("ACTION        :", action)
+        print("NAMA          :", nama)
+        print("NOMINAL INPUT :", nominal_bayar)
+        print("========================================")
+
+        # ========================================================
+        # CEK FITUR
+        # ========================================================
+
+        if not has_feature(
+            sender,
+            "piutang"
+        ):
+
+            kirim_wa(
+                sender,
+                """
+    🔒 *Fitur Piutang hanya tersedia pada paket PREMIUM.*
 
     Upgrade sekarang agar dapat:
 
@@ -11999,35 +12094,40 @@ _ChatSaku Finance Assistant_
     ✅ Hutang Piutang
     ✅ AI Insight
     ✅ Dashboard Lengkap
+    """
+            )
 
-            """)
+            return jsonify(
+                status=True
+            )
 
-            return jsonify(status=True)
+        # ========================================================
+        # VALIDASI NAMA
+        # ========================================================
 
-        data = message.split(" ",1)
-
-
-        if len(data)<2:
+        if not nama:
 
             kirim_wa(
                 sender,
-                """❌ Format salah
-
-    Gunakan:
-
-    bayarpiutang nama
+                """❌ Nama piutang tidak ditemukan.
 
     Contoh:
-    bayarpiutang agus"""
+
+    bayar piutang mia
+
+    atau:
+
+    lunasi piutang mia
+    """
             )
 
-            return jsonify(status=True)
+            return jsonify(
+                status=True
+            )
 
-
-
-        nama=data[1].strip()
-
-
+        # ========================================================
+        # CARI PIUTANG
+        # ========================================================
 
         piutang = HutangPiutang.query.filter(
             HutangPiutang.nomor_wa == sender,
@@ -12036,46 +12136,59 @@ _ChatSaku Finance Assistant_
             HutangPiutang.status != "LUNAS"
         ).first()
 
-
+        # ========================================================
+        # TIDAK DITEMUKAN
+        # ========================================================
 
         if not piutang:
 
             kirim_wa(
                 sender,
-                f"""❌ Piutang {nama} tidak ditemukan"""
+                f"""❌ Piutang *{nama}* tidak ditemukan.
+
+    Pastikan nama sesuai dengan data piutang Anda."""
             )
 
-            return jsonify(status=True)
+            return jsonify(
+                status=True
+            )
 
+        # ========================================================
+        # LUNASKAN PIUTANG
+        # ========================================================
 
+        piutang.status = "LUNAS"
 
-        piutang.status="LUNAS"
-
-        piutang.lunas_tanggal=sekarang()
-
+        piutang.lunas_tanggal = sekarang()
 
         db.session.commit()
 
-
+        # ========================================================
+        # NOTIFIKASI
+        # ========================================================
 
         kirim_wa(
             sender,
             f"""✅ *Piutang Diterima*
 
-    👤 {piutang.nama}
+    👤 *Nama*
+    {piutang.nama}
 
-    💰 Rp {piutang.nominal:,.0f}
+    💰 *Nominal*
+    Rp {piutang.nominal:,.0f}
 
-    Status:
+    📌 *Status*
     ✅ SUDAH DIBAYAR
 
-    🕒 {sekarang().strftime("%d %b %Y %H:%M")}
+    🕒 *Waktu*
+    {sekarang().strftime("%d %b %Y %H:%M")}
 
     _ChatSaku Finance Assistant_"""
         )
 
-
-        return jsonify(status=True)
+        return jsonify(
+            status=True
+        )
 
     # ============================================================
     # BAYAR HUTANG NLP
