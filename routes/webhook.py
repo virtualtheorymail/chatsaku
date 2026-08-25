@@ -16,6 +16,7 @@ from itsdangerous import SignatureExpired
 from utils.duplicate import is_duplicate
 from utils.helper import *
 from routes.nlp_router import parse_message
+from routes.nlp import deteksi_user_nlp
 import re
 
 webhook_bp = Blueprint("webhook", __name__)
@@ -5220,17 +5221,16 @@ https://www.chatsaku.com
 
         print("========================================")
         print("👤 PROSES USER")
-        print("SENDER  :", sender)
-        print("ACTION  :", action)
-        print("NOMOR   :", nomor)
-        print("NAMA    :", nama)
-        print("PAKET   :", paket)
-        print("DURASI  :", durasi)
-        print("ERROR   :", error)
+        print("SENDER :", sender)
+        print("ACTION :", action)
+        print("NOMOR  :", nomor)
+        print("NAMA   :", nama)
+        print("PAKET  :", paket)
+        print("DURASI :", durasi)
         print("========================================")
 
         # ========================================================
-        # CEK ADMIN
+        # HANYA ADMIN
         # ========================================================
 
         if not is_admin(sender):
@@ -5294,6 +5294,7 @@ https://www.chatsaku.com
                     f"📅 Expired : {expired}\n\n"
                 )
 
+                # Hindari pesan WA terlalu panjang
                 if len(text) > 3300:
 
                     kirim_wa(
@@ -5319,6 +5320,10 @@ https://www.chatsaku.com
         # ========================================================
 
         if action == "add":
+
+            # ----------------------------------------------
+            # ERROR FORMAT
+            # ----------------------------------------------
 
             if error == "format":
 
@@ -5346,13 +5351,33 @@ https://www.chatsaku.com
                     status=True
                 )
 
+            # ----------------------------------------------
+            # ERROR NAMA
+            # ----------------------------------------------
+
+            if error == "nama":
+
+                kirim_wa(
+                    sender,
+                    "❌ Nama user belum diberikan."
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+            # ----------------------------------------------
+            # ERROR PAKET
+            # ----------------------------------------------
+
             if error == "paket":
 
                 kirim_wa(
                     sender,
                     """❌ Paket tidak dikenali.
 
-    Paket:
+    Paket tersedia:
+
     • STARTER
     • PRO
     • PREMIUM"""
@@ -5362,26 +5387,32 @@ https://www.chatsaku.com
                     status=True
                 )
 
+            # ----------------------------------------------
+            # ERROR DURASI
+            # ----------------------------------------------
+
             if error == "durasi":
 
                 kirim_wa(
                     sender,
-                    "❌ Durasi belum diberikan."
+                    "❌ Durasi langganan belum diberikan."
                 )
 
                 return jsonify(
                     status=True
                 )
 
-            # ====================================================
+            # ----------------------------------------------
             # NORMALISASI NOMOR
-            # ====================================================
+            # ----------------------------------------------
 
             nomor = normalize_wa(
                 nomor
             )
 
-            paket = paket.upper()
+            # ----------------------------------------------
+            # VALIDASI DURASI
+            # ----------------------------------------------
 
             try:
 
@@ -5396,16 +5427,27 @@ https://www.chatsaku.com
 
                 kirim_wa(
                     sender,
-                    "❌ Durasi harus berupa angka."
+                    "❌ Durasi harus berupa angka (hari)."
                 )
 
                 return jsonify(
                     status=True
                 )
 
-            # ====================================================
-            # CEK PAKET
-            # ====================================================
+            if lama <= 0:
+
+                kirim_wa(
+                    sender,
+                    "❌ Durasi harus lebih dari 0 hari."
+                )
+
+                return jsonify(
+                    status=True
+                )
+
+            # ----------------------------------------------
+            # VALIDASI PAKET
+            # ----------------------------------------------
 
             if paket not in FEATURES:
 
@@ -5421,9 +5463,9 @@ https://www.chatsaku.com
                     status=True
                 )
 
-            # ====================================================
+            # ----------------------------------------------
             # CEK USER
-            # ====================================================
+            # ----------------------------------------------
 
             cek = User.query.filter_by(
                 nomor_wa=nomor
@@ -5433,16 +5475,20 @@ https://www.chatsaku.com
 
                 kirim_wa(
                     sender,
-                    "❌ User sudah terdaftar."
+                    f"""❌ *User sudah terdaftar.*
+
+    👤 Nama : {cek.nama}
+    📱 Nomor : {cek.nomor_wa}
+    💎 Paket : {cek.paket}"""
                 )
 
                 return jsonify(
                     status=True
                 )
 
-            # ====================================================
-            # PERIODE
-            # ====================================================
+            # ----------------------------------------------
+            # HITUNG PERIODE
+            # ----------------------------------------------
 
             mulai = date.today()
 
@@ -5453,9 +5499,9 @@ https://www.chatsaku.com
                 )
             )
 
-            # ====================================================
+            # ----------------------------------------------
             # BUAT USER
-            # ====================================================
+            # ----------------------------------------------
 
             user = User(
                 nama=nama,
@@ -5472,9 +5518,9 @@ https://www.chatsaku.com
 
             db.session.commit()
 
-            # ====================================================
+            # ----------------------------------------------
             # PESAN ADMIN
-            # ====================================================
+            # ----------------------------------------------
 
             kirim_wa(
                 sender,
@@ -5501,9 +5547,9 @@ https://www.chatsaku.com
     🚀 User sudah dapat menggunakan ChatSaku."""
             )
 
-            # ====================================================
+            # ----------------------------------------------
             # PESAN USER
-            # ====================================================
+            # ----------------------------------------------
 
             kirim_wa(
                 nomor,
@@ -5534,7 +5580,6 @@ https://www.chatsaku.com
             return jsonify(
                 status=True
             )
-
     # ======================================
     # Delete User
     # ======================================
