@@ -159,7 +159,14 @@ def deteksi_user_nlp(message, nlp):
 
     return None
 
-def deteksi_bayarhutang_nlp(message, data=None):
+# ============================================================
+# DETEKSI BAYAR HUTANG NLP
+# ============================================================
+
+def deteksi_bayarhutang_nlp(
+    message,
+    data=None
+):
 
     if not message:
         return None
@@ -178,11 +185,58 @@ def deteksi_bayarhutang_nlp(message, data=None):
     if data is None:
         data = {}
 
+    print("========================================")
+    print("💰 CEK BAYAR HUTANG NLP")
+    print("MESSAGE :", message)
+    print("========================================")
+
     # ========================================================
-    # POLA BAYAR HUTANG
+    # ACTION LIST
     # ========================================================
 
-    pola = [
+    pola_list = [
+
+        r'^bayarhutang$',
+
+        r'^bayar\s+hutang$',
+
+        r'^list\s+bayar\s+hutang$',
+
+        r'^daftar\s+bayar\s+hutang$',
+
+        r'^lihat\s+bayar\s+hutang$'
+
+    ]
+
+    for pola in pola_list:
+
+        if re.search(
+            pola,
+            text_lower,
+            re.IGNORECASE
+        ):
+
+            print("💰 BAYAR HUTANG LIST TERDETEKSI")
+
+            return {
+
+                "intent": "bayarhutang",
+
+                "action": "list",
+
+                "nama": None,
+
+                "nominal": None,
+
+                "keterangan": None
+
+            }
+
+    # ========================================================
+    # ACTION PAY
+    # ========================================================
+
+    pola_bayar = [
 
         r'^bayarhutang\s+(.+)$',
 
@@ -194,6 +248,8 @@ def deteksi_bayarhutang_nlp(message, data=None):
 
         r'^aku\s+bayar\s+hutang\s+(.+)$',
 
+        r'^kami\s+bayar\s+hutang\s+(.+)$',
+
         r'^sudah\s+bayar\s+hutang\s+(.+)$',
 
         r'^telah\s+bayar\s+hutang\s+(.+)$',
@@ -204,10 +260,10 @@ def deteksi_bayarhutang_nlp(message, data=None):
 
     ]
 
-    for pattern in pola:
+    for pola in pola_bayar:
 
         match = re.search(
-            pattern,
+            pola,
             text_lower,
             re.IGNORECASE
         )
@@ -215,10 +271,22 @@ def deteksi_bayarhutang_nlp(message, data=None):
         if not match:
             continue
 
+        # ====================================================
+        # ISI SETELAH PREFIX
+        #
+        # bayar hutang mia 4000
+        #
+        # menjadi:
+        #
+        # mia 4000
+        # ====================================================
+
         isi = match.group(1).strip()
 
+        print("ISI :", isi)
+
         # ====================================================
-        # AMBIL NOMINAL JIKA ADA
+        # NOMINAL
         # ====================================================
 
         nominal = None
@@ -229,7 +297,12 @@ def deteksi_bayarhutang_nlp(message, data=None):
                 isi
             )
 
-        except Exception:
+        except Exception as e:
+
+            print(
+                "⚠️ parse_nominal_finance gagal:",
+                repr(e)
+            )
 
             try:
 
@@ -237,13 +310,30 @@ def deteksi_bayarhutang_nlp(message, data=None):
                     isi
                 )
 
-            except Exception:
+            except Exception as e2:
+
+                print(
+                    "⚠️ normalize_nominal gagal:",
+                    repr(e2)
+                )
 
                 nominal = None
 
         # ====================================================
-        # HAPUS NOMINAL DARI NAMA
+        # NAMA
         # ====================================================
+
+        nama = isi
+
+        # ----------------------------------------------------
+        # Hapus nominal di belakang
+        #
+        # mia 4000
+        # mia 4.000
+        # mia 4 ribu
+        # mia 4rb
+        # mia 2 juta
+        # ----------------------------------------------------
 
         nama = re.sub(
             r'\s+(?:rp\s*)?'
@@ -251,13 +341,33 @@ def deteksi_bayarhutang_nlp(message, data=None):
             r'\s*(?:ribu|rb|juta|jt|miliar|milyar)?'
             r'\s*$',
             '',
-            isi,
+            nama,
             flags=re.IGNORECASE
         ).strip()
 
-        # ====================================================
-        # HAPUS "KE" / "KEPADA"
-        # ====================================================
+        # ----------------------------------------------------
+        # Jika masih ada kata "hutang"
+        #
+        # hutang mia
+        #
+        # menjadi:
+        #
+        # mia
+        # ----------------------------------------------------
+
+        nama = re.sub(
+            r'^hutang\s+',
+            '',
+            nama,
+            flags=re.IGNORECASE
+        ).strip()
+
+        # ----------------------------------------------------
+        # Hapus ke / kepada
+        #
+        # kepada mia
+        # ke mia
+        # ----------------------------------------------------
 
         nama = re.sub(
             r'^(ke|kepada)\s+',
@@ -266,29 +376,47 @@ def deteksi_bayarhutang_nlp(message, data=None):
             flags=re.IGNORECASE
         ).strip()
 
+        # ----------------------------------------------------
+        # Bersihkan spasi
+        # ----------------------------------------------------
+
         nama = re.sub(
             r'\s+',
             ' ',
             nama
         ).strip()
 
+        # ====================================================
+        # VALIDASI NAMA
+        # ====================================================
+
         if not nama:
 
+            print(
+                "❌ NAMA BAYAR HUTANG TIDAK DITEMUKAN"
+            )
+
             return {
+
                 "intent": "bayarhutang",
+
                 "action": "pay",
+
                 "nama": None,
+
                 "nominal": nominal,
+
+                "keterangan": None,
+
                 "error": "nama"
+
             }
 
-        print("========================================")
-        print("💰 BAYAR HUTANG TERDETEKSI")
-        print("NAMA    :", nama)
-        print("NOMINAL :", nominal)
-        print("========================================")
+        # ====================================================
+        # RETURN
+        # ====================================================
 
-        return {
+        result = {
 
             "intent": "bayarhutang",
 
@@ -301,5 +429,19 @@ def deteksi_bayarhutang_nlp(message, data=None):
             "keterangan": None
 
         }
+
+        print("========================================")
+        print("💰 BAYAR HUTANG TERDETEKSI")
+        print("INTENT  :", result["intent"])
+        print("ACTION  :", result["action"])
+        print("NAMA    :", result["nama"])
+        print("NOMINAL :", result["nominal"])
+        print("========================================")
+
+        return result
+
+    # ========================================================
+    # TIDAK TERDETEKSI
+    # ========================================================
 
     return None

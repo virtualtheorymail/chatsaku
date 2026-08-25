@@ -11666,17 +11666,34 @@ _ChatSaku Finance Assistant_
 
         return jsonify(status=True)
 
-    # =========================
-    # BAYAR HUTANG
-    # =========================
+    # ============================================================
+    # BAYAR HUTANG NLP
+    # ============================================================
 
-    if cmd.startswith("bayarhutang"):
+    if intent == "bayarhutang":
 
-        if not has_feature(sender, "hutang"):
+        print("========================================")
+        print("💰 PROSES BAYAR HUTANG")
+        print("SENDER :", sender)
+        print("INTENT :", intent)
+        print("ACTION :", nlp.get("action"))
+        print("NAMA   :", nlp.get("nama"))
+        print("NOMINAL:", nlp.get("nominal"))
+        print("========================================")
 
-            kirim_wa(sender,
-    """
-    🔒 Fitur hutang hanya tersedia pada paket PREMIUM.
+        # ========================================================
+        # CEK FEATURE
+        # ========================================================
+
+        if not has_feature(
+            sender,
+            "hutang"
+        ):
+
+            kirim_wa(
+                sender,
+                """
+    🔒 *Fitur hutang hanya tersedia pada paket PREMIUM.*
 
     Upgrade sekarang agar dapat:
 
@@ -11687,83 +11704,177 @@ _ChatSaku Finance Assistant_
     ✅ AI Insight
     ✅ Dashboard Lengkap
 
-            """)
+    🌐 www.chatsaku.com
+    """
+            )
 
-            return jsonify(status=True)
+            return jsonify(
+                status=True
+            )
 
-        data = message.split(" ", 1)
+        # ========================================================
+        # ACTION
+        # ========================================================
 
+        action = nlp.get(
+            "action"
+        )
 
-        if len(data) < 2:
+        # ========================================================
+        # VALIDASI ACTION
+        # ========================================================
+
+        if action != "pay":
 
             kirim_wa(
                 sender,
-                """❌ Format salah
+                """❌ Perintah bayar hutang tidak lengkap.
+
+    Contoh:
+
+    💰 bayar hutang mia
+
+    atau
+
+    💰 bayarhutang mia"""
+            )
+
+            return jsonify(
+                status=True
+            )
+
+        # ========================================================
+        # AMBIL NAMA DARI NLP
+        #
+        # JANGAN menggunakan:
+        #
+        # message.split()
+        #
+        # ========================================================
+
+        nama = nlp.get(
+            "nama"
+        )
+
+        if nama:
+
+            nama = str(
+                nama
+            ).strip()
+
+        # ========================================================
+        # VALIDASI NAMA
+        # ========================================================
+
+        if not nama:
+
+            kirim_wa(
+                sender,
+                """❌ Nama hutang belum ditemukan.
 
     Gunakan:
 
-    bayarhutang nama
+    💰 bayar hutang mia
 
     Contoh:
-    bayarhutang budi"""
+
+    bayar hutang budi
+    bayar hutang mia"""
             )
 
-            return jsonify(status=True)
+            return jsonify(
+                status=True
+            )
 
+        # ========================================================
+        # DEBUG
+        # ========================================================
 
+        print("========================================")
+        print("🔎 CARI HUTANG")
+        print("SENDER :", sender)
+        print("NAMA   :", nama)
+        print("========================================")
 
-        nama = data[1].strip()
-
-
+        # ========================================================
+        # CARI HUTANG
+        # ========================================================
 
         hutang = HutangPiutang.query.filter(
             HutangPiutang.nomor_wa == sender,
+
             HutangPiutang.tipe == "HUTANG",
-            HutangPiutang.nama.ilike(nama),
+
+            HutangPiutang.nama.ilike(
+                nama
+            ),
+
             HutangPiutang.status != "LUNAS"
+
         ).first()
 
-
+        # ========================================================
+        # HUTANG TIDAK DITEMUKAN
+        # ========================================================
 
         if not hutang:
 
+            print("========================================")
+            print("❌ HUTANG TIDAK DITEMUKAN")
+            print("NAMA :", nama)
+            print("========================================")
+
             kirim_wa(
                 sender,
-                f"""❌ Hutang {nama} tidak ditemukan
+                f"""❌ Hutang *{nama}* tidak ditemukan.
 
-    Pastikan nama sesuai."""
+    Pastikan nama sesuai dengan nama hutang yang tercatat.
+
+    Contoh:
+
+    bayar hutang mia"""
             )
 
-            return jsonify(status=True)
+            return jsonify(
+                status=True
+            )
 
-
+        # ========================================================
+        # LUNASKAN HUTANG
+        # ========================================================
 
         hutang.status = "LUNAS"
-        hutang.lunas_tanggal = sekarang()
 
+        hutang.lunas_tanggal = sekarang()
 
         db.session.commit()
 
-
+        # ========================================================
+        # NOTIFIKASI
+        # ========================================================
 
         kirim_wa(
             sender,
             f"""✅ *Hutang Lunas*
 
-    👤 {hutang.nama}
+    👤 *Nama*
+    {hutang.nama}
 
-    💰 Rp {hutang.nominal:,.0f}
+    💰 *Nominal*
+    Rp {hutang.nominal:,.0f}
 
-    Status:
+    📌 *Status*
     ✅ SUDAH LUNAS
 
-    🕒 {sekarang().strftime("%d %b %Y %H:%M")}
+    🕒 *Waktu*
+    {sekarang().strftime("%d %b %Y %H:%M")}
 
     _ChatSaku Finance Assistant_"""
         )
 
-
-        return jsonify(status=True)
+        return jsonify(
+            status=True
+        )
 
     # =========================
     # DASHBOARD
