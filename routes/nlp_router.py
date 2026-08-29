@@ -84,7 +84,14 @@ def extract_amount(text):
 
 def detect_intent(message):
 
+    if not message:
+        return None
+
     text = normalize_text(message)
+
+    # Pastikan string
+    text = str(text).lower().strip()
+
 
     # =====================================================
     # SALDO
@@ -183,6 +190,22 @@ def detect_intent(message):
 
 
     # =====================================================
+    # HAPUS REMINDER
+    # =====================================================
+
+    hapus_reminder_keywords = [
+        "hapus reminder",
+        "hapus pengingat",
+        "batalkan reminder",
+        "hapus semua reminder",
+        "hapus pengingat saya"
+    ]
+
+    if any(x in text for x in hapus_reminder_keywords):
+        return "hapusreminder"
+
+
+    # =====================================================
     # REMINDER
     # =====================================================
 
@@ -201,19 +224,39 @@ def detect_intent(message):
 
 
     # =====================================================
-    # HAPUS REMINDER
+    # BAYAR HUTANG
     # =====================================================
 
-    hapus_reminder_keywords = [
-        "hapus reminder",
-        "hapus pengingat",
-        "batalkan reminder",
-        "hapus semua reminder",
-        "hapus pengingat saya"
+    bayar_hutang_keywords = [
+        "bayar hutang",
+        "bayar utang",
+        "sudah bayar hutang",
+        "sudah bayar utang",
+        "melunasi hutang",
+        "melunasi utang",
+        "hutang sudah dibayar",
+        "utang sudah dibayar"
     ]
 
-    if any(x in text for x in hapus_reminder_keywords):
-        return "hapusreminder"
+    if any(x in text for x in bayar_hutang_keywords):
+        return "bayarhutang"
+
+
+    # =====================================================
+    # BAYAR PIUTANG
+    # =====================================================
+
+    bayar_piutang_keywords = [
+        "bayar piutang",
+        "piutang sudah dibayar",
+        "piutang dibayar",
+        "sudah bayar piutang",
+        "membayar piutang",
+        "pelunasan piutang"
+    ]
+
+    if any(x in text for x in bayar_piutang_keywords):
+        return "bayarpiutang"
 
 
     # =====================================================
@@ -228,7 +271,9 @@ def detect_intent(message):
         "cek hutang",
         "cek utang",
         "daftar hutang",
-        "daftar utang"
+        "daftar utang",
+        "hutang saya berapa",
+        "utang saya berapa"
     ]
 
     if any(x in text for x in hutang_keywords):
@@ -246,36 +291,13 @@ def detect_intent(message):
         "uang saya yang dipinjam",
         "uang yang belum dikembalikan",
         "siapa yang masih hutang",
-        "siapa yang masih utang"
+        "siapa yang masih utang",
+        "orang yang masih hutang",
+        "orang yang masih utang"
     ]
 
     if any(x in text for x in piutang_keywords):
         return "piutang"
-
-
-    # =====================================================
-    # BAYAR HUTANG
-    # =====================================================
-
-    if (
-        "bayar hutang" in text
-        or "bayar utang" in text
-        or "sudah bayar hutang" in text
-        or "sudah bayar utang" in text
-    ):
-        return "bayarhutang"
-
-
-    # =====================================================
-    # BAYAR PIUTANG
-    # =====================================================
-
-    if (
-        "bayar piutang" in text
-        or "piutang sudah dibayar" in text
-        or "sudah dibayar" in text
-    ):
-        return "bayarpiutang"
 
 
     # =====================================================
@@ -331,21 +353,129 @@ def detect_intent(message):
 
 
     # =====================================================
+    # =====================================================
     # TRANSAKSI MASUK
+    # =====================================================
+    # Prioritaskan sebelum transaksi keluar.
+    #
+    # Contoh:
+    #
+    # masuk 4000 sumbangan
+    # masuk 2000000 dari projek website
+    # masuk 2 juta dari freelance
+    # saya dapat 500000
+    # saya dapat gaji 5000000
+    # menerima transfer 750000
+    # dapat bonus 1000000
     # =====================================================
 
     masuk_keywords = [
-        "pemasukan",
+
+        # ---------------------------------------------
+        # MASUK
+        # ---------------------------------------------
+
+        "masuk",
         "uang masuk",
-        "uang masuk",
+        "ada uang masuk",
+        "uang sudah masuk",
+        "uang telah masuk",
+        "uang diterima",
+        "uang bertambah",
+
+        # ---------------------------------------------
+        # DAPAT
+        # ---------------------------------------------
+
+        "saya dapat",
+        "aku dapat",
+        "kami dapat",
+        "saya dapet",
+        "aku dapet",
         "dapat uang",
-        "terima uang",
+        "dapat duit",
+        "dapat pemasukan",
+        "dapat transfer",
+        "dapat kiriman",
+        "dapat bonus",
+
+        # ---------------------------------------------
+        # TERIMA
+        # ---------------------------------------------
+
+        "saya menerima",
+        "aku menerima",
+        "kami menerima",
         "menerima uang",
+        "menerima duit",
+        "menerima transfer",
+        "menerima pembayaran",
+        "terima uang",
+        "terima duit",
+        "terima transfer",
+        "terima pembayaran",
+
+        # ---------------------------------------------
+        # GAJI
+        # ---------------------------------------------
+
+        "gaji",
         "gajian",
         "gaji masuk",
-        "dapat transfer",
-        "transfer masuk"
+        "terima gaji",
+
+        # ---------------------------------------------
+        # BONUS
+        # ---------------------------------------------
+
+        "bonus",
+        "terima bonus",
+
+        # ---------------------------------------------
+        # PEMASUKAN
+        # ---------------------------------------------
+
+        "pemasukan",
+        "pendapatan",
+
+        # ---------------------------------------------
+        # SUMBANGAN / DONASI
+        # ---------------------------------------------
+
+        "sumbangan",
+        "donasi",
+
+        # ---------------------------------------------
+        # PENJUALAN
+        # ---------------------------------------------
+
+        "hasil jual",
+        "hasil jualan",
+        "hasil penjualan",
+        "hasil usaha",
+        "hasil dagang",
+
+        # ---------------------------------------------
+        # PEKERJAAN / PROYEK
+        # ---------------------------------------------
+
+        "hasil kerja",
+        "hasil proyek",
+        "hasil projek",
+        "bayaran kerja",
+        "bayaran proyek",
+        "bayaran projek",
+
+        # ---------------------------------------------
+        # PEMBAYARAN
+        # ---------------------------------------------
+
+        "pembayaran diterima",
+        "bayaran masuk",
+        "sudah dibayar",
+        "telah dibayar"
     ]
+
 
     if any(x in text for x in masuk_keywords):
         return "masuk"
@@ -371,6 +501,43 @@ def detect_intent(message):
 
     if any(x in text for x in keluar_keywords):
         return "keluar"
+
+
+    # =====================================================
+    # DETEKSI NATURAL TRANSAKSI MASUK
+    # =====================================================
+    # Ini menangkap kalimat yang mungkin tidak memiliki
+    # keyword persis di atas tetapi jelas menunjukkan
+    # uang masuk.
+    #
+    # Contoh:
+    #
+    # 4000 masuk
+    # 2 juta masuk
+    # uang 500 ribu masuk
+    # transfer 1000000 masuk
+    # =====================================================
+
+    pola_masuk_natural = [
+
+        r'\b\d[\d.,]*\s*(?:ribu|rb|juta|jt|miliar|milyar)?\s+masuk\b',
+
+        r'\b(?:rp\s*)?\d[\d.,]*\s+masuk\b',
+
+        r'\btransfer\s+\d[\d.,]*\s*(?:ribu|rb|juta|jt|miliar|milyar)?\s+masuk\b',
+
+        r'\buang(?:an)?\s+\d[\d.,]*\s*(?:ribu|rb|juta|jt|miliar|milyar)?\s+masuk\b'
+    ]
+
+
+    for pola in pola_masuk_natural:
+
+        if re.search(
+            pola,
+            text,
+            re.IGNORECASE
+        ):
+            return "masuk"
 
 
     # =====================================================
