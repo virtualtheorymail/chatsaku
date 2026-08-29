@@ -10094,7 +10094,7 @@ _ChatSaku Finance Assistant_
             # DASHBOARD
             # ==================================================
 
-            link = generate_dashboard_link(sender)
+            # link = generate_dashboard_link(sender)
 
             # ==================================================
             # BUDGET
@@ -10233,38 +10233,23 @@ _ChatSaku Finance Assistant_
             # KIRIM BALASAN WHATSAPP
             # ==================================================
 
-            pesan = f"""🏦 *Notifikasi Transaksi*
-    ──────────────────
+            pesan = f"""💚 *Siap, sudah dicatat!*
 
-    ✅ *Pengeluaran Berhasil Dicatat*
+Kamu baru saja mencatat pengeluaran sebesar
+💸 *Rp {nominal:,.0f}*
 
-    💸 Nominal
-    *Rp {nominal:,.0f}*
+📂 *Kategori:* {kategori.title()}
+📁 *Subkategori:* {subkategori.title()}
+📝 *Keterangan:* {keterangan}
 
-    🏷️ Kategori
-    {kategori.title()}
+🕒 {sekarang().strftime("%d %b %Y • %H:%M")}
 
-    📂 Subkategori
-    {subkategori.title()}
+{budget_text}
 
-    📝 Keterangan
-    {keterangan}
+💰 *Saldo kamu sekarang*
+*Rp {saldo:,.0f}*
 
-    🕒 {sekarang().strftime("%d %b %Y • %H:%M")}
-
-    {budget_text}
-
-    ──────────────────
-
-    💳 Saldo Tersedia
-    *Rp {saldo:,.0f}*
-
-    🌐 Dashboard
-    {link}
-
-    ──────────────────
-    _ChatSaku Finance Assistant_
-    """
+_ChatSaku • Teman mengatur keuanganmu_"""
 
             print("========================================")
             print("📤 MENGIRIM BALASAN WA")
