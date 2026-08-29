@@ -11759,7 +11759,7 @@ Kalau mau melihat budget yang sudah kamu buat, tinggal ketik:
 
             for item in insight:
 
-                pesan += f"💡 {item}\n"
+                pesan += f"{item}\n"
 
 
             # ====================================================
