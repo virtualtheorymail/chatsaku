@@ -11586,7 +11586,7 @@ Dengan begitu, kamu bisa lebih mudah memantau pengeluaran untuk kategori ini. �
 Kalau mau melihat budget yang sudah kamu buat, tinggal ketik:
 👉 *budget*
 
-*ChatSaku • Teman mengatur keuanganmu*"""
+*ChatSaku • Teman mengatur keuanganmu*""")
 
 
             print("========================================")
