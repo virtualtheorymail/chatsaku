@@ -9385,25 +9385,17 @@ https://www.chatsaku.com
 
         kirim_wa(
             sender,
-            f"""💳 *Saldo Keuangan*
-┌─────────────────────┐
-📥 Masuk   : Rp {masuk:,.0f}
-📤 Keluar  : Rp {keluar:,.0f}
- ──────────────────────
-💰 Saldo   : *Rp {saldo:,.0f}*
-└─────────────────────┘
+            f"""💚 *Saldo Kamu*
 
-_ChatSaku Finance Assistant_
-"""
+Saat ini saldo kamu:
+💰 *Rp {saldo:,.0f}*
+
+📥 Uang masuk: Rp {masuk:,.0f}
+📤 Uang keluar: Rp {keluar:,.0f}
+
+_ChatSaku • Teman mengatur keuanganmu_"""
         )
         return jsonify({"status": True})
-
-    # ============================================================
-# MASUK / PEMASUKAN
-# NLP + FALLBACK NATURAL LANGUAGE
-# ============================================================
-
-
 
 
     # ============================================================
@@ -9426,7 +9418,23 @@ _ChatSaku Finance Assistant_
 
     except Exception as e:
 
-        print("❌ ERROR deteksi_pemasukan_nlp:", repr(e))
+        print(
+            "❌ ERROR deteksi_pemasukan_nlp:",
+            repr(e)
+        )
+
+
+    # ============================================================
+    # DEBUG HASIL DETEKSI PEMASUKAN
+    # ============================================================
+
+    print("========================================")
+    print("🔎 CEK PEMASUKAN")
+    print("TEXT       :", message)
+    print("INTENT     :", intent)
+    print("HASIL MASUK:", hasil_masuk)
+    print("DATA       :", data)
+    print("========================================")
 
 
     # ============================================================
@@ -9446,6 +9454,13 @@ _ChatSaku Finance Assistant_
                 data = hasil_masuk
 
                 intent = "masuk"
+
+
+            # ====================================================
+            # PASTIKAN INTENT
+            # ====================================================
+
+            intent = "masuk"
 
 
             # ====================================================
@@ -9496,11 +9511,11 @@ _ChatSaku Finance Assistant_
 
 
             # ====================================================
-            # FALLBACK:
+            # FALLBACK NOMINAL ANGKA
             #
-            # 4000000
-            # Rp 4000000
-            # 4.000.000
+            # 2000000
+            # Rp 2000000
+            # 2.000.000
             # ====================================================
 
             if nominal <= 0:
@@ -9530,10 +9545,10 @@ _ChatSaku Finance Assistant_
 
 
             # ====================================================
-            # FALLBACK:
+            # FALLBACK NOMINAL SATUAN
             #
-            # 4 juta
-            # 4 jt
+            # 2 juta
+            # 2 jt
             # 500 ribu
             # 500 rb
             # 1 miliar
@@ -9566,36 +9581,32 @@ _ChatSaku Finance Assistant_
                             angka_text
                         )
 
-
-                        if satuan in [
+                        if satuan in (
                             "ribu",
                             "rb"
-                        ]:
+                        ):
 
                             nominal = int(
                                 angka_float * 1000
                             )
 
-
-                        elif satuan in [
+                        elif satuan in (
                             "juta",
                             "jt"
-                        ]:
+                        ):
 
                             nominal = int(
                                 angka_float * 1000000
                             )
 
-
-                        elif satuan in [
+                        elif satuan in (
                             "miliar",
                             "milyar"
-                        ]:
+                        ):
 
                             nominal = int(
                                 angka_float * 1000000000
                             )
-
 
                     except Exception as e:
 
@@ -9615,15 +9626,14 @@ _ChatSaku Finance Assistant_
 
                 kirim_wa(
                     sender,
-                    """❌ *Nominal Pemasukan Tidak Ditemukan.*
+                    """💬 *Nominalnya belum terbaca.*
 
-    Contoh:
+    Coba tulis jumlah uangnya, misalnya:
 
-    💰 saya dapat sumbangan 4000000
-    💰 saya dapat gaji 5000000
-    💰 menerima transfer 750000
-    💰 dapat bonus 1000000
-    💰 uang masuk 2 juta"""
+    💰 masuk 2000000 dari projek website
+    💰 masuk 2 juta dari freelance
+    💰 gaji 5000000
+    💰 dapat bonus 1000000"""
                 )
 
                 return jsonify({
@@ -9651,17 +9661,23 @@ _ChatSaku Finance Assistant_
 
 
             # ====================================================
-            # BERSIHKAN NOMINAL ANGKA DARI KETERANGAN
+            # BERSIHKAN KETERANGAN
             #
-            # "saya dapat sumbangan 4000000"
+            # Contoh:
+            #
+            # masuk 2000 sumbangan
             #
             # menjadi:
             #
-            # "saya dapat sumbangan"
+            # sumbangan
             # ====================================================
 
+            # Hapus kata "masuk" di awal
             keterangan = re.sub(
-                r'\s+(?:rp\s*)?[\d.,]+\s*$',
+                r'^\s*'
+                r'(?:masuk|pemasukan|uang masuk|'
+                r'ada uang masuk|pendapatan)'
+                r'\s*',
                 '',
                 keterangan,
                 flags=re.IGNORECASE
@@ -9669,19 +9685,60 @@ _ChatSaku Finance Assistant_
 
 
             # ====================================================
-            # BERSIHKAN:
-            #
-            # 4 juta
-            # 500 ribu
-            # 1 miliar
+            # Hapus kata pemasukan natural
             # ====================================================
 
             keterangan = re.sub(
-                r'\s+\d+(?:[.,]\d+)?\s*'
-                r'(?:juta|jt|ribu|rb|miliar|milyar)\s*$',
+                r'^\s*'
+                r'(?:saya|aku|kami)?\s*'
+                r'(?:dapat|dapet|menerima|terima)'
+                r'\s+(?:uang|duit|transfer|pembayaran)?\s*',
                 '',
                 keterangan,
                 flags=re.IGNORECASE
+            ).strip()
+
+
+            # ====================================================
+            # Hapus nominal angka DI MANAPUN
+            #
+            # 2000 sumbangan
+            # masuk 2000 dari projek
+            # sumbangan 2000
+            # ====================================================
+
+            keterangan = re.sub(
+                r'(?:rp\s*)?'
+                r'\d[\d.,]*'
+                r'\s*(?:juta|jt|ribu|rb|miliar|milyar)?',
+                '',
+                keterangan,
+                flags=re.IGNORECASE
+            ).strip()
+
+
+            # ====================================================
+            # Hapus kata penghubung
+            # ====================================================
+
+            keterangan = re.sub(
+                r'^\s*'
+                r'(?:dari|sebesar|senilai|untuk)'
+                r'\s+',
+                '',
+                keterangan,
+                flags=re.IGNORECASE
+            ).strip()
+
+
+            # ====================================================
+            # Hapus spasi berlebih
+            # ====================================================
+
+            keterangan = re.sub(
+                r'\s+',
+                ' ',
+                keterangan
             ).strip()
 
 
@@ -9695,25 +9752,25 @@ _ChatSaku Finance Assistant_
 
 
             # ====================================================
-            # NOMOR OWNER
-            # ====================================================
-
-            nomor = get_owner_number(
-                sender
-            )
-
-
-            # ====================================================
             # DEBUG SEBELUM SIMPAN
             # ====================================================
 
             print("========================================")
             print("💰 SIMPAN PEMASUKAN")
             print("SENDER     :", sender)
-            print("OWNER      :", nomor)
+            print("OWNER      :", get_owner_number(sender))
             print("NOMINAL    :", nominal)
             print("KETERANGAN :", keterangan)
             print("========================================")
+
+
+            # ====================================================
+            # NOMOR OWNER
+            # ====================================================
+
+            nomor = get_owner_number(
+                sender
+            )
 
 
             # ====================================================
@@ -9811,23 +9868,17 @@ _ChatSaku Finance Assistant_
             # PESAN WHATSAPP
             # ====================================================
 
-            pesan = f"""✅ *Transaksi Berhasil Dicatat*
+            pesan = f"""💚 *Siap, sudah dicatat!*
 
-    ━━━━━━━━━━━━━━━━━━
+    Kamu baru saja mencatat pemasukan sebesar
+    💰 *Rp {nominal:,.0f}*
 
-    💰 *PEMASUKAN*
-
-    💵 Nominal
-    *Rp {nominal:,.0f}*
-
-    📝 Keterangan
+    📝 *Keterangan*
     {keterangan}
 
     🕒 {sekarang().strftime("%d %b %Y • %H:%M")}
 
-    ━━━━━━━━━━━━━━━━━━
-
-    💳 *Saldo Saat Ini*
+    💳 *Saldo kamu sekarang*
     *Rp {saldo:,.0f}*
     """
 
@@ -9840,16 +9891,14 @@ _ChatSaku Finance Assistant_
 
                 pesan += f"""
 
-    🌐 Dashboard
-    {link}
+    Kalau mau melihat catatan keuangan lebih lengkap:
+    🌐 {link}
     """
 
 
             pesan += """
 
-    ━━━━━━━━━━━━━━━━━━
-    _ChatSaku Finance Assistant_
-    """
+    _ChatSaku • Teman mengatur keuanganmu_"""
 
 
             # ====================================================
@@ -9920,15 +9969,13 @@ _ChatSaku Finance Assistant_
 
             kirim_wa(
                 sender,
-                """❌ *Terjadi kesalahan saat mencatat pemasukan.*
+                """😕 *Maaf, pemasukan belum berhasil dicatat.*
 
-    Silakan coba lagi.
+    Coba kirim lagi dengan format sederhana, misalnya:
 
-    Contoh:
-
-    💰 saya dapat sumbangan 4000000
-    💰 gaji 5000000
-    💰 menerima transfer 750000"""
+    💰 masuk 2000000 dari projek website
+    💰 masuk 2 juta dari freelance
+    💰 gaji 5000000"""
             )
 
 
