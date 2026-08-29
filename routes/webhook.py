@@ -4976,15 +4976,13 @@ https://www.chatsaku.com
     #
     # Contoh:
     #
+    # masuk 2000000 dari projek website
     # saya dapat sumbangan 3000000
     # saya dapat gaji 5000000
     # menerima transfer 750000
     # dapat bonus 1000000
+    # gaji masuk 5000000
     #
-    # akan menjadi:
-    #
-    # intent  = masuk
-    # nominal = 3000000
     # ============================================================
 
     if not intent:
@@ -5000,6 +4998,23 @@ https://www.chatsaku.com
 
         pola_masuk = [
 
+            # ---------------------------------------------
+            # LANGSUNG "MASUK"
+            # ---------------------------------------------
+
+            "masuk",
+            "uang masuk",
+            "ada uang masuk",
+            "uang sudah masuk",
+            "uang telah masuk",
+
+            "pemasukan masuk",
+            "pendapatan masuk",
+
+            # ---------------------------------------------
+            # DAPAT
+            # ---------------------------------------------
+
             "saya dapat",
             "aku dapat",
             "kami dapat",
@@ -5007,6 +5022,16 @@ https://www.chatsaku.com
             "dapat uang",
             "dapat duit",
             "dapat pemasukan",
+
+            "dapat transfer",
+            "saya dapat transfer",
+            "aku dapat transfer",
+
+            "dapat kiriman",
+
+            # ---------------------------------------------
+            # TERIMA
+            # ---------------------------------------------
 
             "saya menerima",
             "aku menerima",
@@ -5018,9 +5043,12 @@ https://www.chatsaku.com
             "menerima transfer",
             "terima transfer",
 
-            "dapat transfer",
-            "saya dapat transfer",
-            "aku dapat transfer",
+            "menerima pembayaran",
+            "terima pembayaran",
+
+            # ---------------------------------------------
+            # DIBERI / DIBAYAR
+            # ---------------------------------------------
 
             "diberi uang",
             "diberi duit",
@@ -5028,21 +5056,43 @@ https://www.chatsaku.com
             "dikasih uang",
             "dikasih duit",
 
-            "dapat kiriman",
+            "dibayar",
+            "sudah dibayar",
+            "telah dibayar",
 
-            "uang masuk",
-            "ada uang masuk",
+            # ---------------------------------------------
+            # GAJI
+            # ---------------------------------------------
 
             "gaji",
             "gajian",
+            "gaji masuk",
+
+            # ---------------------------------------------
+            # BONUS
+            # ---------------------------------------------
 
             "bonus",
+            "dapat bonus",
+            "terima bonus",
+
+            # ---------------------------------------------
+            # PENDAPATAN
+            # ---------------------------------------------
 
             "pendapatan",
             "pemasukan",
 
+            # ---------------------------------------------
+            # SUMBANGAN / DONASI
+            # ---------------------------------------------
+
             "sumbangan",
             "donasi",
+
+            # ---------------------------------------------
+            # PENJUALAN
+            # ---------------------------------------------
 
             "hasil jual",
             "hasil jualan",
@@ -5051,15 +5101,19 @@ https://www.chatsaku.com
             "hasil usaha",
             "hasil dagang",
 
+            # ---------------------------------------------
+            # HASIL KERJA / PROYEK
+            # ---------------------------------------------
+
             "hasil kerja",
             "hasil proyek",
+            "hasil projek",
 
-            "dibayar",
-            "sudah dibayar",
+            # ---------------------------------------------
+            # PEMBAYARAN
+            # ---------------------------------------------
 
-            "menerima pembayaran",
             "pembayaran diterima",
-
             "bayaran masuk"
 
         ]
@@ -5085,28 +5139,72 @@ https://www.chatsaku.com
 
 
             # ====================================================
-            # CARI NOMINAL ANGKA
+            # CARI NOMINAL SATUAN TERLEBIH DAHULU
+            #
+            # 2 juta
+            # 2 jt
+            # 500 ribu
+            # 500 rb
+            # 1 miliar
             # ====================================================
 
-            angka = re.findall(
-                r'(?:rp\s*)?[\d.,]+',
+            pola_uang = re.search(
+                r'(\d+(?:[.,]\d+)?)\s*'
+                r'(juta|jt|ribu|rb|miliar|milyar)',
                 text_lower,
                 re.IGNORECASE
             )
 
 
-            if angka:
+            if pola_uang:
+
+                angka_text = (
+                    pola_uang.group(1)
+                    .replace(",", ".")
+                )
+
+                satuan = (
+                    pola_uang.group(2)
+                    .lower()
+                )
 
                 try:
 
-                    nominal = normalize_nominal(
-                        angka[-1]
+                    angka_float = float(
+                        angka_text
                     )
+
+                    if satuan in (
+                        "ribu",
+                        "rb"
+                    ):
+
+                        nominal = int(
+                            angka_float * 1000
+                        )
+
+                    elif satuan in (
+                        "juta",
+                        "jt"
+                    ):
+
+                        nominal = int(
+                            angka_float * 1000000
+                        )
+
+                    elif satuan in (
+                        "miliar",
+                        "milyar"
+                    ):
+
+                        nominal = int(
+                            angka_float * 1000000000
+                        )
 
                 except Exception as e:
 
                     print(
-                        "❌ ERROR NORMALIZE NOMINAL:",
+                        "❌ ERROR PARSING SATUAN:",
                         repr(e)
                     )
 
@@ -5114,79 +5212,36 @@ https://www.chatsaku.com
 
 
             # ====================================================
-            # DUKUNGAN NOMINAL:
+            # JIKA BELUM DAPAT NOMINAL
+            # CARI ANGKA BIASA
             #
-            # 3 juta
-            # 3 jt
-            # 500 ribu
-            # 500 rb
-            # 1 miliar
+            # 2000000
+            # Rp 2.000.000
+            # 2.000.000
             # ====================================================
 
             if not nominal:
 
-                pola_uang = re.search(
-                    r'(\d+(?:[.,]\d+)?)\s*'
-                    r'(juta|jt|ribu|rb|miliar|milyar)',
+                angka = re.findall(
+                    r'(?:rp\s*)?[\d.,]+',
                     text_lower,
                     re.IGNORECASE
                 )
 
 
-                if pola_uang:
-
-                    angka_text = (
-                        pola_uang.group(1)
-                        .replace(",", ".")
-                    )
-
-                    satuan = (
-                        pola_uang.group(2)
-                        .lower()
-                    )
-
+                if angka:
 
                     try:
 
-                        angka_float = float(
-                            angka_text
+                        # Ambil angka terakhir
+                        nominal = normalize_nominal(
+                            angka[-1]
                         )
-
-
-                        if satuan in (
-                            "ribu",
-                            "rb"
-                        ):
-
-                            nominal = int(
-                                angka_float * 1000
-                            )
-
-
-                        elif satuan in (
-                            "juta",
-                            "jt"
-                        ):
-
-                            nominal = int(
-                                angka_float * 1000000
-                            )
-
-
-                        elif satuan in (
-                            "miliar",
-                            "milyar"
-                        ):
-
-                            nominal = int(
-                                angka_float * 1000000000
-                            )
-
 
                     except Exception as e:
 
                         print(
-                            "❌ ERROR PARSING SATUAN:",
+                            "❌ ERROR NORMALIZE NOMINAL:",
                             repr(e)
                         )
 
@@ -5206,15 +5261,25 @@ https://www.chatsaku.com
                 # KETERANGAN
                 # =================================================
 
-                keterangan = message
+                keterangan = message.strip()
 
 
                 # =================================================
-                # HAPUS NOMINAL ANGKA DARI AKHIR
+                # HAPUS KATA PEMICU DI AWAL
+                #
+                # masuk 2000000 dari projek website
+                # ↓
+                # 2000000 dari projek website
                 # =================================================
 
                 keterangan = re.sub(
-                    r'\s+(?:rp\s*)?[\d.,]+\s*$',
+                    r'^\s*(?:'
+                    r'masuk|'
+                    r'uang masuk|'
+                    r'ada uang masuk|'
+                    r'pemasukan|'
+                    r'pendapatan'
+                    r')\s*',
                     '',
                     keterangan,
                     flags=re.IGNORECASE
@@ -5222,17 +5287,52 @@ https://www.chatsaku.com
 
 
                 # =================================================
-                # HAPUS NOMINAL SATUAN
+                # HAPUS NOMINAL DARI MANAPUN
+                #
+                # 2000000 dari projek website
+                # ↓
+                # dari projek website
                 # =================================================
 
                 keterangan = re.sub(
-                    r'\s+\d+(?:[.,]\d+)?\s*'
-                    r'(?:juta|jt|ribu|rb|miliar|milyar)\s*$',
+                    r'(?i)(?:rp\s*)?'
+                    r'\d[\d.,]*'
+                    r'\s*(?:juta|jt|ribu|rb|miliar|milyar)?',
+                    '',
+                    keterangan
+                ).strip()
+
+
+                # =================================================
+                # HAPUS KATA PENGHUBUNG
+                #
+                # dari projek website
+                # ↓
+                # projek website
+                # =================================================
+
+                keterangan = re.sub(
+                    r'^\s*(?:dari|sebesar|senilai)\s+',
                     '',
                     keterangan,
                     flags=re.IGNORECASE
                 ).strip()
 
+
+                # =================================================
+                # BERSIHKAN SPASI
+                # =================================================
+
+                keterangan = re.sub(
+                    r'\s+',
+                    ' ',
+                    keterangan
+                ).strip()
+
+
+                # =================================================
+                # DEFAULT KETERANGAN
+                # =================================================
 
                 if not keterangan:
 
@@ -5249,19 +5349,45 @@ https://www.chatsaku.com
 
                     "nominal": nominal,
 
-                    "keterangan": keterangan
+                    "keterangan": keterangan,
+
+                    "action": "catat"
 
                 }
 
 
-                print("========================================")
-                print("🤖 NLP FALLBACK")
-                print(f"TEXT       : {message}")
-                print(f"INTENT     : {intent}")
-                print(f"NOMINAL    : {nominal}")
-                print(f"KETERANGAN : {keterangan}")
-                print(f"DATA       : {nlp}")
-                print("========================================")
+                print(
+                    "========================================"
+                )
+
+                print(
+                    "🤖 NLP FALLBACK PEMASUKAN"
+                )
+
+                print(
+                    f"TEXT       : {message}"
+                )
+
+                print(
+                    f"INTENT     : {intent}"
+                )
+
+                print(
+                    f"NOMINAL    : {nominal}"
+                )
+
+                print(
+                    f"KETERANGAN : {keterangan}"
+                )
+
+                print(
+                    f"DATA       : {nlp}"
+                )
+
+                print(
+                    "========================================"
+                )
+
 
         # ============================================================
         # DETEKSI TARGET NLP
@@ -5290,15 +5416,42 @@ https://www.chatsaku.com
 
             intent = "target"
 
-            print("========================================")
-            print("🎯 TARGET TERDETEKSI")
-            print("TEXT     :", message)
-            print("INTENT   :", intent)
-            print("NAMA     :", nlp.get("nama"))
-            print("NOMINAL  :", nlp.get("nominal"))
-            print("DEADLINE :", nlp.get("deadline"))
-            print("========================================")
+            print(
+                "========================================"
+            )
 
+            print(
+                "🎯 TARGET TERDETEKSI"
+            )
+
+            print(
+                "TEXT     :",
+                message
+            )
+
+            print(
+                "INTENT   :",
+                intent
+            )
+
+            print(
+                "NAMA     :",
+                nlp.get("nama")
+            )
+
+            print(
+                "NOMINAL  :",
+                nlp.get("nominal")
+            )
+
+            print(
+                "DEADLINE :",
+                nlp.get("deadline")
+            )
+
+            print(
+                "========================================"
+            )
     # ============================================================
     # MAPPING INTENT → COMMAND
     # ============================================================
