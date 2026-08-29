@@ -9684,111 +9684,92 @@ _ChatSaku • Teman mengatur keuanganmu_"""
     # NLP NATURAL LANGUAGE
     # ============================================================
 
-    # ============================================================
-    # NLP FALLBACK PEMASUKAN
-    # ============================================================
-
     hasil_masuk = None
 
-    # Hanya jalankan fallback jika parser utama
-    # belum menemukan intent.
 
-    if not intent:
+    # ============================================================
+    # 1. DETEKSI PEMASUKAN NATURAL LANGUAGE
+    # ============================================================
+
+    try:
+
+        hasil_masuk = deteksi_pemasukan_nlp(
+            message,
+            data
+        )
+
+    except Exception as e:
+
+        print("========================================")
+        print("❌ ERROR DETEKSI PEMASUKAN NLP")
+        print("TEXT  :", message)
+        print("ERROR :", repr(e))
+        print("========================================")
+
+        hasil_masuk = None
+
+
+    # ============================================================
+    # 2. JIKA PEMASUKAN TERDETEKSI
+    # ============================================================
+
+    if hasil_masuk:
+
+        # --------------------------------------------------------
+        # HASIL NLP MENJADI HASIL UTAMA
+        # --------------------------------------------------------
+
+        data = hasil_masuk
+
+        intent = "masuk"
+
+        action = data.get(
+            "action",
+            "create"
+        )
+
+
+        # --------------------------------------------------------
+        # DEBUG
+        # --------------------------------------------------------
+
+        print("========================================")
+        print("💰 PEMASUKAN NLP TERDETEKSI")
+        print("TEXT       :", message)
+        print("INTENT     :", intent)
+        print("ACTION     :", action)
+        print("NOMINAL    :", data.get("nominal"))
+        print("KETERANGAN :", data.get("keterangan"))
+        print("DATA       :", data)
+        print("========================================")
+
+
+    # ============================================================
+    # 3. PROSES PEMASUKAN
+    # ============================================================
+
+    if intent == "masuk":
 
         try:
 
-            hasil_masuk = deteksi_pemasukan_nlp(
-                message,
-                data
-            )
+            # ====================================================
+            # PASTIKAN DATA ADA
+            # ====================================================
 
-        except Exception as e:
+            if not isinstance(data, dict):
 
-            print(
-                "❌ ERROR deteksi_pemasukan_nlp:",
-                repr(e)
-            )
-
-            hasil_masuk = None
+                data = {}
 
 
-        # ========================================================
-        # JIKA PEMASUKAN TERDETEKSI
-        # ========================================================
-
-        if hasil_masuk:
-
-            data = hasil_masuk
-
-            intent = "masuk"
-
-            action = hasil_masuk.get(
-                "action",
-                "create"
-            )
+            # ====================================================
+            # DEBUG FINAL
+            # ====================================================
 
             print("========================================")
-            print("💰 PEMASUKAN NLP TERDETEKSI")
+            print("🤖 PEMASUKAN NLP FINAL")
             print("TEXT       :", message)
             print("INTENT     :", intent)
             print("ACTION     :", action)
-            print("NOMINAL    :", data.get("nominal"))
-            print("KETERANGAN :", data.get("keterangan"))
-            print("DATA       :", data)
-            print("========================================")
-
-        # ============================================================
-        # IGNORE NON COMMAND
-        # ============================================================
-
-        if not intent:
-
-            print("========================================")
-            print("🚫 IGNORE NON COMMAND")
-            print("MESSAGE :", message)
-            print("INTENT  :", intent)
-            print("DATA    :", data)
-            print("========================================")
-
-            return jsonify({
-                "status": True
-            })
-
-
-    # ============================================================
-    # JIKA NLP MENGENALI PEMASUKAN
-    # ============================================================
-
-    if intent == "masuk" or hasil_masuk:
-
-        try:
-
-            # ====================================================
-            # PRIORITASKAN HASIL NLP
-            # ====================================================
-
-            if hasil_masuk:
-
-                data = hasil_masuk
-
-                intent = "masuk"
-
-
-            # ====================================================
-            # PASTIKAN INTENT
-            # ====================================================
-
-            intent = "masuk"
-
-
-            # ====================================================
-            # DEBUG NLP
-            # ====================================================
-
-            print("========================================")
-            print("🤖 PEMASUKAN NLP")
-            print("TEXT       :", message)
-            print("INTENT     :", intent)
             print("DATA       :", data)
             print("NOMINAL    :", data.get("nominal"))
             print("KETERANGAN :", data.get("keterangan"))
@@ -9796,7 +9777,7 @@ _ChatSaku • Teman mengatur keuanganmu_"""
 
 
             # ====================================================
-            # AMBIL NOMINAL DARI NLP
+            # AMBIL NOMINAL
             # ====================================================
 
             nominal = data.get(
@@ -9805,12 +9786,12 @@ _ChatSaku • Teman mengatur keuanganmu_"""
 
 
             # ====================================================
-            # NORMALISASI NOMINAL
+            # NORMALISASI NOMINAL DARI DATA
             # ====================================================
 
             try:
 
-                if nominal:
+                if nominal is not None:
 
                     nominal = int(
                         float(nominal)
@@ -9831,9 +9812,10 @@ _ChatSaku • Teman mengatur keuanganmu_"""
             # ====================================================
             # FALLBACK NOMINAL ANGKA
             #
+            # 2000
             # 2000000
-            # Rp 2000000
             # 2.000.000
+            # Rp 2000000
             # ====================================================
 
             if nominal <= 0:
@@ -9848,14 +9830,16 @@ _ChatSaku • Teman mengatur keuanganmu_"""
 
                     try:
 
+                        kandidat = angka[-1]
+
                         nominal = normalize_nominal(
-                            angka[-1]
+                            kandidat
                         )
 
                     except Exception as e:
 
                         print(
-                            "❌ ERROR normalize nominal:",
+                            "❌ ERROR NORMALIZE NOMINAL:",
                             repr(e)
                         )
 
@@ -9863,7 +9847,7 @@ _ChatSaku • Teman mengatur keuanganmu_"""
 
 
             # ====================================================
-            # FALLBACK NOMINAL SATUAN
+            # FALLBACK NOMINAL DENGAN SATUAN
             #
             # 2 juta
             # 2 jt
@@ -9881,6 +9865,7 @@ _ChatSaku • Teman mengatur keuanganmu_"""
                     re.IGNORECASE
                 )
 
+
                 if pola_uang:
 
                     angka_text = (
@@ -9893,11 +9878,13 @@ _ChatSaku • Teman mengatur keuanganmu_"""
                         .lower()
                     )
 
+
                     try:
 
                         angka_float = float(
                             angka_text
                         )
+
 
                         if satuan in (
                             "ribu",
@@ -9908,6 +9895,7 @@ _ChatSaku • Teman mengatur keuanganmu_"""
                                 angka_float * 1000
                             )
 
+
                         elif satuan in (
                             "juta",
                             "jt"
@@ -9916,6 +9904,7 @@ _ChatSaku • Teman mengatur keuanganmu_"""
                             nominal = int(
                                 angka_float * 1000000
                             )
+
 
                         elif satuan in (
                             "miliar",
@@ -9926,10 +9915,11 @@ _ChatSaku • Teman mengatur keuanganmu_"""
                                 angka_float * 1000000000
                             )
 
+
                     except Exception as e:
 
                         print(
-                            "❌ ERROR parsing satuan:",
+                            "❌ ERROR PARSING SATUAN:",
                             repr(e)
                         )
 
@@ -9944,9 +9934,9 @@ _ChatSaku • Teman mengatur keuanganmu_"""
 
                 kirim_wa(
                     sender,
-                    """💬 *Nominalnya belum terbaca.*
+                    """💬 *Jumlah pemasukan belum terbaca.*
 
-    Coba tulis jumlah uangnya, misalnya:
+    Coba tulis nominalnya, misalnya:
 
     💰 masuk 2000000 dari projek website
     💰 masuk 2 juta dari freelance
@@ -9955,46 +9945,47 @@ _ChatSaku • Teman mengatur keuanganmu_"""
                 )
 
                 return jsonify({
-                    "status": True
+                    "status": True,
+                    "intent": "masuk",
+                    "action": "create"
                 })
 
 
             # ====================================================
             # KETERANGAN
+            #
+            # SELALU AMBIL DARI PESAN ASLI
+            # supaya tidak tergantung hasil parse_message()
             # ====================================================
 
-            keterangan = data.get(
-                "keterangan"
-            )
-
-
-            if not keterangan:
-
-                keterangan = message
-
-
             keterangan = str(
-                keterangan
+                message
             ).strip()
 
 
             # ====================================================
-            # BERSIHKAN KETERANGAN
+            # HAPUS KATA PEMASUKAN DI AWAL
             #
-            # Contoh:
+            # masuk 4000 sumbangan
+            # ↓
+            # 4000 sumbangan
             #
-            # masuk 2000 sumbangan
-            #
-            # menjadi:
-            #
-            # sumbangan
+            # masuk 2000000 dari projek website
+            # ↓
+            # 2000000 dari projek website
             # ====================================================
 
-            # Hapus kata "masuk" di awal
             keterangan = re.sub(
                 r'^\s*'
-                r'(?:masuk|pemasukan|uang masuk|'
-                r'ada uang masuk|pendapatan)'
+                r'(?:'
+                r'ada\s+uang\s+masuk|'
+                r'uang\s+sudah\s+masuk|'
+                r'uang\s+telah\s+masuk|'
+                r'uang\s+masuk|'
+                r'masuk|'
+                r'pemasukan|'
+                r'pendapatan'
+                r')'
                 r'\s*',
                 '',
                 keterangan,
@@ -10003,14 +9994,37 @@ _ChatSaku • Teman mengatur keuanganmu_"""
 
 
             # ====================================================
-            # Hapus kata pemasukan natural
+            # HAPUS "SAYA DAPAT", "AKU DAPAT", DLL
+            #
+            # saya dapat 500000 dari jualan
+            # ↓
+            # 500000 dari jualan
             # ====================================================
 
             keterangan = re.sub(
                 r'^\s*'
-                r'(?:saya|aku|kami)?\s*'
-                r'(?:dapat|dapet|menerima|terima)'
-                r'\s+(?:uang|duit|transfer|pembayaran)?\s*',
+                r'(?:'
+                r'saya|'
+                r'aku|'
+                r'kami'
+                r')?'
+                r'\s*'
+                r'(?:'
+                r'dapat|'
+                r'dapet|'
+                r'menerima|'
+                r'terima'
+                r')'
+                r'(?:'
+                r'\s+(?:'
+                r'uang|'
+                r'duit|'
+                r'transfer|'
+                r'pembayaran|'
+                r'kiriman'
+                r')'
+                r')?'
+                r'\s*',
                 '',
                 keterangan,
                 flags=re.IGNORECASE
@@ -10018,17 +10032,52 @@ _ChatSaku • Teman mengatur keuanganmu_"""
 
 
             # ====================================================
-            # Hapus nominal angka DI MANAPUN
+            # HAPUS "SAYA DAPAT UANG"
+            # ====================================================
+
+            keterangan = re.sub(
+                r'^\s*'
+                r'(?:'
+                r'saya|'
+                r'aku|'
+                r'kami'
+                r')?'
+                r'\s*'
+                r'(?:'
+                r'dapat|'
+                r'dapet|'
+                r'menerima|'
+                r'terima'
+                r')'
+                r'\s+'
+                r'(?:uang|duit)'
+                r'\s*',
+                '',
+                keterangan,
+                flags=re.IGNORECASE
+            ).strip()
+
+
+            # ====================================================
+            # HAPUS NOMINAL + SATUAN
             #
-            # 2000 sumbangan
-            # masuk 2000 dari projek
-            # sumbangan 2000
+            # 2 juta
+            # 500 ribu
+            # 1 miliar
             # ====================================================
 
             keterangan = re.sub(
                 r'(?:rp\s*)?'
-                r'\d[\d.,]*'
-                r'\s*(?:juta|jt|ribu|rb|miliar|milyar)?',
+                r'\d+(?:[.,]\d+)?'
+                r'\s*'
+                r'(?:'
+                r'juta|'
+                r'jt|'
+                r'ribu|'
+                r'rb|'
+                r'miliar|'
+                r'milyar'
+                r')',
                 '',
                 keterangan,
                 flags=re.IGNORECASE
@@ -10036,12 +10085,38 @@ _ChatSaku • Teman mengatur keuanganmu_"""
 
 
             # ====================================================
-            # Hapus kata penghubung
+            # HAPUS NOMINAL ANGKA BIASA
+            #
+            # 4000
+            # 2000000
+            # 2.000.000
+            # ====================================================
+
+            keterangan = re.sub(
+                r'(?:rp\s*)?'
+                r'\d[\d.,]*',
+                '',
+                keterangan,
+                flags=re.IGNORECASE
+            ).strip()
+
+
+            # ====================================================
+            # HAPUS KATA PENGHUBUNG DI AWAL
+            #
+            # dari projek website
+            # ↓
+            # projek website
             # ====================================================
 
             keterangan = re.sub(
                 r'^\s*'
-                r'(?:dari|sebesar|senilai|untuk)'
+                r'(?:'
+                r'dari|'
+                r'sebesar|'
+                r'senilai|'
+                r'untuk'
+                r')'
                 r'\s+',
                 '',
                 keterangan,
@@ -10050,7 +10125,19 @@ _ChatSaku • Teman mengatur keuanganmu_"""
 
 
             # ====================================================
-            # Hapus spasi berlebih
+            # HAPUS KATA PENGHUBUNG YANG TERTINGGAL
+            # ====================================================
+
+            keterangan = re.sub(
+                r'^\s*(?:dari|sebesar|senilai)\s*$',
+                '',
+                keterangan,
+                flags=re.IGNORECASE
+            ).strip()
+
+
+            # ====================================================
+            # BERSIHKAN SPASI
             # ====================================================
 
             keterangan = re.sub(
@@ -10070,25 +10157,25 @@ _ChatSaku • Teman mengatur keuanganmu_"""
 
 
             # ====================================================
-            # DEBUG SEBELUM SIMPAN
-            # ====================================================
-
-            print("========================================")
-            print("💰 SIMPAN PEMASUKAN")
-            print("SENDER     :", sender)
-            print("OWNER      :", get_owner_number(sender))
-            print("NOMINAL    :", nominal)
-            print("KETERANGAN :", keterangan)
-            print("========================================")
-
-
-            # ====================================================
             # NOMOR OWNER
             # ====================================================
 
             nomor = get_owner_number(
                 sender
             )
+
+
+            # ====================================================
+            # DEBUG SEBELUM SIMPAN
+            # ====================================================
+
+            print("========================================")
+            print("💰 SIMPAN PEMASUKAN")
+            print("SENDER     :", sender)
+            print("OWNER      :", nomor)
+            print("NOMINAL    :", nominal)
+            print("KETERANGAN :", keterangan)
+            print("========================================")
 
 
             # ====================================================
@@ -10106,7 +10193,6 @@ _ChatSaku • Teman mengatur keuanganmu_"""
                 keterangan=keterangan,
 
                 nomor_wa=nomor
-
             )
 
 
@@ -10175,7 +10261,7 @@ _ChatSaku • Teman mengatur keuanganmu_"""
             except Exception as e:
 
                 print(
-                    "⚠️ Dashboard link error:",
+                    "⚠️ DASHBOARD LINK ERROR:",
                     repr(e)
                 )
 
@@ -10188,8 +10274,10 @@ _ChatSaku • Teman mengatur keuanganmu_"""
 
             pesan = f"""💚 *Siap, sudah dicatat!*
 
-    Kamu baru saja mencatat pemasukan sebesar
+    Pemasukan sebesar
     💰 *Rp {nominal:,.0f}*
+
+    sudah masuk ke catatan keuangan kamu.
 
     📝 *Keterangan*
     {keterangan}
@@ -10209,10 +10297,14 @@ _ChatSaku • Teman mengatur keuanganmu_"""
 
                 pesan += f"""
 
-    Kalau mau melihat catatan keuangan lebih lengkap:
+    Kalau ingin melihat catatan keuangan lebih lengkap:
     🌐 {link}
     """
 
+
+            # ====================================================
+            # FOOTER
+            # ====================================================
 
             pesan += """
 
@@ -10269,7 +10361,7 @@ _ChatSaku • Teman mengatur keuanganmu_"""
 
 
         # ========================================================
-        # ERROR
+        # ERROR PEMASUKAN
         # ========================================================
 
         except Exception as e:
@@ -10289,11 +10381,12 @@ _ChatSaku • Teman mengatur keuanganmu_"""
                 sender,
                 """😕 *Maaf, pemasukan belum berhasil dicatat.*
 
-    Coba kirim lagi dengan format sederhana, misalnya:
+    Coba kirim lagi dengan format seperti:
 
     💰 masuk 2000000 dari projek website
     💰 masuk 2 juta dari freelance
-    💰 gaji 5000000"""
+    💰 gaji 5000000
+    💰 dapat bonus 1000000"""
             )
 
 
