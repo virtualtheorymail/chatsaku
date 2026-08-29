@@ -10901,23 +10901,6 @@ _ChatSaku • Teman mengatur keuanganmu_"""
                 message or ""
             ).lower().strip()
 
-            # ====================================================
-            # FALLBACK ACTION
-            # ====================================================
-            #
-            # Jika NLP belum mengirim action,
-            # kita tentukan dari kalimat user.
-            #
-            # budget
-            # -> lihat
-            #
-            # buat budget makanan 500000
-            # -> buat
-            #
-            # ubah budget makanan 750000
-            # -> update
-            #
-            # ====================================================
 
             if not aksi_budget:
 
@@ -11514,22 +11497,23 @@ _ChatSaku • Teman mengatur keuanganmu_"""
 
                 kirim_wa(
                     sender,
-                    f"""⚠️ *Budget Tidak Dapat Disimpan*
+                    f"""😊 *Budget belum bisa disimpan*
 
-    ━━━━━━━━━━━━━━
+Sepertinya total budget kamu akan melebihi saldo yang tersedia.
 
-    💰 Saldo Anda
-    *Rp {saldo:,.0f}*
+💳 Saldo saat ini
+*Rp {saldo:,.0f}*
 
-    📊 Total Budget Setelah Disimpan
-    *Rp {total_setelah:,.0f}*
+📊 Total budget setelah ditambahkan
+*Rp {total_setelah:,.0f}*
 
-    ❌ Total budget melebihi saldo tersedia.
+💡 Budget tambahan yang masih aman:
+*Rp {sisa:,.0f}*
 
-    💵 Maksimal budget tambahan
-    *Rp {sisa:,.0f}*
+Coba kurangi nominal budget-nya, atau tambahkan pemasukan terlebih dahulu ya. 👍
 
-    Silakan kurangi nominal budget atau tambahkan saldo terlebih dahulu."""
+*ChatSaku • Teman mengatur keuanganmu*"""
+
                 )
 
                 return jsonify({
@@ -11589,27 +11573,21 @@ _ChatSaku • Teman mengatur keuanganmu_"""
 
             kirim_wa(
                 sender,
-                f"""🎯 *Budget {status}*
+                f"""😊 *Budget sudah {status.lower()}!*
 
-    ━━━━━━━━━━━━━━
+Kamu sudah mengatur budget untuk kategori:
 
-    📂 Kategori
-    *{kategori.title()}*
+📂 *{kategori.title()}*
+💰 *Rp {nominal:,.0f}*
+📅 Periode: *{periode}*
 
-    💰 Budget
-    *Rp {nominal:,.0f}*
+Dengan begitu, kamu bisa lebih mudah memantau pengeluaran untuk kategori ini. 👍
 
-    📅 Periode
-    *{periode}*
+Kalau mau melihat budget yang sudah kamu buat, tinggal ketik:
+👉 *budget*
 
-    ━━━━━━━━━━━━━━
+*ChatSaku • Teman mengatur keuanganmu*"""
 
-    Ketik:
-
-    *budget*
-
-    untuk melihat semua budget."""
-            )
 
             print("========================================")
             print("✅ BUDGET BERHASIL")
@@ -13217,133 +13195,162 @@ _ChatSaku • Teman mengatur keuanganmu_"""
 
         kirim_wa(
             sender,
-    f"""🤖 *ChatSaku Finance Assistant*
+    f"""👋 *Halo, selamat datang di ChatSaku!*
 
-Selamat datang di *ChatSaku* 💚
-Kelola seluruh keuangan langsung dari WhatsApp.
-Cepat • Praktis • Tanpa Install Aplikasi
+Aku siap membantu kamu mencatat dan mengatur keuangan langsung dari WhatsApp. 💚
 
-━━━━━━━━━━━━━━━━━━
-💰 *TRANSAKSI*
-
-➕ masuk 500000 Gaji
-➖ keluar 25000 Makan Siang
-
-Mencatat pemasukan & pengeluaran hanya dengan chat.
+Nggak perlu install aplikasi. Tinggal chat seperti biasa, biar ChatSaku yang membantu mencatatnya.
 
 ━━━━━━━━━━━━━━━━━━
-💳 *KEUANGAN*
 
-• saldo
-   Melihat saldo terbaru.
+💰 *CATAT KEUANGAN*
 
-• hari ini
-   Ringkasan transaksi hari ini.
+Mau mencatat pemasukan?
 
-• dashboard
-   Membuka Dashboard Web secara realtime.
+👉 *masuk 500000 gaji*
 
-━━━━━━━━━━━━━━━━━━
-📊 *BUDGET BULANAN*
+Mau mencatat pengeluaran?
 
-• budget
-   Melihat seluruh budget.
+👉 *keluar 25000 makan siang*
 
-• budget makanan 1500000
-   Membuat atau mengubah budget.
+Semudah kirim pesan WhatsApp. 😊
 
 ━━━━━━━━━━━━━━━━━━
+
+💳 *CEK KEUANGAN*
+
+👉 *saldo*
+Untuk melihat saldo kamu saat ini.
+
+👉 *hari ini*
+Untuk melihat ringkasan pemasukan dan pengeluaran hari ini.
+
+👉 *dashboard*
+Untuk melihat kondisi keuanganmu lebih lengkap melalui Dashboard Web.
+
+━━━━━━━━━━━━━━━━━━
+
+📊 *ATUR BUDGET*
+
+Mau membatasi pengeluaran supaya lebih terkontrol?
+
+👉 *budget*
+Melihat budget yang sudah dibuat.
+
+👉 *budget makanan 1500000*
+Membuat atau mengubah budget makanan.
+
+━━━━━━━━━━━━━━━━━━
+
 🎯 *TARGET TABUNGAN*
 
-• target
-   Daftar target tabungan.
+Punya sesuatu yang ingin dibeli?
 
-• target laptop 12000000 31-12-2026
-   Membuat target baru.
+👉 *target*
+Melihat target tabunganmu.
 
-• target laptop
-   Melihat detail target.
+👉 *target laptop 12000000 31-12-2026*
+Membuat target baru.
 
-• tabung laptop 500000
-   Menambah tabungan.
+👉 *target laptop*
+Melihat perkembangan target.
 
-• hapustarget laptop
-   Menghapus target.
+👉 *tabung laptop 500000*
+Menambahkan uang ke tabungan target.
 
-━━━━━━━━━━━━━━━━━━
-🔔 *REMINDER TAGIHAN*
-
-• reminder
-   Daftar reminder.
-
-• reminder listrik 20 500000
-   Membuat reminder baru.
-
-• hapusreminder listrik
-   Menghapus reminder.
+👉 *hapustarget laptop*
+Menghapus target.
 
 ━━━━━━━━━━━━━━━━━━
+
+🔔 *REMINDER*
+
+Takut lupa bayar tagihan?
+
+👉 *reminder*
+Melihat semua pengingat.
+
+👉 *reminder listrik 20 500000*
+Membuat pengingat tagihan.
+
+👉 *hapusreminder listrik*
+Menghapus pengingat.
+
+━━━━━━━━━━━━━━━━━━
+
 🤝 *HUTANG & PIUTANG*
 
-• hutang
-   Daftar hutang.
+Biar nggak lupa siapa yang masih punya tanggungan.
 
-• hutang Budi 500000 Pinjam uang
-   Menambah hutang.
+👉 *hutang*
+Melihat daftar hutang.
 
-• bayarhutang Budi
-   Melunasi hutang.
+👉 *hutang Budi 500000 pinjam uang*
+Mencatat hutang.
 
-• piutang
-   Daftar piutang.
+👉 *bayarhutang Budi*
+Mencatat hutang yang sudah dibayar.
 
-• piutang Andi 300000 Pinjam modal
-   Menambah piutang.
+👉 *piutang*
+Melihat daftar piutang.
 
-• bayarpiutang Andi
-   Menandai piutang sudah dibayar.
+👉 *piutang Andi 300000 pinjam modal*
+Mencatat piutang.
+
+👉 *bayarpiutang Andi*
+Mencatat piutang yang sudah dibayar.
 
 ━━━━━━━━━━━━━━━━━━
+
 📈 *LAPORAN & ANALISIS*
 
-• insight
-   AI Finance Insight.
+Ingin tahu kondisi keuanganmu lebih dalam?
 
-• statistik
-   Statistik keuangan.
+👉 *insight*
+Mendapatkan analisis keuangan dari AI.
 
-• excel
-   Export laporan Excel.
+👉 *statistik*
+Melihat statistik keuangan.
 
-• pdf
-   Export laporan PDF.
+👉 *excel*
+Mengunduh laporan dalam Excel.
 
-━━━━━━━━━━━━━━━━━━
-👥 *MULTI USER*
-
-• viewer
-   Daftar pengguna Viewer.
-
-• share 08123456789
-   Menambahkan Viewer.
-
-• unshare 08123456789
-   Menghapus Viewer.
+👉 *pdf*
+Mengunduh laporan dalam PDF.
 
 ━━━━━━━━━━━━━━━━━━
-⚙️ *AKUN*
 
-• paket
-   Melihat paket yang aktif.
+👥 *BERBAGI AKUN*
 
-• fitur
-   Daftar seluruh fitur ChatSaku.
+Kamu juga bisa berbagi akses dengan orang lain.
 
-• help
-   Menampilkan bantuan.
+👉 *viewer*
+Melihat daftar pengguna yang memiliki akses.
+
+👉 *share 08123456789*
+Menambahkan pengguna Viewer.
+
+👉 *unshare 08123456789*
+Menghapus akses Viewer.
 
 ━━━━━━━━━━━━━━━━━━
+
+⚙️ *AKUN & BANTUAN*
+
+👉 *paket*
+Melihat paket yang sedang digunakan.
+
+👉 *fitur*
+Melihat fitur yang tersedia.
+
+👉 *help*
+Menampilkan panduan ini lagi.
+
+━━━━━━━━━━━━━━━━━━
+
 👑 *FITUR PREMIUM*
+
+Kalau ingin mengelola keuangan lebih lengkap, ChatSaku juga menyediakan:
 
 ✨ Dashboard Web Realtime
 ✨ AI Finance Insight
@@ -13351,28 +13358,32 @@ Mencatat pemasukan & pengeluaran hanya dengan chat.
 ✨ Reminder Tagihan
 ✨ Target Tabungan
 ✨ Hutang & Piutang
-✨ Export Excel
-✨ Export PDF
+✨ Export Excel & PDF
 ✨ Multi User & Viewer
 ✨ Laporan Harian Otomatis
 
 ━━━━━━━━━━━━━━━━━━
-🌐 Website
+
+🌐 *Website*
 https://chatsaku.com
 
-📊 Dashboard
+📊 *Dashboard*
 https://dashboard.chatsaku.com
 
-💚 *ChatSaku Finance Assistant*
+💚 *ChatSaku • Teman mengatur keuanganmu*
 
-✔️ 100% melalui WhatsApp
-✔️ Tanpa Install Aplikasi
+✔️ Cukup lewat WhatsApp
+✔️ Tanpa install aplikasi
 ✔️ Dashboard Web Realtime
-✔️ AI Powered Financial Assistant
-✔️ Aman & Terenkripsi
+✔️ Dibantu AI
+✔️ Data aman dan terenkripsi
 
-_Kelola keuangan lebih mudah, lebih cerdas, dan lebih praktis bersama ChatSaku._
+*Mulai saja dengan mencatat transaksi pertamamu. 😊*
+
+Contoh:
+👉 *keluar 25000 makan siang*
 """
+
         )
 
         return jsonify(status=True)
