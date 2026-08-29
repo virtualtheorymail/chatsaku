@@ -10217,18 +10217,18 @@ _ChatSaku Finance Assistant_
 
             else:
 
-        budget_text = f"""
-    ──────────────────
-    🎯 *Budget {kategori.title()}*
+                budget_text = f"""
+        ──────────────────
+        🎯 *Budget {kategori.title()}*
 
-    Kamu belum membuat budget untuk kategori ini.
+        Kamu belum membuat budget untuk kategori ini.
 
-    Kalau mau mulai mengatur pengeluaran, cukup kirim:
+        Kalau mau mulai mengatur pengeluaran, cukup kirim:
 
-    💡 *budget {kategori.lower()} 1000000*
+        💡 *budget {kategori.lower()} 1000000*
 
-    ChatSaku akan membantu memantau penggunaannya setiap bulan. 😊
-    """
+        ChatSaku akan membantu memantau penggunaannya setiap bulan. 😊
+        """
 
             # ==================================================
             # KIRIM BALASAN WHATSAPP
