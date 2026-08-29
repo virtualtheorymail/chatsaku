@@ -11634,75 +11634,218 @@ Kalau mau melihat budget yang sudah kamu buat, tinggal ketik:
                 "error": str(e)
             }), 500
 
-    # =========================
+    # ============================================================
     # AI INSIGHT
-    # =========================
-    if cmd == "insight":
+    # NLP NATURAL LANGUAGE
+    # ============================================================
+
+    if intent == "insight":
 
         from utils.ai_insight import generate_ai_insight
+
+
+        # ========================================================
+        # CEK FITUR PREMIUM
+        # ========================================================
 
         if not has_feature(sender, "ai"):
 
             kirim_wa(
                 sender,
-                """🔒 *Fitur AI Insight* hanya tersedia pada paket PREMIUM.
+                """🔒 *Fitur AI Insight belum tersedia di paket kamu.*
 
-    Upgrade sekarang untuk menikmati:
+    Dengan AI Finance Insight, ChatSaku bisa membantu kamu memahami kondisi keuangan, melihat pola pengeluaran, dan memberikan saran sederhana berdasarkan transaksi kamu.
 
-    ✅ Budget Bulanan
-    ✅ Reminder
-    ✅ Target Tabungan
-    ✅ Hutang Piutang
-    ✅ AI Finance Insight
-    ✅ Dashboard Lengkap
-    """
+    ✨ Budget Bulanan
+    ✨ Reminder
+    ✨ Target Tabungan
+    ✨ Hutang & Piutang
+    ✨ AI Finance Insight
+    ✨ Dashboard Lengkap
+
+    Kalau mau, kamu bisa upgrade paket untuk menggunakan fitur ini. 😊
+
+    _ChatSaku • Teman mengatur keuanganmu_"""
             )
 
-            return jsonify(status=True)
+            return jsonify({
+                "status": True,
+                "intent": "insight",
+                "action": "upgrade"
+            })
+
+
+        # ========================================================
+        # GENERATE INSIGHT
+        # ========================================================
 
         try:
 
             nomor = get_owner_number(sender)
 
-            insight = generate_ai_insight(nomor)
+
+            print("========================================")
+            print("🤖 AI FINANCE INSIGHT")
+            print("SENDER :", sender)
+            print("OWNER  :", nomor)
+            print("MESSAGE:", message)
+            print("INTENT :", intent)
+            print("========================================")
+
+
+            insight = generate_ai_insight(
+                nomor
+            )
+
+
+            # ====================================================
+            # VALIDASI HASIL AI
+            # ====================================================
+
+            if not insight:
+
+                kirim_wa(
+                    sender,
+                    """😊 *Belum ada insight yang bisa saya berikan.*
+
+    Coba catat beberapa transaksi terlebih dahulu. Setelah ada cukup data, saya bisa membantu melihat pola pengeluaran dan kondisi keuangan kamu.
+
+    Contohnya:
+    👉 *keluar 25000 makan siang*
+    👉 *keluar 50000 bensin*
+    👉 *masuk 5000000 gaji*
+
+    Nanti saya bantu analisis. 💚
+
+    _ChatSaku • Teman mengatur keuanganmu_"""
+                )
+
+                return jsonify({
+                    "status": True,
+                    "intent": "insight",
+                    "action": "empty"
+                })
+
+
+            # ====================================================
+            # MODE VIEWER
+            # ====================================================
 
             viewer_info = ""
 
             if nomor != sender:
-                viewer_info = (
-                    "👁 *Mode Viewer*\n"
-                    "Analisis ini menggunakan data Owner.\n\n"
-                )
 
-            pesan = f"""🏦 *AI Finance Insight*
-    ──────────────────
+                viewer_info = """👁️ *Mode Viewer*
 
-    {viewer_info}🧠 *Analisis AI*
+    Analisis ini menggunakan data keuangan Owner.
 
     """
 
+
+            # ====================================================
+            # SUSUN PESAN
+            # ====================================================
+
+            pesan = f"""🧠 *Ini kondisi keuangan kamu*
+
+    {viewer_info}Saya sudah melihat data keuangan kamu dan menemukan beberapa hal yang menarik:
+
+    """
+
+
+            # ====================================================
+            # TAMBAHKAN INSIGHT
+            # ====================================================
+
             for item in insight:
-                pesan += f"• {item}\n"
+
+                pesan += f"💡 {item}\n"
+
+
+            # ====================================================
+            # PENUTUP
+            # ====================================================
 
             pesan += """
 
-    ──────────────────
-    _ChatSaku Finance Assistant_
-    💚 AI Powered • WhatsApp Finance
-    """
+    Kalau kamu mau, kamu bisa terus mencatat transaksi seperti biasa. Semakin lengkap datanya, semakin baik analisis yang bisa saya berikan. 😊
 
-            kirim_wa(sender, pesan)
+    _ChatSaku • Teman mengatur keuanganmu_"""
+
+
+            # ====================================================
+            # DEBUG
+            # ====================================================
+
+            print("========================================")
+            print("📤 KIRIM AI INSIGHT")
+            print("SENDER :", sender)
+            print("MESSAGE:")
+            print(pesan)
+            print("========================================")
+
+
+            # ====================================================
+            # KIRIM WHATSAPP
+            # ====================================================
+
+            hasil_kirim = kirim_wa(
+                sender,
+                pesan
+            )
+
+
+            print(
+                "📨 HASIL KIRIM WA:",
+                hasil_kirim
+            )
+
+
+            return jsonify({
+
+                "status": True,
+
+                "intent": "insight",
+
+                "action": "view",
+
+                "insight": insight
+
+            })
+
+
+        # ========================================================
+        # ERROR
+        # ========================================================
 
         except Exception as e:
 
-            print(e)
+            print("========================================")
+            print("❌ ERROR AI INSIGHT")
+            print("SENDER :", sender)
+            print("MESSAGE:", message)
+            print("ERROR  :", repr(e))
+            print("========================================")
+
 
             kirim_wa(
                 sender,
-                f"Terjadi kesalahan\n\n{e}"
+                """😕 *Maaf, saya belum bisa menganalisis keuangan kamu.*
+
+    Coba beberapa saat lagi ya.
+
+    Kalau masih terjadi masalah, kirim:
+    👉 *insight*
+
+    _ChatSaku • Teman mengatur keuanganmu_"""
             )
 
-        return jsonify(status=True)
+
+            return jsonify({
+                "status": False,
+                "intent": "insight",
+                "error": str(e)
+            }), 500
 
 
     # ============================================================

@@ -192,24 +192,70 @@ def detect_intent(message):
 
 
     # =====================================================
-    # INSIGHT
+    # INSIGHT / ANALISIS KEUANGAN
     # =====================================================
 
     insight_keywords = [
+
+        # Perintah langsung
         "insight",
+        "analisa",
+        "analisis",
         "analisa keuangan",
         "analisis keuangan",
-        "analisa keuangan saya",
+
+        # Kondisi keuangan
         "kondisi keuangan",
+        "kondisi keuangan saya",
         "keuangan saya bagaimana",
+        "keuangan saya gimana",
+
+        # Evaluasi
+        "evaluasi keuangan",
+        "evaluasi keuangan saya",
+        "cek kondisi keuangan",
+        "cek keuangan saya",
+
+        # Pengeluaran
+        "saya boros",
+        "aku boros",
+        "apakah saya boros",
+        "apakah aku boros",
         "saya boros tidak",
-        "saya boros atau tidak",
-        "evaluasi keuangan"
+        "aku boros tidak",
+
+        # Saran
+        "beri saya saran keuangan",
+        "kasih saya saran keuangan",
+        "minta saran keuangan",
+        "saran keuangan",
+        "tips keuangan saya",
+
+        # Natural language
+        "bagaimana kondisi keuangan saya",
+        "gimana kondisi keuangan saya",
+        "bagaimana keuangan saya",
+        "gimana keuangan saya",
+
+        "tolong analisa keuangan saya",
+        "tolong analisis keuangan saya",
+        "coba analisa keuangan saya",
+        "coba analisis keuangan saya",
+
+        "bisa analisa keuangan saya",
+        "bisa analisis keuangan saya",
+
+        "saya ingin tahu kondisi keuangan saya",
+        "saya mau tahu kondisi keuangan saya"
     ]
 
-    if any(x in text for x in insight_keywords):
-        return "insight"
 
+    if any(
+        x in text
+        for x in insight_keywords
+    ):
+
+        return "insight"
 
     # =====================================================
     # BUDGET
