@@ -13087,49 +13087,128 @@ _ChatSaku • Teman mengatur keuanganmu_"""
         return jsonify(
             status=True
         )
-    # =========================
+    # ============================================================
     # DASHBOARD
-    # =========================
+    # NLP NATURAL LANGUAGE
+    # ============================================================
 
-    if cmd == "dashboard":
+    if intent == "dashboard":
 
-        nomor = get_owner_number(sender)
+        try:
 
-        link = generate_dashboard_link(nomor)
+            # ====================================================
+            # NOMOR OWNER
+            # ====================================================
 
-        mode = ""
+            nomor = get_owner_number(sender)
 
-        if nomor != sender:
-            mode = (
-                "\n👁 *Mode Viewer*\n"
-                "Anda sedang melihat dashboard milik Owner.\n"
-            )
 
-        kirim_wa(
-            sender,
-            f"""📊 *Dashboard ChatSaku*
+            # ====================================================
+            # GENERATE LINK DASHBOARD
+            # ====================================================
 
-    Akses Dashboard:
+            link = generate_dashboard_link(nomor)
 
+
+            # ====================================================
+            # MODE VIEWER
+            # ====================================================
+
+            mode_viewer = ""
+
+            if nomor != sender:
+
+                mode_viewer = """
+    👁️ *Mode Viewer*
+
+    Kamu sedang melihat dashboard milik pemilik akun.
+    """
+
+
+            # ====================================================
+            # PESAN YANG LEBIH MANUSIAWI
+            # ====================================================
+
+            pesan = f"""📊 *Dashboard kamu sudah siap!*
+
+    Di sini kamu bisa melihat kondisi keuanganmu dengan lebih lengkap, seperti:
+
+    💰 Saldo saat ini
+    📥 Total pemasukan
+    📤 Total pengeluaran
+    📈 Grafik keuangan
+    💳 Hutang & piutang
+    🎯 Target tabungan
+    🤖 Insight keuangan
+
+    🌐 *Buka Dashboard*
     {link}
 
-    {mode}
-    Fitur:
+    {mode_viewer}
+    ⏳ Link ini bisa digunakan selama *30 menit*.
 
-    💰 Saldo
-    📥 Pemasukan
-    📤 Pengeluaran
-    📈 Grafik
-    💳 Hutang Piutang
-    🎯 Target Tabungan
-    🤖 AI Insight
+    Semoga membantu kamu mengatur keuangan dengan lebih rapi 😊
 
-    ⏳ Link berlaku 30 menit.
+    _ChatSaku • Teman mengatur keuanganmu_"""
 
-    _ChatSaku Finance Assistant_"""
-        )
 
-        return jsonify(status=True)
+            # ====================================================
+            # DEBUG
+            # ====================================================
+
+            print("========================================")
+            print("📊 DASHBOARD NLP")
+            print("SENDER :", sender)
+            print("OWNER  :", nomor)
+            print("INTENT :", intent)
+            print("LINK   :", link)
+            print("========================================")
+
+
+            # ====================================================
+            # KIRIM WHATSAPP
+            # ====================================================
+
+            kirim_wa(
+                sender,
+                pesan
+            )
+
+
+            return jsonify({
+                "status": True,
+                "intent": "dashboard",
+                "action": "view",
+                "link": link
+            })
+
+
+        except Exception as e:
+
+            print("========================================")
+            print("❌ ERROR DASHBOARD")
+            print("SENDER :", sender)
+            print("MESSAGE:", message)
+            print("ERROR  :", repr(e))
+            print("========================================")
+
+
+            kirim_wa(
+                sender,
+                """😕 *Dashboard belum bisa dibuka.*
+
+    Coba beberapa saat lagi ya.
+
+    Kalau masih mengalami kendala, kirim:
+    👉 *dashboard*"""
+            )
+
+
+            return jsonify({
+                "status": False,
+                "intent": "dashboard",
+                "error": str(e)
+            }), 500
 
     # ==========================
     # MENU

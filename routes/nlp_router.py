@@ -140,14 +140,54 @@ def detect_intent(message):
     # =====================================================
 
     dashboard_keywords = [
+
+        # Kata langsung
         "dashboard",
         "dasbor",
+
+        # Perintah
         "lihat dashboard",
         "buka dashboard",
-        "tampilkan dashboard"
+        "tampilkan dashboard",
+        "cek dashboard",
+        "cek dasbor",
+
+        # Natural language
+        "saya mau lihat dashboard",
+        "aku mau lihat dashboard",
+        "saya ingin lihat dashboard",
+        "aku ingin lihat dashboard",
+
+        "mau lihat dashboard",
+        "mau buka dashboard",
+        "mau cek dashboard",
+
+        "ingin lihat dashboard",
+        "ingin buka dashboard",
+        "ingin cek dashboard",
+
+        "boleh lihat dashboard",
+        "boleh buka dashboard",
+
+        # Keuangan
+        "lihat keuangan saya",
+        "lihat laporan keuangan",
+        "lihat kondisi keuangan",
+        "cek keuangan saya",
+        "cek laporan keuangan",
+
+        # Akses
+        "buka halaman keuangan",
+        "buka halaman saya",
+        "buka akun saya"
     ]
 
-    if any(x in text for x in dashboard_keywords):
+
+    if any(
+        x in text
+        for x in dashboard_keywords
+    ):
+
         return "dashboard"
 
 
