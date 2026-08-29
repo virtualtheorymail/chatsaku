@@ -9667,7 +9667,7 @@ _ChatSaku • Teman mengatur keuanganmu_"""
     # ============================================================
 
     # ============================================================
-    # JALANKAN DETEKSI PEMASUKAN SATU KALI
+    # DETEKSI PEMASUKAN
     # ============================================================
 
     hasil_masuk = None
@@ -9688,16 +9688,55 @@ _ChatSaku • Teman mengatur keuanganmu_"""
 
 
     # ============================================================
-    # DEBUG HASIL DETEKSI PEMASUKAN
+    # JIKA PEMASUKAN TERDETEKSI
     # ============================================================
 
-    print("========================================")
-    print("🔎 CEK PEMASUKAN")
-    print("TEXT       :", message)
-    print("INTENT     :", intent)
-    print("HASIL MASUK:", hasil_masuk)
-    print("DATA       :", data)
-    print("========================================")
+    if hasil_masuk is not None:
+
+        print("========================================")
+        print("💰 PEMASUKAN TERDETEKSI")
+        print("TEXT       :", message)
+        print("HASIL      :", hasil_masuk)
+        print("========================================")
+
+
+        # --------------------------------------------------------
+        # WAJIB UPDATE DATA
+        # --------------------------------------------------------
+
+        data = hasil_masuk
+
+
+        # --------------------------------------------------------
+        # WAJIB UPDATE INTENT
+        # --------------------------------------------------------
+
+        intent = "masuk"
+
+
+        # --------------------------------------------------------
+        # WAJIB UPDATE ACTION
+        # --------------------------------------------------------
+
+        action = hasil_masuk.get(
+            "action",
+            "create"
+        )
+
+
+        # --------------------------------------------------------
+        # DEBUG
+        # --------------------------------------------------------
+
+        print("========================================")
+        print("🤖 NLP PEMASUKAN FINAL")
+        print("TEXT       :", message)
+        print("INTENT     :", intent)
+        print("ACTION     :", action)
+        print("NOMINAL    :", data.get("nominal"))
+        print("KETERANGAN :", data.get("keterangan"))
+        print("DATA       :", data)
+        print("========================================")
 
 
     # ============================================================
