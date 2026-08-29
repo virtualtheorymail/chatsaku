@@ -10184,23 +10184,18 @@ _ChatSaku Finance Assistant_
 
                 budget_text = f"""
     ──────────────────
-    🏦 *Budget Bulan Ini*
+    🎯 *Budget {kategori.title()}*
 
-    🏷️ Kategori
-    {kategori.title()}
+    💰 Budget bulan ini
+    *Rp {budget.nominal:,.0f}*
 
-    💰 Budget
-    Rp {budget.nominal:,.0f}
+    💸 Sudah terpakai
+    *Rp {total_keluar:,.0f}*
 
-    💸 Terpakai
-    Rp {total_keluar:,.0f}
+    💚 Masih tersisa
+    *Rp {max(sisa, 0):,.0f}*
 
-    💳 Sisa Budget
-    Rp {max(sisa, 0):,.0f}
-
-    📊 Progress
-    {persen:.1f}%
-
+    📊 Terpakai *{persen:.1f}%*
     {bar}
 
     {status}
@@ -10212,21 +10207,27 @@ _ChatSaku Finance Assistant_
 
                     budget_text += f"""
 
-    ⚠️ Melebihi Budget
-    Rp {over:,.0f}
+    ⚠️ *Budget sudah terlewati*
+
+    Pengeluaranmu sudah melebihi budget sebesar
+    *Rp {over:,.0f}*.
+
+    Yuk, lebih perhatikan pengeluaran {kategori.lower()} berikutnya 😊
     """
 
             else:
 
-                budget_text = """
+        budget_text = f"""
     ──────────────────
+    🎯 *Budget {kategori.title()}*
 
-    🏦 *Budget Bulan Ini*
+    Kamu belum membuat budget untuk kategori ini.
 
-    ℹ️ Belum ada budget untuk kategori ini.
+    Kalau mau mulai mengatur pengeluaran, cukup kirim:
 
-    Contoh:
-    budget transport 1000000
+    💡 *budget {kategori.lower()} 1000000*
+
+    ChatSaku akan membantu memantau penggunaannya setiap bulan. 😊
     """
 
             # ==================================================
