@@ -1224,48 +1224,63 @@ def generate_laporan_harian(nomor_wa):
 
     Link = generate_dashboard_link(nomor_wa)
 
-    laporan = f"""📊 *Laporan Harian ChatSaku*
+    laporan = f"""💚 *Hai! Ini ringkasan keuanganmu hari ini*
+
 📅 {hari_ini.strftime("%d %B %Y")}
 
-════════════════════
+Hari ini, berikut gambaran keuanganmu:
 
-📈 *Ringkasan*
+━━━━━━━━━━━━━━━━━━
 
-• 💰 Pemasukan      : Rp {total_masuk:,.0f}
-• 💸 Pengeluaran    : Rp {total_keluar:,.0f}
-• 💳 Hutang Baru    : Rp {total_hutang:,.0f}
-• 📥 Piutang Baru   : Rp {total_piutang:,.0f}
+📊 *Ringkasan Hari Ini*
 
-━━━━━━━━━━━━━━━━━━━━
+💰 Uang masuk
+*Rp {total_masuk:,.0f}*
 
-💼 *Saldo Hari Ini*
-💵 *Rp {saldo:,.0f}*
+💸 Uang keluar
+*Rp {total_keluar:,.0f}*
 
-💼 *Saldo Keseluruhan*
-💵 *Rp {saldo_total:,.0f}*
+🤝 Hutang baru
+*Rp {total_hutang:,.0f}*
 
-━━━━━━━━━━━━━━━━━━━━
+📥 Piutang baru
+*Rp {total_piutang:,.0f}*
 
-🟢 *Detail Pemasukan*
-{detail_masuk or "• Tidak ada"}
+━━━━━━━━━━━━━━━━━━
 
-🔴 *Detail Pengeluaran*
-{detail_keluar or "• Tidak ada"}
+💳 *Posisi Saldo*
 
-🟠 *Detail Hutang*
-{detail_hutang or "• Tidak ada"}
+Saldo dari transaksi hari ini:
+*Rp {saldo:,.0f}*
 
-🔵 *Detail Piutang*
-{detail_piutang or "• Tidak ada"}
+Saldo keseluruhan:
+*Rp {saldo_total:,.0f}*
 
-════════════════════
+━━━━━━━━━━━━━━━━━━
 
-Link Dashboard
-{Link}
-*Link aktif selama 30 menit
+🟢 *Uang Masuk Hari Ini*
+{detail_masuk or "Belum ada pemasukan hari ini."}
 
-Terima kasih telah menggunakan *ChatSaku* 😊
-Kelola keuangan lebih rapi, setiap hari.
+🔴 *Uang Keluar Hari Ini*
+{detail_keluar or "Belum ada pengeluaran hari ini."}
+
+🟠 *Hutang Hari Ini*
+{detail_hutang or "Tidak ada hutang baru hari ini."}
+
+🔵 *Piutang Hari Ini*
+{detail_piutang or "Tidak ada piutang baru hari ini."}
+
+━━━━━━━━━━━━━━━━━━
+
+📱 Mau melihat catatan keuanganmu lebih lengkap?
+
+🌐 {Link}
+
+_Link aktif selama 30 menit._
+
+Semoga keuanganmu hari ini tetap terkontrol dan berjalan sesuai rencana. 😊
+
+*ChatSaku • Teman mengatur keuanganmu*
 """
     return laporan
 
