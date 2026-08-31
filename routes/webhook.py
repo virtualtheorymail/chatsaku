@@ -7562,26 +7562,20 @@ https://www.chatsaku.com
                 sender,
                 f"""🔔 *Reminder {status_text}*
 
-    ━━━━━━━━━━━━━━━━━━
+Siap, saya sudah mencatat pengingat untuk kamu 😊
 
-    📄 *Tagihan*
-    {nama.title()}
+📌 *{nama.title()}*
+📅 Jatuh tempo: *{tanggal}*
+💰 Perkiraan: *Rp {nominal:,.0f}*
 
-    📅 *Jatuh Tempo*
-    Tanggal {tanggal}
+Tenang, nanti saya akan mengingatkan kamu saat sudah mendekati tanggal jatuh temponya 👍
 
-    💰 *Estimasi*
-    Rp {nominal:,.0f}
+Kalau mau melihat semua pengingat kamu, cukup ketik:
 
-    ━━━━━━━━━━━━━━━━━━
+👉 *reminder*
 
-    Ketik:
+*ChatSaku • Teman mengatur keuanganmu 💚*"""
 
-    *reminder*
-
-    untuk melihat seluruh reminder.
-
-    _ChatSaku Finance Assistant_"""
             )
 
             return jsonify({
