@@ -2430,121 +2430,232 @@ def create_payment():
         }), 500
 
 
+import hashlib
+import json
+import os
 
 @app.route("/midtrans/notification", methods=["POST"])
 def notification():
 
-    print("=" * 60)
-    print("MIDTRANS NOTIFICATION")
-    print(request.get_json())
-    print("=" * 60)
+    try:
 
-    notif = request.get_json()
+        notif = request.get_json()
 
-    order_id = notif.get("order_id")
-    status = notif.get("transaction_status")
+        if not notif:
+            return "Invalid notification", 400
 
-    print("ORDER :", order_id)
-    print("STATUS:", status)
+        print("=" * 60)
+        print("MIDTRANS NOTIFICATION")
+        print("ORDER :", notif.get("order_id"))
+        print("STATUS:", notif.get("transaction_status"))
+        print("=" * 60)
 
-    payment = Payment.query.filter_by(
-        order_id=order_id
-    ).first()
+        order_id = notif.get("order_id")
+        status = notif.get("transaction_status")
+        status_code = notif.get("status_code")
+        gross_amount = notif.get("gross_amount")
+        signature_key = notif.get("signature_key")
 
-    if payment is None:
-        return "Not Found", 404
+        # =====================================
+        # VALIDASI DATA WAJIB
+        # =====================================
 
-    # Jangan diproses dua kali
-    if payment.status == "PAID":
-        return "OK", 200
+        if not all([
+            order_id,
+            status,
+            status_code,
+            gross_amount,
+            signature_key
+        ]):
+            print("❌ Notification tidak lengkap")
+            return "Invalid notification", 400
 
-    # ==========================
-    # STATUS YANG BELUM BERHASIL
-    # ==========================
+        # =====================================
+        # VERIFIKASI SIGNATURE MIDTRANS
+        # =====================================
 
-    if status == "pending":
-        payment.status = "PENDING"
-        db.session.commit()
-        return "OK", 200
+        server_key = os.getenv("MIDTRANS_SERVER_KEY")
 
-    if status == "expire":
-        payment.status = "EXPIRED"
-        db.session.commit()
-        return "OK", 200
+        raw_signature = (
+            str(order_id)
+            + str(status_code)
+            + str(gross_amount)
+            + str(server_key)
+        )
 
-    if status == "cancel":
-        payment.status = "CANCELLED"
-        db.session.commit()
-        return "OK", 200
+        expected_signature = hashlib.sha512(
+            raw_signature.encode("utf-8")
+        ).hexdigest()
 
-    if status == "deny":
-        payment.status = "DENIED"
-        db.session.commit()
-        return "OK", 200
+        if signature_key != expected_signature:
 
-    if status not in ["settlement", "capture"]:
-        payment.status = status.upper()
-        db.session.commit()
-        return "OK", 200
+            print("❌ INVALID MIDTRANS SIGNATURE")
+            print("ORDER :", order_id)
 
-    # ==========================
-    # PEMBAYARAN BERHASIL
-    # ==========================
+            return "Invalid signature", 403
 
-    payment.status = "PAID"
-    payment.paid_at = sekarang()
+        print("✅ MIDTRANS SIGNATURE VALID")
 
-    login_user = UserLogin.query.get(
-        payment.user_login_id
-    )
+        # =====================================
+        # CARI PAYMENT
+        # =====================================
 
-    if not login_user:
-        print("UserLogin tidak ditemukan")
-        db.session.commit()
-        return "OK", 200
+        payment = Payment.query.filter_by(
+            order_id=order_id
+        ).first()
 
-    user = User.query.filter_by(
-        nomor_wa=login_user.nomor_whatsapp
-    ).first()
+        if payment is None:
 
-    if user:
+            print("❌ Payment tidak ditemukan :", order_id)
 
-        user.nama = login_user.nama
-        user.paket = payment.paket
-        user.aktif = True
+            return "Not Found", 404
 
-        if user.akhir_langganan and user.akhir_langganan >= sekarang().date():
+        # =====================================
+        # CEGAH DOUBLE PROCESSING
+        # =====================================
 
-            user.akhir_langganan += timedelta(days=30)
+        if payment.status == "PAID":
+
+            print("ℹ️ Payment sudah PAID :", order_id)
+
+            return "OK", 200
+
+        # =====================================
+        # STATUS BELUM BERHASIL
+        # =====================================
+
+        if status == "pending":
+
+            payment.status = "PENDING"
+
+            db.session.commit()
+
+            return "OK", 200
+
+        if status == "expire":
+
+            payment.status = "EXPIRED"
+
+            db.session.commit()
+
+            return "OK", 200
+
+        if status == "cancel":
+
+            payment.status = "CANCELLED"
+
+            db.session.commit()
+
+            return "OK", 200
+
+        if status == "deny":
+
+            payment.status = "DENIED"
+
+            db.session.commit()
+
+            return "OK", 200
+
+        if status not in ["settlement", "capture"]:
+
+            payment.status = status.upper()
+
+            db.session.commit()
+
+            return "OK", 200
+
+        # =====================================
+        # PEMBAYARAN BERHASIL
+        # =====================================
+
+        print("🎉 PAYMENT BERHASIL :", order_id)
+
+        payment.status = "PAID"
+        payment.paid_at = sekarang()
+
+        login_user = UserLogin.query.get(
+            payment.user_login_id
+        )
+
+        if not login_user:
+
+            print("❌ UserLogin tidak ditemukan")
+
+            db.session.commit()
+
+            return "OK", 200
+
+        # =====================================
+        # NORMALIZE WHATSAPP
+        # =====================================
+
+        nomor_wa = normalize_wa(
+            login_user.nomor_whatsapp
+        )
+
+        # =====================================
+        # CARI USER
+        # =====================================
+
+        user = User.query.filter_by(
+            nomor_wa=nomor_wa
+        ).first()
+
+        # =====================================
+        # UPDATE USER
+        # =====================================
+
+        if user:
+
+            user.nama = login_user.nama
+            user.paket = payment.paket
+            user.aktif = True
+
+            if (
+                user.akhir_langganan
+                and user.akhir_langganan >= sekarang().date()
+            ):
+
+                user.akhir_langganan += timedelta(days=30)
+
+            else:
+
+                user.akhir_langganan = (
+                    sekarang().date()
+                    + timedelta(days=30)
+                )
+
+        # =====================================
+        # USER BARU
+        # =====================================
 
         else:
 
-            user.akhir_langganan = sekarang().date() + timedelta(days=30)
+            user = User(
+                nama=login_user.nama,
+                nomor_wa=nomor_wa,
+                paket=payment.paket,
+                aktif=True,
+                akhir_langganan=(
+                    sekarang().date()
+                    + timedelta(days=30)
+                )
+            )
 
-    else:
+            db.session.add(user)
 
-        user = User(
-            nama=login_user.nama,
-            nomor_wa=normalize_wa(login_user.nomor_whatsapp),
-            paket=payment.paket,
-            aktif=True,
-            akhir_langganan=sekarang().date() + timedelta(days=30)
-        )
+        db.session.commit()
 
-        db.session.add(user)
+        # =====================================
+        # WA ADMIN
+        # =====================================
 
-    db.session.commit()
+        try:
 
-    # ==========================
-    # WA ADMIN
-    # ==========================
-    print("Kirim WA Admin ke :", ADMIN_NUMBER)
-    try:
-
-        pesan_admin = f"""🎉 *Pembayaran ChatSaku Berhasil*
+            pesan_admin = f"""🎉 *Pembayaran ChatSaku Berhasil*
 
 👤 Nama : {login_user.nama}
-📱 WhatsApp : {login_user.nomor_whatsapp}
+📱 WhatsApp : {nomor_wa}
 📦 Paket : {payment.paket}
 💰 Nominal : Rp {payment.harga_bayar:,}
 🧾 Order ID : {payment.order_id}
@@ -2552,46 +2663,57 @@ def notification():
 Status : ✅ PAID
 """
 
-        kirim_wa(
-            ADMIN_NUMBER,
-            pesan_admin
-        )
+            kirim_wa(
+                ADMIN_NUMBER,
+                pesan_admin
+            )
 
-    except Exception as e:
-        print("WA ADMIN ERROR:", e)
+        except Exception as e:
 
-    # ==========================
-    # WA CUSTOMER
-    # ==========================
-    print("Kirim WA User ke :", login_user.nomor_whatsapp)
-    try:
+            print("❌ WA ADMIN ERROR:", e)
 
-        pesan_user = f"""🎉 *Pembayaran Berhasil*
+        # =====================================
+        # WA CUSTOMER
+        # =====================================
+
+        try:
+
+            pesan_user = f"""🎉 *Pembayaran Berhasil*
 
 Halo *{login_user.nama}* 👋
 
 Terima kasih telah berlangganan ChatSaku.
 
 📦 Paket : *{payment.paket}*
+
 📅 Berlaku sampai :
-{user.akhir_langganan.strftime('%d-%m-%Y')}
+*{user.akhir_langganan.strftime('%d-%m-%Y')}*
 
 Silakan mulai menggunakan seluruh fitur paket Anda.
 
 Terima kasih 🙏
 """
 
-        kirim_wa(
-            login_user.nomor_whatsapp,
-            pesan_user
-        )
+            kirim_wa(
+                nomor_wa,
+                pesan_user
+            )
+
+        except Exception as e:
+
+            print("❌ WA USER ERROR:", e)
+
+        print("✅ PAYMENT UPDATED :", order_id)
+
+        return "OK", 200
 
     except Exception as e:
-        print("WA USER ERROR:", e)
 
-    print("PAYMENT UPDATED")
+        import traceback
 
-    return "OK", 200
+        traceback.print_exc()
+
+        return "Internal Server Error", 500
 
 def list_period_between(start_period, end_period):
 
