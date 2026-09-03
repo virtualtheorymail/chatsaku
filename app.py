@@ -2568,8 +2568,6 @@ def notification():
         # PEMBAYARAN BERHASIL
         # =====================================
 
-        print("🎉 PAYMENT BERHASIL :", order_id)
-
         payment.status = "PAID"
         payment.paid_at = sekarang()
 
@@ -2585,51 +2583,88 @@ def notification():
 
             return "OK", 200
 
+
         # =====================================
-        # NORMALIZE WHATSAPP
+        # NORMALIZE NOMOR WHATSAPP
         # =====================================
 
         nomor_wa = normalize_wa(
             login_user.nomor_whatsapp
         )
 
+        print("NORMALIZED WA :", nomor_wa)
+
+
         # =====================================
-        # CARI USER
+        # CARI USER YANG SUDAH ADA
         # =====================================
 
         user = User.query.filter_by(
             nomor_wa=nomor_wa
         ).first()
 
+
         # =====================================
-        # UPDATE USER
+        # USER SUDAH ADA
         # =====================================
 
         if user:
 
+            print("♻️ USER SUDAH ADA")
+            print("USER ID :", user.id)
+            print("NAMA LAMA :", user.nama)
+            print("PAKET LAMA :", user.paket)
+            print("EXPIRED LAMA :", user.akhir_langganan)
+
+            # ---------------------------------
+            # UPDATE DATA USER
+            # ---------------------------------
+
             user.nama = login_user.nama
             user.paket = payment.paket
             user.aktif = True
+
+
+            # ---------------------------------
+            # PERPANJANG LANGGANAN
+            # ---------------------------------
 
             if (
                 user.akhir_langganan
                 and user.akhir_langganan >= sekarang().date()
             ):
 
+                # Masih aktif → tambah 30 hari
+
                 user.akhir_langganan += timedelta(days=30)
 
+                print(
+                    "➕ LANGGANAN DIPERPANJANG 30 HARI"
+                )
+
             else:
+
+                # Sudah expired → mulai 30 hari dari hari ini
 
                 user.akhir_langganan = (
                     sekarang().date()
                     + timedelta(days=30)
                 )
 
+                print(
+                    "🔄 LANGGANAN DIMULAI ULANG 30 HARI"
+                )
+
+
         # =====================================
-        # USER BARU
+        # USER BELUM ADA
         # =====================================
 
         else:
+
+            print("🆕 USER BELUM ADA")
+            print("MEMBUAT USER BARU")
+
 
             user = User(
                 nama=login_user.nama,
@@ -2644,7 +2679,22 @@ def notification():
 
             db.session.add(user)
 
+
+        # =====================================
+        # SIMPAN DATABASE
+        # =====================================
+
         db.session.commit()
+
+        print("=" * 50)
+        print("✅ USER BERHASIL DIUPDATE / DIBUAT")
+        print("USER ID :", user.id)
+        print("NAMA :", user.nama)
+        print("WA :", user.nomor_wa)
+        print("PAKET :", user.paket)
+        print("AKTIF :", user.aktif)
+        print("BERLAKU SAMPAI :", user.akhir_langganan)
+        print("=" * 50)
 
         # =====================================
         # WA ADMIN
