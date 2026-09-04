@@ -24,7 +24,11 @@ def rupiah(nominal):
 # AI FINANCE INSIGHT
 # =========================================================
 
-def generate_ai_insight(nomor):
+def generate_ai_insight(
+    nomor,
+    transaksi_baru=None,
+    event=None
+):
 
     periode = periode_sekarang()
 

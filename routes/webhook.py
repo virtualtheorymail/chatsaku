@@ -10515,6 +10515,12 @@ _ChatSaku • Teman mengatur keuanganmu_"""
             db.session.add(trx)
             db.session.commit()
 
+            ai_insight = generate_ai_insight(
+                nomor=sender,
+                transaksi_baru=trx,
+                event="KELUAR"
+            )
+
             print("========================================")
             print("💰 TRANSAKSI KELUAR BERHASIL")
             print("SENDER      :", sender)
@@ -10696,6 +10702,8 @@ Kamu baru saja mencatat pengeluaran sebesar
 📝 *Keterangan:* {keterangan}
 
 🕒 {sekarang().strftime("%d %b %Y • %H:%M")}
+
+{ai_insight}
 
 {budget_text}
 
