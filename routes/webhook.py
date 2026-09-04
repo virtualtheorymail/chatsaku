@@ -10639,7 +10639,7 @@ _ChatSaku • Teman mengatur keuanganmu_"""
                         if item:
 
                             insight_items.append(
-                                f"💡 {str(item).strip()}"
+                                f"{str(item).strip()}"
                             )
 
                     ai_insight_text = "\n".join(
