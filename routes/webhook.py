@@ -12008,7 +12008,8 @@ Kalau mau melihat budget yang sudah kamu buat, tinggal ketik:
 
 
             insight = generate_ai_insight(
-                nomor
+                nomor=nomor,
+                event="INSIGHT"
             )
 
 
