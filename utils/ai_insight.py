@@ -9,7 +9,7 @@ from models import (
     TargetPembelian,
 )
 
-from app import transaksi_user, periode_sekarang
+# from app import transaksi_user, periode_sekarang
 
 
 # =========================================================
@@ -24,7 +24,12 @@ def rupiah(nominal):
 # AI FINANCE INSIGHT
 # =========================================================
 
-def generate_ai_insight(nomor):
+def generate_ai_insight(
+    nomor,
+    transaksi_baru=None,
+    event=None
+):
+
 
     periode = periode_sekarang()
 

@@ -18,6 +18,7 @@ from utils.helper import *
 from routes.nlp_router import parse_message
 from routes.nlp import *
 import re
+from utils.ai_insight import generate_ai_insight
 
 webhook_bp = Blueprint("webhook", __name__)
 
@@ -10515,6 +10516,23 @@ _ChatSaku • Teman mengatur keuanganmu_"""
             db.session.add(trx)
             db.session.commit()
 
+            try:
+
+                ai_insight = generate_ai_insight(
+                    nomor=sender,
+                    transaksi_baru=trx,
+                    event="KELUAR"
+                )
+
+            except Exception as ai_error:
+
+                print("=" * 60)
+                print("⚠️ AI INSIGHT ERROR")
+                print("ERROR :", repr(ai_error))
+                print("=" * 60)
+
+                ai_insight = []
+
             print("========================================")
             print("💰 TRANSAKSI KELUAR BERHASIL")
             print("SENDER      :", sender)
@@ -10696,6 +10714,8 @@ Kamu baru saja mencatat pengeluaran sebesar
 📝 *Keterangan:* {keterangan}
 
 🕒 {sekarang().strftime("%d %b %Y • %H:%M")}
+
+{ai_insight}
 
 {budget_text}
 
