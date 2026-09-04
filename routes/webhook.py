@@ -10397,28 +10397,32 @@ _ChatSaku • Teman mengatur keuanganmu_"""
     # KELUAR
     # =========================
     # if cmd.startswith("keluar"):
+    # ==============================================================
+    # TRANSAKSI KELUAR
+    # ==============================================================
+
     if intent == "keluar":
 
         try:
 
-            # ==================================================
+            # ==========================================================
             # AMBIL HASIL NLP
-            # ==================================================
+            # ==========================================================
 
             nominal = data.get("nominal")
             keterangan = data.get("keterangan", "")
 
-            # ==================================================
+            # ==========================================================
             # FALLBACK NOMINAL DARI PESAN ASLI
-            # ==================================================
-            # Jika NLP gagal menemukan nominal,
-            # ambil angka dari message.
+            # ==========================================================
             #
             # Contoh:
             # beli baso dengan arip 30000
             # beli bakso 20.000
             # bayar listrik Rp150.000
-            # ==================================================
+            # keluar 25000 grab
+            #
+            # ==========================================================
 
             if not nominal or nominal <= 0:
 
@@ -10434,18 +10438,35 @@ _ChatSaku • Teman mengatur keuanganmu_"""
 
                     try:
                         nominal = normalize_nominal(kandidat)
-                    except Exception:
+
+                    except Exception as e:
+
+                        print(
+                            "⚠️ GAGAL NORMALIZE NOMINAL:",
+                            repr(e)
+                        )
+
                         nominal = 0
 
-            # Pastikan integer
+            # ==========================================================
+            # PASTIKAN NOMINAL INTEGER
+            # ==========================================================
+
             try:
-                nominal = int(float(nominal or 0))
+
+                nominal = int(
+                    float(
+                        nominal or 0
+                    )
+                )
+
             except (ValueError, TypeError):
+
                 nominal = 0
 
-            # ==================================================
+            # ==========================================================
             # VALIDASI NOMINAL
-            # ==================================================
+            # ==========================================================
 
             if nominal <= 0:
 
@@ -10454,22 +10475,30 @@ _ChatSaku • Teman mengatur keuanganmu_"""
                     """❌ *Nominal tidak ditemukan.*
 
     Contoh:
+
     • beli bakso 20000
     • bayar listrik 150000
     • keluar 25000 grab
     """
                 )
 
-                return jsonify({"status": True})
+                return jsonify({
+                    "status": True
+                })
 
-            # ==================================================
+            # ==========================================================
             # BERSIHKAN KETERANGAN
-            # ==================================================
+            # ==========================================================
 
             if not keterangan:
+
                 keterangan = message
 
             keterangan = keterangan.strip()
+
+            # ==========================================================
+            # HAPUS NOMINAL DI AKHIR KETERANGAN
+            # ==========================================================
 
             pola_nominal = re.compile(
                 r"""
@@ -10481,30 +10510,63 @@ _ChatSaku • Teman mengatur keuanganmu_"""
                 re.IGNORECASE | re.VERBOSE
             )
 
-            keterangan = pola_nominal.sub("", keterangan).strip()
+            keterangan = pola_nominal.sub(
+                "",
+                keterangan
+            ).strip()
+
+            # ==========================================================
+            # DEFAULT KETERANGAN
+            # ==========================================================
 
             if not keterangan:
+
                 keterangan = "Pengeluaran"
 
-            # ==================================================
+            # ==========================================================
             # CARI KATEGORI
-            # ==================================================
+            # ==========================================================
 
-            kategori, subkategori = cari_kategori(keterangan)
+            try:
 
-            # Fallback jika kategori kosong
+                kategori, subkategori = cari_kategori(
+                    keterangan
+                )
+
+            except Exception as kategori_error:
+
+                print("=" * 60)
+                print("⚠️ ERROR CARI KATEGORI")
+                print("ERROR :", repr(kategori_error))
+                print("=" * 60)
+
+                kategori = "lainnya"
+                subkategori = "lainnya"
+
+            # ==========================================================
+            # FALLBACK KATEGORI
+            # ==========================================================
+
             if not kategori:
+
                 kategori = "lainnya"
 
             if not subkategori:
+
                 subkategori = "lainnya"
 
-            # ==================================================
-            # SIMPAN TRANSAKSI
-            # ==================================================
+            # ==========================================================
+            # WAKTU TRANSAKSI
+            # ==========================================================
+
+            waktu_transaksi = sekarang()
+
+            # ==========================================================
+            # BUAT OBJECT TRANSAKSI
+            # ==========================================================
 
             trx = Transaksi(
-                tanggal=sekarang(),
+                tanggal=waktu_transaksi,
                 tipe="KELUAR",
                 nominal=nominal,
                 kategori=kategori,
@@ -10513,8 +10575,40 @@ _ChatSaku • Teman mengatur keuanganmu_"""
                 nomor_wa=sender
             )
 
+            # ==========================================================
+            # SIMPAN TRANSAKSI
+            # ==========================================================
+
             db.session.add(trx)
+
             db.session.commit()
+
+            # ==========================================================
+            # LOG TRANSAKSI
+            # ==========================================================
+
+            print("=" * 60)
+            print("💰 TRANSAKSI KELUAR BERHASIL")
+            print("SENDER      :", sender)
+            print("NOMINAL     :", nominal)
+            print("KETERANGAN  :", keterangan)
+            print("KATEGORI    :", kategori)
+            print("SUBKATEGORI :", subkategori)
+            print("WAKTU       :", waktu_transaksi)
+            print("=" * 60)
+
+            # ==========================================================
+            # AI INSIGHT
+            # ==========================================================
+            #
+            # PENTING:
+            # AI TIDAK BOLEH MEMBUAT TRANSAKSI GAGAL.
+            #
+            # Jika AI error, transaksi tetap dianggap berhasil.
+            #
+            # ==========================================================
+
+            ai_insight_text = ""
 
             try:
 
@@ -10524,6 +10618,50 @@ _ChatSaku • Teman mengatur keuanganmu_"""
                     event="KELUAR"
                 )
 
+                # ======================================================
+                # JIKA HASIL AI BERUPA LIST
+                # ======================================================
+
+                if isinstance(
+                    ai_insight,
+                    list
+                ):
+
+                    insight_items = []
+
+                    for item in ai_insight:
+
+                        if item:
+
+                            insight_items.append(
+                                f"💡 {str(item).strip()}"
+                            )
+
+                    ai_insight_text = "\n".join(
+                        insight_items
+                    )
+
+                # ======================================================
+                # JIKA HASIL AI STRING
+                # ======================================================
+
+                elif isinstance(
+                    ai_insight,
+                    str
+                ):
+
+                    ai_insight_text = (
+                        ai_insight.strip()
+                    )
+
+                # ======================================================
+                # JIKA NONE
+                # ======================================================
+
+                else:
+
+                    ai_insight_text = ""
+
             except Exception as ai_error:
 
                 print("=" * 60)
@@ -10531,46 +10669,63 @@ _ChatSaku • Teman mengatur keuanganmu_"""
                 print("ERROR :", repr(ai_error))
                 print("=" * 60)
 
-                ai_insight = []
+                # ======================================================
+                # JANGAN GAGALKAN TRANSAKSI
+                # ======================================================
 
-            print("========================================")
-            print("💰 TRANSAKSI KELUAR BERHASIL")
-            print("SENDER      :", sender)
-            print("NOMINAL     :", nominal)
-            print("KETERANGAN  :", keterangan)
-            print("KATEGORI    :", kategori)
-            print("SUBKATEGORI :", subkategori)
-            print("========================================")
+                ai_insight_text = ""
 
-            # ==================================================
-            # TOTAL SALDO
-            # ==================================================
+            # ==========================================================
+            # TOTAL PEMASUKAN
+            # ==========================================================
 
-            masuk = transaksi_user(sender).filter(
-                Transaksi.tipe == "MASUK"
-            ).with_entities(
-                db.func.sum(Transaksi.nominal)
-            ).scalar() or 0
+            masuk = (
+                transaksi_user(sender)
+                .filter(
+                    Transaksi.tipe == "MASUK"
+                )
+                .with_entities(
+                    db.func.sum(
+                        Transaksi.nominal
+                    )
+                )
+                .scalar()
+                or 0
+            )
 
-            keluar = transaksi_user(sender).filter(
-                Transaksi.tipe == "KELUAR"
-            ).with_entities(
-                db.func.sum(Transaksi.nominal)
-            ).scalar() or 0
+            # ==========================================================
+            # TOTAL PENGELUARAN
+            # ==========================================================
+
+            keluar = (
+                transaksi_user(sender)
+                .filter(
+                    Transaksi.tipe == "KELUAR"
+                )
+                .with_entities(
+                    db.func.sum(
+                        Transaksi.nominal
+                    )
+                )
+                .scalar()
+                or 0
+            )
+
+            # ==========================================================
+            # HITUNG SALDO
+            # ==========================================================
 
             saldo = masuk - keluar
 
-            # ==================================================
-            # DASHBOARD
-            # ==================================================
-
-            # link = generate_dashboard_link(sender)
-
-            # ==================================================
-            # BUDGET
-            # ==================================================
+            # ==========================================================
+            # PERIODE SEKARANG
+            # ==========================================================
 
             periode = periode_sekarang()
+
+            # ==========================================================
+            # CARI BUDGET KATEGORI
+            # ==========================================================
 
             budget = Budget.query.filter_by(
                 nomor_wa=sender,
@@ -10578,11 +10733,23 @@ _ChatSaku • Teman mengatur keuanganmu_"""
                 periode=periode
             ).first()
 
+            # ==========================================================
+            # DEFAULT BUDGET TEXT
+            # ==========================================================
+
             budget_text = ""
+
+            # ==========================================================
+            # JIKA ADA BUDGET
+            # ==========================================================
 
             if budget:
 
                 now = sekarang()
+
+                # ======================================================
+                # AWAL BULAN
+                # ======================================================
 
                 awal_bulan = now.replace(
                     day=1,
@@ -10591,6 +10758,10 @@ _ChatSaku • Teman mengatur keuanganmu_"""
                     second=0,
                     microsecond=0
                 )
+
+                # ======================================================
+                # AKHIR BULAN
+                # ======================================================
 
                 if now.month == 12:
 
@@ -10615,42 +10786,91 @@ _ChatSaku • Teman mengatur keuanganmu_"""
                         microsecond=0
                     )
 
-                total_keluar = transaksi_user(sender).filter(
-                    Transaksi.tipe == "KELUAR",
-                    Transaksi.kategori == kategori,
-                    Transaksi.tanggal >= awal_bulan,
-                    Transaksi.tanggal < akhir_bulan
-                ).with_entities(
-                    db.func.sum(Transaksi.nominal)
-                ).scalar() or 0
+                # ======================================================
+                # TOTAL PENGELUARAN KATEGORI BULAN INI
+                # ======================================================
 
-                persen = (
-                    (total_keluar / budget.nominal) * 100
-                    if budget.nominal > 0
-                    else 0
+                total_keluar = (
+                    transaksi_user(sender)
+                    .filter(
+                        Transaksi.tipe == "KELUAR",
+                        Transaksi.kategori == kategori,
+                        Transaksi.tanggal >= awal_bulan,
+                        Transaksi.tanggal < akhir_bulan
+                    )
+                    .with_entities(
+                        db.func.sum(
+                            Transaksi.nominal
+                        )
+                    )
+                    .scalar()
+                    or 0
                 )
 
-                sisa = budget.nominal - total_keluar
+                # ======================================================
+                # HITUNG PERSENTASE
+                # ======================================================
 
-                # Batasi progress bar maksimal 10 blok
-                blok = min(10, max(0, int(persen / 10)))
+                if budget.nominal > 0:
+
+                    persen = (
+                        total_keluar /
+                        budget.nominal
+                    ) * 100
+
+                else:
+
+                    persen = 0
+
+                # ======================================================
+                # SISA BUDGET
+                # ======================================================
+
+                sisa = (
+                    budget.nominal -
+                    total_keluar
+                )
+
+                # ======================================================
+                # PROGRESS BAR
+                # ======================================================
+
+                blok = min(
+                    10,
+                    max(
+                        0,
+                        int(persen / 10)
+                    )
+                )
 
                 bar = (
                     "🟩" * blok +
                     "⬜" * (10 - blok)
                 )
 
+                # ======================================================
+                # STATUS BUDGET
+                # ======================================================
+
                 if persen <= 50:
+
                     status = "🟢 Budget Aman"
 
                 elif persen <= 80:
+
                     status = "🟡 Perlu Perhatian"
 
                 elif persen <= 100:
+
                     status = "🟠 Hampir Habis"
 
                 else:
+
                     status = "🔴 Budget Terlampaui"
+
+                # ======================================================
+                # BUDGET TEXT
+                # ======================================================
 
                 budget_text = f"""
     ──────────────────
@@ -10671,9 +10891,16 @@ _ChatSaku • Teman mengatur keuanganmu_"""
     {status}
     """
 
+                # ======================================================
+                # JIKA BUDGET TERLEWATI
+                # ======================================================
+
                 if persen > 100:
 
-                    over = total_keluar - budget.nominal
+                    over = (
+                        total_keluar -
+                        budget.nominal
+                    )
 
                     budget_text += f"""
 
@@ -10682,100 +10909,171 @@ _ChatSaku • Teman mengatur keuanganmu_"""
     Pengeluaranmu sudah melebihi budget sebesar
     *Rp {over:,.0f}*.
 
-    Yuk, lebih perhatikan pengeluaran {kategori.lower()} berikutnya 😊
+    Yuk, lebih perhatikan pengeluaran
+    {kategori.lower()} berikutnya 😊
     """
+
+            # ==========================================================
+            # JIKA BELUM ADA BUDGET
+            # ==========================================================
 
             else:
 
                 budget_text = f"""
-        ──────────────────
-        🎯 *Budget {kategori.title()}*
+    ──────────────────
+    🎯 *Budget {kategori.title()}*
 
-        Kamu belum membuat budget untuk kategori ini.
+    Kamu belum membuat budget untuk kategori ini.
 
-        Kalau mau mulai mengatur pengeluaran, cukup kirim:
+    Kalau mau mulai mengatur pengeluaran,
+    cukup kirim:
 
-        💡 *budget {kategori.lower()} 1000000*
+    💡 *budget {kategori.lower()} 1000000*
 
-        ChatSaku akan membantu memantau penggunaannya setiap bulan. 😊
-        """
+    ChatSaku akan membantu memantau penggunaannya
+    setiap bulan. 😊
+    """
 
-            # ==================================================
-            # KIRIM BALASAN WHATSAPP
-            # ==================================================
+            # ==========================================================
+            # BUAT PESAN DASAR
+            # ==========================================================
 
             pesan = f"""💚 *Siap, sudah dicatat!*
 
-Kamu baru saja mencatat pengeluaran sebesar
-💸 *Rp {nominal:,.0f}*
+    Kamu baru saja mencatat pengeluaran sebesar
+    💸 *Rp {nominal:,.0f}*
 
-📂 *Kategori:* {kategori.title()}
-📁 *Subkategori:* {subkategori.title()}
-📝 *Keterangan:* {keterangan}
+    📂 *Kategori:* {kategori.title()}
+    📁 *Subkategori:* {subkategori.title()}
+    📝 *Keterangan:* {keterangan}
 
-🕒 {sekarang().strftime("%d %b %Y • %H:%M")}
+    🕒 {waktu_transaksi.strftime("%d %b %Y • %H:%M")}
+    """
 
-{ai_insight}
+            # ==========================================================
+            # TAMBAHKAN AI INSIGHT JIKA ADA
+            # ==========================================================
 
-{budget_text}
+            if ai_insight_text:
 
-💰 *Saldo kamu sekarang*
-*Rp {saldo:,.0f}*
+                pesan += f"""
 
-_ChatSaku • Teman mengatur keuanganmu_"""
+    ━━━━━━━━━━━━━━━━━━
+    🤖 *AI INSIGHT*
+    ━━━━━━━━━━━━━━━━━━
 
-            print("========================================")
+    {ai_insight_text}
+    """
+
+            # ==========================================================
+            # TAMBAHKAN BUDGET
+            # ==========================================================
+
+            pesan += f"""
+
+    {budget_text}
+    """
+
+            # ==========================================================
+            # TAMBAHKAN SALDO
+            # ==========================================================
+
+            pesan += f"""
+    💰 *Saldo kamu sekarang*
+    *Rp {saldo:,.0f}*
+
+    _ChatSaku • Teman mengatur keuanganmu_
+    """
+
+            # ==========================================================
+            # LOG PESAN
+            # ==========================================================
+
+            print("=" * 60)
             print("📤 MENGIRIM BALASAN WA")
-            print("========================================")
+            print("=" * 60)
             print(pesan)
+            print("=" * 60)
+
+            # ==========================================================
+            # KIRIM WHATSAPP
+            # ==========================================================
 
             hasil_kirim = kirim_wa(
                 sender,
                 pesan
             )
 
+            # ==========================================================
+            # LOG HASIL KIRIM
+            # ==========================================================
+
             print("📨 HASIL KIRIM WA :", hasil_kirim)
+
+            # ==========================================================
+            # RESPONSE WEBHOOK
+            # ==========================================================
 
             return jsonify({
                 "status": True,
                 "intent": "keluar",
                 "nominal": nominal,
-                "keterangan": keterangan
+                "keterangan": keterangan,
+                "kategori": kategori,
+                "subkategori": subkategori
             })
+
+        # ==============================================================
+        # ERROR NOMINAL
+        # ==============================================================
 
         except ValueError:
 
             db.session.rollback()
 
+            print("=" * 60)
+            print("❌ VALUE ERROR TRANSAKSI KELUAR")
+            print("=" * 60)
+
             kirim_wa(
                 sender,
-                """❌ Nominal tidak valid.
+                """❌ *Nominal tidak valid.*
 
     Contoh:
-    beli bakso 20000
-    bayar listrik 150000
-    keluar 25000 grab"""
+
+    • beli bakso 20000
+    • bayar listrik 150000
+    • keluar 25000 grab
+    """
             )
 
-            return jsonify({"status": True})
+            return jsonify({
+                "status": True
+            })
+
+        # ==============================================================
+        # ERROR UMUM
+        # ==============================================================
 
         except Exception as e:
 
             db.session.rollback()
 
-            print("========================================")
+            print("=" * 60)
             print("❌ ERROR TRANSAKSI KELUAR")
             print("ERROR :", repr(e))
-            print("========================================")
+            print("=" * 60)
 
             kirim_wa(
                 sender,
-                f"""❌ *Terjadi kesalahan saat mencatat transaksi.*
+                """❌ *Terjadi kesalahan saat mencatat transaksi.*
 
     Silakan coba lagi.
 
     Contoh:
-    beli bakso 20000"""
+
+    • beli bakso 20000
+    """
             )
 
             return jsonify({
