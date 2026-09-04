@@ -10608,77 +10608,77 @@ _ChatSaku • Teman mengatur keuanganmu_"""
             #
             # ==========================================================
 
-            # ai_insight_text = ""
+            ai_insight_text = ""
 
-            # try:
+            try:
 
-            #     ai_insight = generate_ai_insight(
-            #         nomor=sender,
-            #         transaksi_baru=trx,
-            #         event="KELUAR"
-            #     )
+                ai_insight = generate_ai_insight(
+                    nomor=sender,
+                    transaksi_baru=trx,
+                    event="KELUAR"
+                )
 
-            #     print("=" * 60)
-            #     print("🤖 HASIL AI INSIGHT")
-            #     print("TYPE   :", type(ai_insight))
-            #     print("VALUE  :", repr(ai_insight))
-            #     print("=" * 60)
-            #     # ======================================================
-            #     # JIKA HASIL AI BERUPA LIST
-            #     # ======================================================
+                print("=" * 60)
+                print("🤖 HASIL AI INSIGHT")
+                print("TYPE   :", type(ai_insight))
+                print("VALUE  :", repr(ai_insight))
+                print("=" * 60)
+                # ======================================================
+                # JIKA HASIL AI BERUPA LIST
+                # ======================================================
 
-            #     if isinstance(
-            #         ai_insight,
-            #         list
-            #     ):
+                if isinstance(
+                    ai_insight,
+                    list
+                ):
 
-            #         insight_items = []
+                    insight_items = []
 
-            #         for item in ai_insight:
+                    for item in ai_insight:
 
-            #             if item:
+                        if item:
 
-            #                 insight_items.append(
-            #                     f"{str(item).strip()}"
-            #                 )
+                            insight_items.append(
+                                f"{str(item).strip()}"
+                            )
 
-            #         ai_insight_text = "\n".join(
-            #             insight_items
-            #         )
+                    ai_insight_text = "\n".join(
+                        insight_items
+                    )
 
-            #     # ======================================================
-            #     # JIKA HASIL AI STRING
-            #     # ======================================================
+                # ======================================================
+                # JIKA HASIL AI STRING
+                # ======================================================
 
-            #     elif isinstance(
-            #         ai_insight,
-            #         str
-            #     ):
+                elif isinstance(
+                    ai_insight,
+                    str
+                ):
 
-            #         ai_insight_text = (
-            #             ai_insight.strip()
-            #         )
+                    ai_insight_text = (
+                        ai_insight.strip()
+                    )
 
-            #     # ======================================================
-            #     # JIKA NONE
-            #     # ======================================================
+                # ======================================================
+                # JIKA NONE
+                # ======================================================
 
-            #     else:
+                else:
 
-            #         ai_insight_text = ""
+                    ai_insight_text = ""
 
-            # except Exception as ai_error:
+            except Exception as ai_error:
 
-            #     print("=" * 60)
-            #     print("⚠️ AI INSIGHT ERROR")
-            #     print("ERROR :", repr(ai_error))
-            #     print("=" * 60)
+                print("=" * 60)
+                print("⚠️ AI INSIGHT ERROR")
+                print("ERROR :", repr(ai_error))
+                print("=" * 60)
 
-            #     # ======================================================
-            #     # JANGAN GAGALKAN TRANSAKSI
-            #     # ======================================================
+                # ======================================================
+                # JANGAN GAGALKAN TRANSAKSI
+                # ======================================================
 
-            #     ai_insight_text = ""
+                ai_insight_text = ""
 
             # ==========================================================
             # TOTAL PEMASUKAN
@@ -10955,20 +10955,20 @@ _ChatSaku • Teman mengatur keuanganmu_"""
     🕒 {waktu_transaksi.strftime("%d %b %Y • %H:%M")}
     """
 
-    #         # ==========================================================
-    #         # TAMBAHKAN AI INSIGHT JIKA ADA
-    #         # ==========================================================
+            # ==========================================================
+            # TAMBAHKAN AI INSIGHT JIKA ADA
+            # ==========================================================
 
-    #         if ai_insight_text:
+            if ai_insight_text:
 
-    #             pesan += f"""
+                pesan += f"""
 
-    # ━━━━━━━━━━━━━━━━━━
-    # 🤖 *AI INSIGHT*
-    # ━━━━━━━━━━━━━━━━━━
+    ━━━━━━━━━━━━━━━━━━
+    🤖 *AI INSIGHT*
+    ━━━━━━━━━━━━━━━━━━
 
-    # {ai_insight_text}
-    # """
+    {ai_insight_text}
+    """
 
             # ==========================================================
             # TAMBAHKAN BUDGET

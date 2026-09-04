@@ -124,6 +124,10 @@ def generate_ai_insight(
 # =========================================================
 # =========================================================
 
+# =========================================================
+# MODE KELUAR - SINGLE LINE AI INSIGHT
+# =========================================================
+
 def generate_insight_keluar(
     nomor,
     transaksi_baru,
@@ -132,17 +136,13 @@ def generate_insight_keluar(
     all_data
 ):
 
-    insight = []
-
     # =====================================================
     # VALIDASI
     # =====================================================
 
     if not transaksi_baru:
-
         return [
-            "🧠 Belum ada transaksi pengeluaran baru "
-            "untuk dianalisis."
+            "🧠 Belum ada transaksi pengeluaran baru untuk dianalisis."
         ]
 
     # =====================================================
@@ -176,8 +176,12 @@ def generate_insight_keluar(
         subkategori_baru
     ).lower().strip()
 
+    kategori_title = str(
+        kategori_baru
+    ).title()
+
     # =====================================================
-    # FILTER TRANSAKSI BULAN INI
+    # TRANSAKSI BULAN INI
     # =====================================================
 
     transaksi_bulan_ini = []
@@ -193,54 +197,30 @@ def generate_insight_keluar(
             tanggal.year == hari_ini.year
             and tanggal.month == hari_ini.month
         ):
-
             transaksi_bulan_ini.append(trx)
 
     # =====================================================
-    # 1. INSIGHT TRANSAKSI BARU
+    # TOTAL PENGELUARAN BULAN INI
     # =====================================================
 
-    if nominal_baru <= 10000:
-
-        insight.append(
-            f"💡 Pengeluaran {rupiah(nominal_baru)} "
-            f"untuk {keterangan_baru.lower()} sudah dicatat."
-        )
-
-        insight.append(
-            "Pengeluaran kecil terlihat ringan, "
-            "tetapi kalau sering dilakukan tetap "
-            "bisa cukup besar dalam sebulan."
-        )
-
-    elif nominal_baru <= 50000:
-
-        insight.append(
-            f"💡 Pengeluaran {rupiah(nominal_baru)} "
-            f"untuk {keterangan_baru.lower()} sudah dicatat."
-        )
-
-        insight.append(
-            f"Coba perhatikan frekuensi pengeluaran "
-            f"*{str(kategori_baru).title()}* "
-            f"selama bulan ini."
-        )
-
-    else:
-
-        insight.append(
-            f"💡 Pengeluaran {rupiah(nominal_baru)} "
-            f"untuk {keterangan_baru.lower()} sudah dicatat."
-        )
-
-        insight.append(
-            f"Pastikan pengeluaran ini masih sesuai "
-            f"dengan kebutuhan dan budget "
-            f"*{str(kategori_baru).title()}*."
-        )
+    total_keluar = sum(
+        int(x.nominal or 0)
+        for x in transaksi_bulan_ini
+        if str(x.tipe or "").upper() == "KELUAR"
+    )
 
     # =====================================================
-    # 2. HITUNG TOTAL KATEGORI
+    # TOTAL PEMASUKAN BULAN INI
+    # =====================================================
+
+    total_masuk = sum(
+        int(x.nominal or 0)
+        for x in transaksi_bulan_ini
+        if str(x.tipe or "").upper() == "MASUK"
+    )
+
+    # =====================================================
+    # TOTAL KATEGORI
     # =====================================================
 
     total_kategori = 0
@@ -257,40 +237,20 @@ def generate_insight_keluar(
 
         if kategori_trx == kategori_key:
 
-            total_kategori += (
+            total_kategori += int(
                 trx.nominal or 0
             )
 
             jumlah_kategori += 1
 
     # =====================================================
-    # 3. FREKUENSI KATEGORI
+    # SUBKATEGORI
     # =====================================================
 
-    if jumlah_kategori >= 3:
-
-        insight.append(
-            f"📊 Kamu sudah melakukan "
-            f"*{jumlah_kategori} transaksi* "
-            f"di kategori "
-            f"*{str(kategori_baru).title()}* "
-            f"bulan ini."
-        )
-
-        insight.append(
-            f"Total pengeluaran kategori ini sudah "
-            f"{rupiah(total_kategori)}."
-        )
-
-    # =====================================================
-    # 4. DETEKSI SUBKATEGORI BERULANG
-    # =====================================================
+    jumlah_subkategori = 0
+    total_subkategori = 0
 
     if subkategori_key:
-
-        jumlah_subkategori = 0
-
-        total_subkategori = 0
 
         for trx in transaksi_bulan_ini:
 
@@ -305,26 +265,12 @@ def generate_insight_keluar(
 
                 jumlah_subkategori += 1
 
-                total_subkategori += (
+                total_subkategori += int(
                     trx.nominal or 0
                 )
 
-        if jumlah_subkategori >= 3:
-
-            insight.append(
-                f"🔁 Pengeluaran "
-                f"*{str(subkategori_baru).title()}* "
-                f"sudah tercatat "
-                f"{jumlah_subkategori} kali bulan ini."
-            )
-
-            insight.append(
-                f"Totalnya sudah mencapai "
-                f"{rupiah(total_subkategori)}."
-            )
-
     # =====================================================
-    # 5. CARI BUDGET KATEGORI
+    # CARI BUDGET
     # =====================================================
 
     budget = Budget.query.filter_by(
@@ -334,7 +280,8 @@ def generate_insight_keluar(
     ).first()
 
     # =====================================================
-    # 6. BUDGET TERSEDIA
+    # PRIORITAS 1
+    # BUDGET TERLAMPAUI
     # =====================================================
 
     if budget:
@@ -345,176 +292,140 @@ def generate_insight_keluar(
 
         if nominal_budget > 0:
 
-            terpakai = total_kategori
-
             persen = (
-                terpakai /
+                total_kategori /
                 nominal_budget
             ) * 100
 
             sisa = (
                 nominal_budget -
-                terpakai
+                total_kategori
             )
-
-            # =============================================
-            # BUDGET LEWAT
-            # =============================================
 
             if persen >= 100:
 
-                insight.append(
-                    f"🚨 Budget "
-                    f"*{str(kategori_baru).title()}* "
-                    f"sudah terlampaui."
-                )
+                return [
+                    f"🚨 Pengeluaran {rupiah(nominal_baru)} untuk "
+                    f"{keterangan_baru.lower()} membuat budget "
+                    f"{kategori_title} terlampaui {rupiah(abs(sisa))}."
+                ]
 
-                insight.append(
-                    f"Penggunaan: "
-                    f"{rupiah(terpakai)} / "
-                    f"{rupiah(nominal_budget)}."
-                )
-
-                insight.append(
-                    f"Sudah melebihi budget sebesar "
-                    f"{rupiah(abs(sisa))}."
-                )
-
-            # =============================================
+            # =================================================
+            # PRIORITAS 2
             # BUDGET 90%
-            # =============================================
+            # =================================================
 
-            elif persen >= 90:
+            if persen >= 90:
 
-                insight.append(
-                    f"🚨 Budget "
-                    f"*{str(kategori_baru).title()}* "
-                    f"tinggal sedikit lagi."
-                )
+                return [
+                    f"⚠️ Pengeluaran ini membuat budget "
+                    f"{kategori_title} sudah terpakai {persen:.0f}%, "
+                    f"tersisa {rupiah(sisa)}."
+                ]
 
-                insight.append(
-                    f"Terpakai "
-                    f"{persen:.0f}% "
-                    f"({rupiah(terpakai)} / "
-                    f"{rupiah(nominal_budget)})."
-                )
-
-                insight.append(
-                    f"Sisa budget sekitar "
-                    f"{rupiah(sisa)}."
-                )
-
-            # =============================================
+            # =================================================
+            # PRIORITAS 3
             # BUDGET 75%
-            # =============================================
+            # =================================================
 
-            elif persen >= 75:
+            if persen >= 75:
 
-                insight.append(
-                    f"🟡 Budget "
-                    f"*{str(kategori_baru).title()}* "
-                    f"sudah terpakai "
-                    f"{persen:.0f}%."
-                )
-
-                insight.append(
-                    f"Sisa sekitar "
-                    f"{rupiah(sisa)} "
-                    f"dari budget "
-                    f"{rupiah(nominal_budget)}."
-                )
-
-            # =============================================
-            # BUDGET 50%
-            # =============================================
-
-            elif persen >= 50:
-
-                insight.append(
-                    f"🟢 Budget "
-                    f"*{str(kategori_baru).title()}* "
-                    f"terpakai "
-                    f"{persen:.0f}%."
-                )
-
-                insight.append(
-                    f"Masih tersisa "
-                    f"{rupiah(sisa)} "
-                    f"untuk kategori ini."
-                )
-
-            # =============================================
-            # BUDGET < 50%
-            # =============================================
-
-            else:
-
-                insight.append(
-                    f"🎯 Budget "
-                    f"*{str(kategori_baru).title()}* "
-                    f"masih cukup aman."
-                )
-
-                insight.append(
-                    f"Terpakai "
-                    f"{persen:.0f}% "
-                    f"dan masih tersisa "
-                    f"{rupiah(sisa)}."
-                )
+                return [
+                    f"🟡 Pengeluaran {rupiah(nominal_baru)} menambah "
+                    f"pemakaian budget {kategori_title} menjadi "
+                    f"{persen:.0f}%; masih tersisa {rupiah(sisa)}."
+                ]
 
     # =====================================================
-    # 7. BELUM ADA BUDGET
+    # PRIORITAS 4
+    # PENGELUARAN BERULANG
     # =====================================================
 
-    else:
+    if jumlah_subkategori >= 3:
 
-        insight.append(
-            f"🎯 Belum ada budget untuk kategori "
-            f"*{str(kategori_baru).title()}*."
-        )
+        return [
+            f"🔁 Pengeluaran {keterangan_baru.lower()} sudah "
+            f"{jumlah_subkategori} kali bulan ini dengan total "
+            f"{rupiah(total_subkategori)}."
+        ]
 
-        insight.append(
-            f"Kalau ingin mengontrol pengeluaran "
-            f"{str(kategori_baru).lower()}, "
-            f"kamu bisa membuat budget."
-        )
+    if jumlah_kategori >= 5:
 
-        insight.append(
-            f"💡 Contoh: "
-            f"*budget {str(kategori_baru).lower()} 1000000*"
-        )
+        return [
+            f"📊 Kategori {kategori_title} sudah {jumlah_kategori} "
+            f"kali digunakan bulan ini dengan total "
+            f"{rupiah(total_kategori)}."
+        ]
 
     # =====================================================
-    # 8. PENGELUARAN BESAR
+    # PRIORITAS 5
+    # PENGELUARAN BESAR
     # =====================================================
 
     if nominal_baru >= 500000:
 
-        insight.append(
-            f"⚠️ Pengeluaran ini cukup besar, "
-            f"yaitu {rupiah(nominal_baru)}."
-        )
+        if total_masuk > 0:
 
-        insight.append(
-            "Sebaiknya pastikan pengeluaran ini "
-            "memang sudah direncanakan."
-        )
+            persen_pemasukan = (
+                nominal_baru /
+                total_masuk
+            ) * 100
+
+            if persen_pemasukan >= 20:
+
+                return [
+                    f"⚠️ Pengeluaran {rupiah(nominal_baru)} untuk "
+                    f"{keterangan_baru.lower()} cukup besar, sekitar "
+                    f"{persen_pemasukan:.0f}% dari pemasukan bulan ini."
+                ]
+
+        return [
+            f"⚠️ Pengeluaran {rupiah(nominal_baru)} untuk "
+            f"{keterangan_baru.lower()} cukup besar, pastikan "
+            f"masih sesuai rencana."
+        ]
+
+    # =====================================================
+    # PRIORITAS 6
+    # KONTEKS KATEGORI
+    # =====================================================
+
+    if total_keluar > 0:
+
+        persen_total = (
+            total_kategori /
+            total_keluar
+        ) * 100
+
+        if persen_total >= 40 and jumlah_kategori >= 2:
+
+            return [
+                f"📊 Pengeluaran {kategori_title} mulai cukup dominan, "
+                f"mencapai {persen_total:.0f}% dari total pengeluaran "
+                f"bulan ini."
+            ]
+
+    # =====================================================
+    # PRIORITAS 7
+    # PENGELUARAN KECIL TAPI BERULANG
+    # =====================================================
+
+    if nominal_baru <= 50000 and jumlah_kategori >= 2:
+
+        return [
+            f"💡 Pengeluaran kecil seperti {keterangan_baru.lower()} "
+            f"mulai muncul beberapa kali bulan ini; kalau terus "
+            f"berulang, totalnya bisa cukup terasa."
+        ]
 
     # =====================================================
     # FALLBACK
     # =====================================================
 
-    if not insight:
-
-        insight.append(
-            f"💡 Pengeluaran "
-            f"{rupiah(nominal_baru)} "
-            f"untuk "
-            f"{keterangan_baru.lower()} "
-            f"sudah dicatat."
-        )
-
-    return insight
+    return [
+        f"💡 Pengeluaran {rupiah(nominal_baru)} untuk "
+        f"{keterangan_baru.lower()} sudah dicatat."
+    ]
 
 
 # =========================================================
