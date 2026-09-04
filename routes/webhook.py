@@ -10618,6 +10618,11 @@ _ChatSaku • Teman mengatur keuanganmu_"""
                     event="KELUAR"
                 )
 
+                print("=" * 60)
+                print("🤖 HASIL AI INSIGHT")
+                print("TYPE   :", type(ai_insight))
+                print("VALUE  :", repr(ai_insight))
+                print("=" * 60)
                 # ======================================================
                 # JIKA HASIL AI BERUPA LIST
                 # ======================================================
