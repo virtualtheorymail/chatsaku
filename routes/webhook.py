@@ -19,6 +19,8 @@ from routes.nlp_router import parse_message
 from routes.nlp import *
 import re
 
+from utils.ai_insight import generate_ai_insight
+
 webhook_bp = Blueprint("webhook", __name__)
 
 ADMIN_NUMBER = "6285872362212"
@@ -11642,7 +11644,7 @@ Kalau mau melihat budget yang sudah kamu buat, tinggal ketik:
 
     if intent == "insight":
 
-        from utils.ai_insight import generate_ai_insight
+
 
 
         # ========================================================
