@@ -10797,27 +10797,26 @@ _ChatSaku • Teman mengatur keuanganmu_"""
 
         kirim_wa(
             sender,
-            f"""📊 *Ringkasan Hari Ini*
-    ━━━━━━━━━━━━━━
+            f"""📊 *Rekap Keuangan Hari Ini*
 
-    🧾 *Jumlah Transaksi*
-    {len(data)}
+Hai! Ini ringkasan keuanganmu hari ini 😊
 
-    📥 *Pemasukan*
-    Rp {masuk_hari_ini:,.0f}
+🧾 Kamu mencatat *{len(data)} transaksi*.
 
-    📤 *Pengeluaran*
-    Rp {keluar_hari_ini:,.0f}
+📥 Pemasukan
+*Rp {masuk_hari_ini:,.0f}*
 
-    ━━━━━━━━━━━━━━
+📤 Pengeluaran
+*Rp {keluar_hari_ini:,.0f}*
 
-    💰 *Total Aktivitas*
-    Rp {total:,.0f}
-    {viewer_info}
-    ━━━━━━━━━━━━━━
+💰 Total aktivitas
+*Rp {total:,.0f}*
 
-    _ChatSaku Finance Assistant_
-    """
+{viewer_info}
+
+Tetap semangat mengatur keuangan. Sedikit demi sedikit, lama-lama jadi lebih teratur 💚
+
+_ChatSaku Finance Assistant_"""
         )
 
         return jsonify({"status": True})
