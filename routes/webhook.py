@@ -11957,8 +11957,6 @@ Kalau mau melihat budget yang sudah kamu buat, tinggal ketik:
 
     if intent == "insight":
 
-        from utils.ai_insight import generate_ai_insight
-
 
         # ========================================================
         # CEK FITUR PREMIUM
