@@ -30,6 +30,7 @@ def generate_ai_insight(
     event=None
 ):
 
+    from app import transaksi_user, periode_sekarang
 
     periode = periode_sekarang()
 
