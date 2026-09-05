@@ -2936,6 +2936,55 @@ def kirim_template_waba(phone, nama, invoice):
 # DASHBOARD
 # =========================
 
+def get_logged_in_user():
+    user_id = get_jwt_identity()
+
+    if not user_id:
+        return None
+
+    try:
+        user_id = int(user_id)
+    except (TypeError, ValueError):
+        return None
+
+    return UserLogin.query.filter_by(
+        id=user_id
+    ).first()
+
+from datetime import datetime
+from flask import request, jsonify
+from flask_jwt_extended import jwt_required, get_jwt_identity
+from sqlalchemy import func, or_
+
+from models import db, UserLogin, Transaksi
+
+
+# =========================================================
+# GET USER LOGIN DARI JWT
+# =========================================================
+
+def get_logged_in_user():
+
+    user_id = get_jwt_identity()
+
+    if not user_id:
+        return None
+
+    try:
+        user_id = int(user_id)
+
+    except (TypeError, ValueError):
+        return None
+
+    return UserLogin.query.filter_by(
+        id=user_id
+    ).first()
+
+
+# =========================================================
+# SUMMARY TRANSAKSI
+# =========================================================
+
 @app.route("/api/transaksi/summary", methods=["GET"])
 @jwt_required()
 def transaksi_summary():
@@ -2950,18 +2999,27 @@ def transaksi_summary():
 
     nomor_wa = user.nomor_whatsapp
 
-    bulan = request.args.get("bulan")
+    bulan = request.args.get("bulan", "").strip()
 
     if not bulan:
         bulan = datetime.now().strftime("%Y-%m")
 
+    # =====================================================
+    # VALIDASI BULAN
+    # =====================================================
+
     try:
-        tahun, bulan_num = map(int, bulan.split("-"))
+
+        tahun, bulan_num = map(
+            int,
+            bulan.split("-")
+        )
 
         if bulan_num < 1 or bulan_num > 12:
             raise ValueError
 
-    except ValueError:
+    except (ValueError, TypeError):
+
         return jsonify({
             "success": False,
             "message": "Format bulan harus YYYY-MM."
@@ -2974,23 +3032,34 @@ def transaksi_summary():
     )
 
     if bulan_num == 12:
+
         akhir_bulan = datetime(
             tahun + 1,
             1,
             1
         )
+
     else:
+
         akhir_bulan = datetime(
             tahun,
             bulan_num + 1,
             1
         )
 
+    # =====================================================
+    # FILTER DASAR
+    # =====================================================
+
     base_filter = [
         Transaksi.nomor_wa == nomor_wa,
         Transaksi.tanggal >= awal_bulan,
         Transaksi.tanggal < akhir_bulan
     ]
+
+    # =====================================================
+    # TOTAL PEMASUKAN
+    # =====================================================
 
     total_masuk = db.session.query(
         func.coalesce(
@@ -3002,6 +3071,10 @@ def transaksi_summary():
         Transaksi.tipe == "MASUK"
     ).scalar()
 
+    # =====================================================
+    # TOTAL PENGELUARAN
+    # =====================================================
+
     total_keluar = db.session.query(
         func.coalesce(
             func.sum(Transaksi.nominal),
@@ -3012,24 +3085,47 @@ def transaksi_summary():
         Transaksi.tipe == "KELUAR"
     ).scalar()
 
+    # =====================================================
+    # JUMLAH TRANSAKSI
+    # =====================================================
+
     jumlah = db.session.query(
         func.count(Transaksi.id)
     ).filter(
         *base_filter
     ).scalar()
 
+    total_masuk = int(total_masuk or 0)
+    total_keluar = int(total_keluar or 0)
+
     saldo = total_masuk - total_keluar
 
     return jsonify({
+
         "success": True,
+
         "periode": bulan,
+
         "summary": {
-            "pemasukan": int(total_masuk or 0),
-            "pengeluaran": int(total_keluar or 0),
-            "saldo": int(saldo or 0),
-            "jumlah_transaksi": int(jumlah or 0)
+
+            "pemasukan": total_masuk,
+
+            "pengeluaran": total_keluar,
+
+            "saldo": saldo,
+
+            "jumlah_transaksi": int(
+                jumlah or 0
+            )
+
         }
+
     })
+
+
+# =========================================================
+# GET TRANSAKSI
+# =========================================================
 
 @app.route("/api/transaksi", methods=["GET"])
 @jwt_required()
@@ -3075,6 +3171,10 @@ def get_transaksi():
         type=str
     ).strip()
 
+    # =====================================================
+    # VALIDASI PAGINATION
+    # =====================================================
+
     if page < 1:
         page = 1
 
@@ -3084,22 +3184,27 @@ def get_transaksi():
     if limit > 100:
         limit = 100
 
+    # =====================================================
+    # QUERY USER
+    # =====================================================
+
     query = Transaksi.query.filter(
         Transaksi.nomor_wa == nomor_wa
     )
 
-    # =========================
+    # =====================================================
     # FILTER TIPE
-    # =========================
+    # =====================================================
 
     if tipe in ["MASUK", "KELUAR"]:
+
         query = query.filter(
             Transaksi.tipe == tipe
         )
 
-    # =========================
+    # =====================================================
     # FILTER BULAN
-    # =========================
+    # =====================================================
 
     if bulan:
 
@@ -3109,6 +3214,9 @@ def get_transaksi():
                 int,
                 bulan.split("-")
             )
+
+            if bulan_num < 1 or bulan_num > 12:
+                raise ValueError
 
             awal_bulan = datetime(
                 tahun,
@@ -3137,46 +3245,65 @@ def get_transaksi():
                 Transaksi.tanggal < akhir_bulan
             )
 
-        except ValueError:
+        except (ValueError, TypeError):
 
             return jsonify({
                 "success": False,
                 "message": "Format bulan harus YYYY-MM."
             }), 400
 
-    # =========================
+    # =====================================================
     # SEARCH
-    # =========================
+    # =====================================================
 
     if search:
 
         pattern = f"%{search}%"
 
         query = query.filter(
+
             or_(
-                Transaksi.keterangan.ilike(pattern),
-                Transaksi.kategori.ilike(pattern),
-                Transaksi.subkategori.ilike(pattern)
+
+                Transaksi.keterangan.ilike(
+                    pattern
+                ),
+
+                Transaksi.kategori.ilike(
+                    pattern
+                ),
+
+                Transaksi.subkategori.ilike(
+                    pattern
+                )
+
             )
+
         )
 
-    # =========================
+    # =====================================================
     # ORDER
-    # =========================
+    # =====================================================
 
     query = query.order_by(
+
         Transaksi.tanggal.desc(),
+
         Transaksi.id.desc()
+
     )
 
-    # =========================
+    # =====================================================
     # PAGINATION
-    # =========================
+    # =====================================================
 
     pagination = query.paginate(
+
         page=page,
+
         per_page=limit,
+
         error_out=False
+
     )
 
     data = []
@@ -3184,6 +3311,7 @@ def get_transaksi():
     for t in pagination.items:
 
         data.append({
+
             "id": t.id,
 
             "tanggal": (
@@ -3193,7 +3321,9 @@ def get_transaksi():
             ),
 
             "tanggal_display": (
-                t.tanggal.strftime("%d/%m/%Y %H:%M")
+                t.tanggal.strftime(
+                    "%d/%m/%Y %H:%M"
+                )
                 if t.tanggal
                 else "-"
             ),
@@ -3204,11 +3334,18 @@ def get_transaksi():
                 t.nominal or 0
             ),
 
-            "kategori": t.kategori or "",
+            "kategori": (
+                t.kategori or ""
+            ),
 
-            "subkategori": t.subkategori or "",
+            "subkategori": (
+                t.subkategori or ""
+            ),
 
-            "keterangan": t.keterangan or ""
+            "keterangan": (
+                t.keterangan or ""
+            )
+
         })
 
     return jsonify({
@@ -3218,13 +3355,23 @@ def get_transaksi():
         "data": data,
 
         "pagination": {
+
             "page": pagination.page,
+
             "limit": pagination.per_page,
+
             "total": pagination.total,
+
             "pages": pagination.pages
+
         }
 
     })
+
+
+# =========================================================
+# CREATE TRANSAKSI
+# =========================================================
 
 @app.route("/api/transaksi", methods=["POST"])
 @jwt_required()
@@ -3233,14 +3380,21 @@ def create_transaksi():
     user = get_logged_in_user()
 
     if not user:
+
         return jsonify({
             "success": False,
             "message": "User tidak ditemukan."
         }), 401
 
+    # =====================================================
+    # NOMOR WA DIAMBIL DARI DATABASE
+    # =====================================================
+
     nomor_wa = user.nomor_whatsapp
 
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(
+        silent=True
+    ) or {}
 
     tipe = str(
         data.get("tipe", "")
@@ -3262,9 +3416,9 @@ def create_transaksi():
 
     tanggal = data.get("tanggal")
 
-    # =========================
+    # =====================================================
     # VALIDASI TIPE
-    # =========================
+    # =====================================================
 
     if tipe not in ["MASUK", "KELUAR"]:
 
@@ -3273,18 +3427,15 @@ def create_transaksi():
             "message": "Tipe transaksi harus MASUK atau KELUAR."
         }), 400
 
-    # =========================
+    # =====================================================
     # VALIDASI NOMINAL
-    # =========================
+    # =====================================================
 
     try:
 
         nominal = int(nominal)
 
-    except (
-        ValueError,
-        TypeError
-    ):
+    except (ValueError, TypeError):
 
         return jsonify({
             "success": False,
@@ -3297,6 +3448,10 @@ def create_transaksi():
             "success": False,
             "message": "Nominal harus lebih dari 0."
         }), 400
+
+    # =====================================================
+    # VALIDASI PANJANG
+    # =====================================================
 
     if len(kategori) > 50:
 
@@ -3319,9 +3474,9 @@ def create_transaksi():
             "message": "Keterangan maksimal 255 karakter."
         }), 400
 
-    # =========================
+    # =====================================================
     # TANGGAL
-    # =========================
+    # =====================================================
 
     tanggal_obj = datetime.now()
 
@@ -3340,9 +3495,9 @@ def create_transaksi():
                 "message": "Format tanggal tidak valid."
             }), 400
 
-    # =========================
+    # =====================================================
     # CREATE
-    # =========================
+    # =====================================================
 
     transaksi = Transaksi(
 
@@ -3380,7 +3535,9 @@ def create_transaksi():
 
             "tipe": transaksi.tipe,
 
-            "nominal": transaksi.nominal,
+            "nominal": int(
+                transaksi.nominal or 0
+            ),
 
             "kategori": transaksi.kategori,
 
@@ -3392,13 +3549,22 @@ def create_transaksi():
 
     }), 201
 
-@app.route("/api/transaksi/<int:transaksi_id>", methods=["PUT"])
+
+# =========================================================
+# UPDATE TRANSAKSI
+# =========================================================
+
+@app.route(
+    "/api/transaksi/<int:transaksi_id>",
+    methods=["PUT"]
+)
 @jwt_required()
 def update_transaksi(transaksi_id):
 
     user = get_logged_in_user()
 
     if not user:
+
         return jsonify({
             "success": False,
             "message": "User tidak ditemukan."
@@ -3406,9 +3572,16 @@ def update_transaksi(transaksi_id):
 
     nomor_wa = user.nomor_whatsapp
 
+    # =====================================================
+    # CARI TRANSAKSI MILIK USER
+    # =====================================================
+
     transaksi = Transaksi.query.filter_by(
+
         id=transaksi_id,
+
         nomor_wa=nomor_wa
+
     ).first()
 
     if not transaksi:
@@ -3418,10 +3591,15 @@ def update_transaksi(transaksi_id):
             "message": "Transaksi tidak ditemukan."
         }), 404
 
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(
+        silent=True
+    ) or {}
 
     tipe = str(
-        data.get("tipe", transaksi.tipe)
+        data.get(
+            "tipe",
+            transaksi.tipe
+        )
     ).strip().upper()
 
     kategori = str(
@@ -3452,9 +3630,9 @@ def update_transaksi(transaksi_id):
 
     tanggal = data.get("tanggal")
 
-    # =========================
-    # VALIDASI
-    # =========================
+    # =====================================================
+    # VALIDASI TIPE
+    # =====================================================
 
     if tipe not in ["MASUK", "KELUAR"]:
 
@@ -3463,14 +3641,15 @@ def update_transaksi(transaksi_id):
             "message": "Tipe transaksi tidak valid."
         }), 400
 
+    # =====================================================
+    # VALIDASI NOMINAL
+    # =====================================================
+
     try:
 
         nominal = int(nominal)
 
-    except (
-        ValueError,
-        TypeError
-    ):
+    except (ValueError, TypeError):
 
         return jsonify({
             "success": False,
@@ -3484,9 +3663,34 @@ def update_transaksi(transaksi_id):
             "message": "Nominal harus lebih dari 0."
         }), 400
 
-    # =========================
+    # =====================================================
+    # VALIDASI PANJANG
+    # =====================================================
+
+    if len(kategori) > 50:
+
+        return jsonify({
+            "success": False,
+            "message": "Kategori maksimal 50 karakter."
+        }), 400
+
+    if len(subkategori) > 100:
+
+        return jsonify({
+            "success": False,
+            "message": "Subkategori maksimal 100 karakter."
+        }), 400
+
+    if len(keterangan) > 255:
+
+        return jsonify({
+            "success": False,
+            "message": "Keterangan maksimal 255 karakter."
+        }), 400
+
+    # =====================================================
     # UPDATE TANGGAL
-    # =========================
+    # =====================================================
 
     if tanggal:
 
@@ -3503,9 +3707,9 @@ def update_transaksi(transaksi_id):
                 "message": "Format tanggal tidak valid."
             }), 400
 
-    # =========================
-    # UPDATE DATA
-    # =========================
+    # =====================================================
+    # UPDATE
+    # =====================================================
 
     transaksi.tipe = tipe
 
@@ -3539,7 +3743,9 @@ def update_transaksi(transaksi_id):
 
             "tipe": transaksi.tipe,
 
-            "nominal": transaksi.nominal,
+            "nominal": int(
+                transaksi.nominal or 0
+            ),
 
             "kategori": transaksi.kategori,
 
@@ -3551,13 +3757,22 @@ def update_transaksi(transaksi_id):
 
     })
 
-@app.route("/api/transaksi/<int:transaksi_id>", methods=["DELETE"])
+
+# =========================================================
+# DELETE TRANSAKSI
+# =========================================================
+
+@app.route(
+    "/api/transaksi/<int:transaksi_id>",
+    methods=["DELETE"]
+)
 @jwt_required()
 def delete_transaksi(transaksi_id):
 
     user = get_logged_in_user()
 
     if not user:
+
         return jsonify({
             "success": False,
             "message": "User tidak ditemukan."
@@ -3565,9 +3780,16 @@ def delete_transaksi(transaksi_id):
 
     nomor_wa = user.nomor_whatsapp
 
+    # =====================================================
+    # PASTIKAN TRANSAKSI MILIK USER
+    # =====================================================
+
     transaksi = Transaksi.query.filter_by(
+
         id=transaksi_id,
+
         nomor_wa=nomor_wa
+
     ).first()
 
     if not transaksi:
