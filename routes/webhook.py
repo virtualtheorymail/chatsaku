@@ -10561,6 +10561,54 @@ _ChatSaku • Teman mengatur keuanganmu_"""
 
             keterangan = keterangan.strip()
 
+
+            # ==========================================================
+            # HAPUS KATA PERINTAH DI AWAL
+            # ==========================================================
+
+            keterangan = re.sub(
+                r'^\s*(?:keluar|pengeluaran|bayar|beli|belanja|transfer)\b',
+                '',
+                keterangan,
+                count=1,
+                flags=re.IGNORECASE
+            ).strip()
+
+
+            # ==========================================================
+            # HAPUS NOMINAL
+            # ==========================================================
+
+            if nominal and nominal > 0:
+
+                # Hapus format nominal yang sama dengan input
+                keterangan = re.sub(
+                    r'\bRp\.?\s*[\d.,]+\b',
+                    '',
+                    keterangan,
+                    count=1,
+                    flags=re.IGNORECASE
+                )
+
+                # Hapus angka nominal jika masih ada
+                keterangan = re.sub(
+                    r'\b\d[\d.,]*\b',
+                    '',
+                    keterangan,
+                    count=1
+                )
+
+
+            # ==========================================================
+            # RAPATKAN SPASI
+            # ==========================================================
+
+            keterangan = re.sub(
+                r'\s+',
+                ' ',
+                keterangan
+            ).strip()
+
             # ==========================================================
             # HAPUS NOMINAL DI AKHIR KETERANGAN
             # ==========================================================
