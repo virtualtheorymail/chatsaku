@@ -2490,6 +2490,7 @@ def deteksi_pemasukan_nlp(message, data=None):
         "saya dapat",
         "aku dapat",
         "kami dapat",
+
         "saya dapet",
         "aku dapet",
         "kami dapet",
@@ -2628,18 +2629,29 @@ def deteksi_pemasukan_nlp(message, data=None):
     nominal = 0
 
     # ========================================================
-    # 1. AMBIL NOMINAL DENGAN SATUAN
+    # 1. NOMINAL DENGAN SATUAN
     #
     # 2 juta
     # 2 jt
     # 500 ribu
     # 500 rb
     # 1 miliar
+    #
+    # \b digunakan agar angka dalam:
+    #
+    # rt7
+    # user123
+    #
+    # tidak dianggap sebagai nominal.
     # ========================================================
 
     pola_uang = re.search(
-        r'(\d+(?:[.,]\d+)?)\s*'
-        r'(juta|jt|ribu|rb|miliar|milyar)',
+        r'(?<!\w)'
+        r'(?:rp\.?\s*)?'
+        r'(\d+(?:[.,]\d+)?)'
+        r'\s*'
+        r'(juta|jt|ribu|rb|miliar|milyar)'
+        r'(?!\w)',
         text,
         re.IGNORECASE
     )
@@ -2648,23 +2660,20 @@ def deteksi_pemasukan_nlp(message, data=None):
 
         angka_text = pola_uang.group(1)
 
-        satuan = (
-            pola_uang.group(2)
-            .lower()
-        )
+        satuan = pola_uang.group(2).lower()
 
         try:
 
-            # ----------------------------------------------
-            # Format Indonesia:
+            # ------------------------------------------------
+            # Normalisasi angka desimal
+            #
             # 2,5 juta
-            # ----------------------------------------------
+            # 2.5 juta
+            # ------------------------------------------------
 
             angka_text = angka_text.replace(",", ".")
 
-            angka_float = float(
-                angka_text
-            )
+            angka_float = float(angka_text)
 
             if satuan in (
                 "ribu",
@@ -2693,6 +2702,14 @@ def deteksi_pemasukan_nlp(message, data=None):
                     angka_float * 1000000000
                 )
 
+            print(
+                "💰 NOMINAL SATUAN:",
+                angka_text,
+                satuan,
+                "=>",
+                nominal
+            )
+
         except Exception as e:
 
             print(
@@ -2703,41 +2720,126 @@ def deteksi_pemasukan_nlp(message, data=None):
             nominal = 0
 
     # ========================================================
-    # 2. AMBIL NOMINAL ANGKA BIASA
+    # 2. NOMINAL ANGKA BIASA
     #
-    # 2000
-    # 2000000
-    # Rp 2000000
-    # 2.000.000
+    # Contoh:
+    #
+    # masuk 200000
+    # masuk 2.000.000
+    # masuk Rp2000000
+    #
+    # PENTING:
+    # Ambil angka yang benar-benar berdiri sendiri.
+    #
+    # rt7
+    #
+    # tidak akan dianggap nominal.
+    # ========================================================
+
+    if nominal <= 0:
+
+        # ----------------------------------------------------
+        # PRIORITAS:
+        # Cari angka setelah kata pemicu pemasukan.
+        #
+        # masuk 200000 dari pak rt7
+        #       ^^^^^^
+        #
+        # bukan angka 7 di rt7.
+        # ----------------------------------------------------
+
+        pola_nominal_utama = re.search(
+            r'\b'
+            r'(?:masuk|pemasukan|pendapatan|gaji|gajian|'
+            r'bonus|sumbangan|donasi)'
+            r'\s+'
+            r'(?:rp\.?\s*)?'
+            r'(\d[\d.,]*)'
+            r'\b',
+            text,
+            re.IGNORECASE
+        )
+
+        if pola_nominal_utama:
+
+            kandidat = pola_nominal_utama.group(1)
+
+            try:
+
+                nominal = normalize_nominal(
+                    kandidat
+                )
+
+                print(
+                    "💰 NOMINAL DARI POLA UTAMA:",
+                    kandidat,
+                    "=>",
+                    nominal
+                )
+
+            except Exception as e:
+
+                print(
+                    "❌ ERROR NORMALIZE NOMINAL UTAMA:",
+                    repr(e)
+                )
+
+                nominal = 0
+
+    # ========================================================
+    # 3. FALLBACK NOMINAL
+    #
+    # Cari angka yang berdiri sendiri.
+    #
+    # JANGAN ambil angka[-1]
+    # karena bisa mengambil angka dari rt7.
     # ========================================================
 
     if nominal <= 0:
 
         angka = re.findall(
-            r'(?:rp\s*)?[\d.,]+',
+            r'(?<!\w)'
+            r'(?:rp\.?\s*)?'
+            r'\d[\d.,]*'
+            r'(?!\w)',
             text,
             re.IGNORECASE
         )
 
         if angka:
 
-            try:
+            # ------------------------------------------------
+            # Ambil kandidat pertama yang valid
+            # ------------------------------------------------
 
-                # Ambil angka terakhir
-                kandidat = angka[-1]
+            for kandidat in angka:
 
-                nominal = normalize_nominal(
-                    kandidat
-                )
+                try:
 
-            except Exception as e:
+                    nilai = normalize_nominal(
+                        kandidat
+                    )
 
-                print(
-                    "❌ ERROR NORMALIZE NOMINAL:",
-                    repr(e)
-                )
+                    if nilai > 0:
 
-                nominal = 0
+                        nominal = nilai
+
+                        print(
+                            "💰 NOMINAL FALLBACK:",
+                            kandidat,
+                            "=>",
+                            nominal
+                        )
+
+                        break
+
+                except Exception as e:
+
+                    print(
+                        "⚠️ GAGAL NORMALIZE:",
+                        kandidat,
+                        repr(e)
+                    )
 
     # ========================================================
     # JIKA NOMINAL TIDAK ADA
@@ -2745,11 +2847,11 @@ def deteksi_pemasukan_nlp(message, data=None):
 
     if nominal <= 0:
 
-        print("========================================")
+        print("=" * 60)
         print("⚠️ PEMASUKAN TERDETEKSI")
         print("⚠️ NOMINAL TIDAK DITEMUKAN")
         print("TEXT :", message)
-        print("========================================")
+        print("=" * 60)
 
         return {
             "intent": "masuk",
@@ -2761,8 +2863,7 @@ def deteksi_pemasukan_nlp(message, data=None):
     # ========================================================
     # KETERANGAN
     #
-    # SELALU GUNAKAN MESSAGE ASLI
-    # agar hasil parse_message tidak mengganggu
+    # Gunakan MESSAGE ASLI
     # ========================================================
 
     keterangan = str(
@@ -2770,23 +2871,33 @@ def deteksi_pemasukan_nlp(message, data=None):
     ).strip()
 
     # ========================================================
-    # HAPUS KATA PEMICU DI AWAL
+    # HAPUS PEMICU PEMASUKAN DI AWAL
     #
     # masuk 4000 sumbangan
-    # menjadi:
+    # =>
     # 4000 sumbangan
+    #
+    # masuk 200000 dari pak rt7
+    # =>
+    # 200000 dari pak rt7
     # ========================================================
 
     keterangan = re.sub(
         r'^\s*'
         r'(?:'
         r'ada\s+uang\s+masuk|'
-        r'uang\s+masuk|'
         r'uang\s+sudah\s+masuk|'
         r'uang\s+telah\s+masuk|'
+        r'uang\s+masuk|'
         r'masuk|'
         r'pemasukan|'
-        r'pendapatan'
+        r'pendapatan|'
+        r'gaji\s+masuk|'
+        r'gaji|'
+        r'gajian|'
+        r'bonus|'
+        r'sumbangan|'
+        r'donasi'
         r')'
         r'\s*',
         '',
@@ -2795,7 +2906,15 @@ def deteksi_pemasukan_nlp(message, data=None):
     ).strip()
 
     # ========================================================
-    # HAPUS "SAYA DAPAT", "AKU DAPAT", DLL
+    # HAPUS:
+    #
+    # saya dapat
+    # aku dapat
+    # kami dapat
+    # saya menerima
+    # aku menerima
+    # terima
+    # dapet
     # ========================================================
 
     keterangan = re.sub(
@@ -2813,24 +2932,8 @@ def deteksi_pemasukan_nlp(message, data=None):
         r'terima'
         r')'
         r'(?:'
-        r'\s+(?:uang|duit|transfer|pembayaran|kiriman)'
+        r'\s+(?:uang|duit|transfer|pembayaran|kiriman|bonus)'
         r')?'
-        r'\s*',
-        '',
-        keterangan,
-        flags=re.IGNORECASE
-    ).strip()
-
-    # ========================================================
-    # HAPUS "SAYA DAPAT UANG"
-    # ========================================================
-
-    keterangan = re.sub(
-        r'^\s*'
-        r'(?:saya|aku|kami)?\s*'
-        r'(?:dapat|dapet|menerima|terima)'
-        r'\s+'
-        r'(?:uang|duit)'
         r'\s*',
         '',
         keterangan,
@@ -2846,14 +2949,16 @@ def deteksi_pemasukan_nlp(message, data=None):
     # ========================================================
 
     keterangan = re.sub(
-        r'(?:rp\s*)?'
+        r'(?<!\w)'
+        r'(?:rp\.?\s*)?'
         r'\d+(?:[.,]\d+)?'
         r'\s*'
         r'(?:'
         r'juta|jt|'
         r'ribu|rb|'
         r'miliar|milyar'
-        r')',
+        r')'
+        r'(?!\w)',
         '',
         keterangan,
         flags=re.IGNORECASE
@@ -2862,24 +2967,36 @@ def deteksi_pemasukan_nlp(message, data=None):
     # ========================================================
     # HAPUS NOMINAL ANGKA BIASA
     #
-    # 2000
+    # 200000
     # 2.000.000
+    # Rp200000
+    #
+    # PENTING:
+    # hanya angka yang berdiri sendiri.
+    #
+    # rt7 tidak ikut terhapus.
     # ========================================================
 
     keterangan = re.sub(
-        r'(?:rp\s*)?'
-        r'\d[\d.,]*',
+        r'(?<!\w)'
+        r'(?:rp\.?\s*)?'
+        r'\d[\d.,]*'
+        r'(?!\w)',
         '',
         keterangan,
         flags=re.IGNORECASE
     ).strip()
 
     # ========================================================
-    # HAPUS KATA PENGHUBUNG DI AWAL
+    # HAPUS KATA PENGHUBUNG
     #
     # dari projek website
-    # menjadi:
+    # =>
     # projek website
+    #
+    # sebesar 500000
+    # =>
+    # ''
     # ========================================================
 
     keterangan = re.sub(
@@ -2907,7 +3024,7 @@ def deteksi_pemasukan_nlp(message, data=None):
     ).strip()
 
     # ========================================================
-    # FALLBACK
+    # FALLBACK KETERANGAN
     # ========================================================
 
     if not keterangan:
@@ -2933,14 +3050,14 @@ def deteksi_pemasukan_nlp(message, data=None):
     # DEBUG
     # ========================================================
 
-    print("========================================")
+    print("=" * 60)
     print("💰 DETEKSI PEMASUKAN NLP")
     print("TEXT       :", message)
     print("INTENT     :", hasil["intent"])
     print("ACTION     :", hasil["action"])
     print("NOMINAL    :", hasil["nominal"])
     print("KETERANGAN :", hasil["keterangan"])
-    print("========================================")
+    print("=" * 60)
 
     return hasil
 
