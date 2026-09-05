@@ -3010,23 +3010,91 @@ def transaksi_summary():
     verify_monthly_summary(nomor_wa)
 
     # =====================================================
-    # SEMUA TRANSAKSI USER
+    # PERIODE SEKARANG
     #
-    # PENTING:
-    # Tidak ada filter bulan di sini.
-    # Saldo = seluruh riwayat transaksi.
+    # HANYA DIGUNAKAN UNTUK BUDGET
+    # =====================================================
+
+    periode = periode_sekarang()
+
+    # =====================================================
+    # QUERY SEMUA TRANSAKSI
+    #
+    # TIDAK ADA FILTER BULAN
+    #
+    # Jadi:
+    # saldo = seluruh pemasukan - seluruh pengeluaran
     # =====================================================
 
     query = Transaksi.query.filter(
         Transaksi.nomor_wa == nomor_wa
     )
 
+    # =====================================================
+    # OPTIONAL FILTER TANGGAL
+    #
+    # Jika frontend mengirim:
+    # ?start_date=2026-09-01&end_date=2026-09-30
+    #
+    # maka transaksi difilter sesuai tanggal.
+    #
+    # Jika tidak dikirim:
+    # SEMUA TRANSAKSI USER
+    # =====================================================
+
+    start_date = request.args.get(
+        "start_date",
+        ""
+    ).strip()
+
+    end_date = request.args.get(
+        "end_date",
+        ""
+    ).strip()
+
+    try:
+
+        if start_date:
+
+            start = datetime.strptime(
+                start_date,
+                "%Y-%m-%d"
+            )
+
+            query = query.filter(
+                Transaksi.tanggal >= start
+            )
+
+        if end_date:
+
+            end = datetime.strptime(
+                end_date,
+                "%Y-%m-%d"
+            ) + timedelta(days=1)
+
+            query = query.filter(
+                Transaksi.tanggal < end
+            )
+
+    except ValueError:
+
+        return jsonify({
+            "success": False,
+            "message": "Format tanggal harus YYYY-MM-DD."
+        }), 400
+
+    # =====================================================
+    # SEMUA DATA TRANSAKSI
+    # =====================================================
+
     all_data = query.order_by(
         Transaksi.tanggal.desc()
     ).all()
 
     # =====================================================
-    # TOTAL PEMASUKAN - SEMUA TRANSAKSI
+    # TOTAL PEMASUKAN
+    #
+    # SEMUA TRANSAKSI
     # =====================================================
 
     total_masuk = sum(
@@ -3036,7 +3104,9 @@ def transaksi_summary():
     )
 
     # =====================================================
-    # TOTAL PENGELUARAN - SEMUA TRANSAKSI
+    # TOTAL PENGELUARAN
+    #
+    # SEMUA TRANSAKSI
     # =====================================================
 
     total_keluar = sum(
@@ -3046,10 +3116,13 @@ def transaksi_summary():
     )
 
     # =====================================================
-    # SALDO - SEMUA TRANSAKSI
+    # SALDO
     # =====================================================
 
-    saldo = total_masuk - total_keluar
+    saldo = (
+        total_masuk
+        - total_keluar
+    )
 
     # =====================================================
     # SAVING
@@ -3084,19 +3157,15 @@ def transaksi_summary():
 
         transaksi_terbaru.append({
 
-            "id": trx.id,
-
             "jenis": (
                 trx.tipe.lower()
                 if trx.tipe
                 else ""
             ),
 
-            "tipe": trx.tipe,
-
             "keterangan": (
                 trx.keterangan
-                or "-"
+                or ""
             ),
 
             "kategori": (
@@ -3116,19 +3185,12 @@ def transaksi_summary():
                 else "-"
             ),
 
-            "tanggal_full": (
-                trx.tanggal.strftime(
-                    "%d/%m/%Y %H:%M"
-                )
-                if trx.tanggal
-                else "-"
-            ),
-
             "nominal": (
                 trx.nominal or 0
             ),
 
-            "saldo": saldo
+            # Sama seperti dashboard Railway
+            "saldo": int(saldo)
 
         })
 
@@ -3177,12 +3239,10 @@ def transaksi_summary():
     )
 
     # =====================================================
-    # BUDGET BULAN INI
+    # BUDGET
     #
-    # HANYA bagian ini yang memakai periode.
+    # BUDGET TETAP BULAN BERJALAN
     # =====================================================
-
-    periode = periode_sekarang()
 
     budget_list = Budget.query.filter_by(
         nomor_wa=nomor_wa,
@@ -3193,13 +3253,50 @@ def transaksi_summary():
 
     for b in budget_list:
 
+        # -------------------------------------------------
+        # RANGE BULAN BERJALAN
+        # -------------------------------------------------
+
+        tahun_budget, bulan_budget = map(
+            int,
+            periode.split("-")
+        )
+
+        awal_bulan = datetime(
+            tahun_budget,
+            bulan_budget,
+            1
+        )
+
+        if bulan_budget == 12:
+
+            akhir_bulan = datetime(
+                tahun_budget + 1,
+                1,
+                1
+            )
+
+        else:
+
+            akhir_bulan = datetime(
+                tahun_budget,
+                bulan_budget + 1,
+                1
+            )
+
+        # -------------------------------------------------
+        # TOTAL BUDGET TERPAKAI
+        # -------------------------------------------------
+
         terpakai = db.session.query(
+
             db.func.coalesce(
                 db.func.sum(
                     Transaksi.nominal
                 ),
                 0
             )
+
         ).filter(
 
             Transaksi.nomor_wa == nomor_wa,
@@ -3208,10 +3305,9 @@ def transaksi_summary():
 
             Transaksi.kategori == b.kategori,
 
-            db.func.to_char(
-                Transaksi.tanggal,
-                "YYYY-MM"
-            ) == periode
+            Transaksi.tanggal >= awal_bulan,
+
+            Transaksi.tanggal < akhir_bulan
 
         ).scalar()
 
@@ -3251,7 +3347,64 @@ def transaksi_summary():
         })
 
     # =====================================================
-    # TARGET PEMBELIAN / TABUNGAN
+    # HUTANG
+    # =====================================================
+
+    hutang_list = HutangPiutang.query.filter(
+
+        HutangPiutang.nomor_wa == nomor_wa,
+
+        HutangPiutang.tipe == "HUTANG",
+
+        HutangPiutang.status != "LUNAS"
+
+    ).order_by(
+
+        HutangPiutang.tanggal.desc()
+
+    ).all()
+
+    # =====================================================
+    # PIUTANG
+    # =====================================================
+
+    piutang_list = HutangPiutang.query.filter(
+
+        HutangPiutang.nomor_wa == nomor_wa,
+
+        HutangPiutang.tipe == "PIUTANG",
+
+        HutangPiutang.status != "LUNAS"
+
+    ).order_by(
+
+        HutangPiutang.tanggal.desc()
+
+    ).all()
+
+    total_hutang = sum(
+
+        x.nominal or 0
+
+        for x in hutang_list
+
+    )
+
+    total_piutang = sum(
+
+        x.nominal or 0
+
+        for x in piutang_list
+
+    )
+
+    net_balance = (
+        total_piutang
+        - total_hutang
+    )
+
+    # =====================================================
+    # TARGET TABUNGAN
     # =====================================================
 
     target_pembelian = TargetPembelian.query.filter(
@@ -3270,6 +3423,8 @@ def transaksi_summary():
 
     if target_pembelian:
 
+        progress = 0
+
         target = (
             target_pembelian.target
             or 0
@@ -3280,15 +3435,10 @@ def transaksi_summary():
             or 0
         )
 
-        progress = 0
-
         if target > 0:
 
             progress = round(
-                (
-                    terkumpul
-                    / target
-                ) * 100,
+                (terkumpul / target) * 100,
                 1
             )
 
@@ -3324,11 +3474,15 @@ def transaksi_summary():
             "progress": progress,
 
             "deadline": (
+
                 target_pembelian.deadline.strftime(
                     "%Y-%m-%d"
                 )
+
                 if target_pembelian.deadline
+
                 else None
+
             ),
 
             "sisa_hari": sisa_hari,
@@ -3342,10 +3496,15 @@ def transaksi_summary():
     # =====================================================
 
     reminders = Reminder.query.filter_by(
+
         nomor_wa=nomor_wa,
+
         aktif=True
+
     ).order_by(
+
         Reminder.tanggal.asc()
+
     ).all()
 
     reminder_count = len(
@@ -3358,6 +3517,8 @@ def transaksi_summary():
     reminder_overdue = 0
 
     reminder_list = []
+
+    today = sekarang().date()
 
     for r in reminders:
 
@@ -3451,7 +3612,9 @@ def transaksi_summary():
                 ""
             ),
 
-            "nominal": r.nominal or 0,
+            "nominal": (
+                r.nominal or 0
+            ),
 
             "status": status,
 
@@ -3460,88 +3623,18 @@ def transaksi_summary():
         })
 
     # =====================================================
-    # HUTANG
-    # =====================================================
-
-    hutang_list = HutangPiutang.query.filter(
-
-        HutangPiutang.nomor_wa == nomor_wa,
-
-        HutangPiutang.tipe == "HUTANG",
-
-        HutangPiutang.status != "LUNAS"
-
-    ).order_by(
-
-        HutangPiutang.tanggal.desc()
-
-    ).all()
-
-    # =====================================================
-    # PIUTANG
-    # =====================================================
-
-    piutang_list = HutangPiutang.query.filter(
-
-        HutangPiutang.nomor_wa == nomor_wa,
-
-        HutangPiutang.tipe == "PIUTANG",
-
-        HutangPiutang.status != "LUNAS"
-
-    ).order_by(
-
-        HutangPiutang.tanggal.desc()
-
-    ).all()
-
-    total_hutang = sum(
-        x.nominal or 0
-        for x in hutang_list
-    )
-
-    total_piutang = sum(
-        x.nominal or 0
-        for x in piutang_list
-    )
-
-    net_balance = (
-        total_piutang
-        - total_hutang
-    )
-
-    # =====================================================
-    # AI INSIGHT
-    # =====================================================
-
-    try:
-
-        from utils.ai_insight import generate_ai_insight
-
-        insight = generate_ai_insight(
-            nomor_wa
-        )
-
-    except Exception as e:
-
-        print(
-            "AI INSIGHT ERROR:",
-            e
-        )
-
-        insight = None
-
-    # =====================================================
     # TREND
     #
-    # Mengikuti dashboard Railway:
-    # semua transaksi.
+    # MENGIKUTI LOGIC DASHBOARD RAILWAY
     # =====================================================
 
     trend_label = []
     trend_value = []
 
     for trx in reversed(all_data):
+
+        if not trx.tanggal:
+            continue
 
         tanggal = trx.tanggal.strftime(
             "%d %b"
@@ -3575,23 +3668,34 @@ def transaksi_summary():
 
         "success": True,
 
-        "status": True,
-
-        # Periode hanya informasi budget,
-        # bukan periode saldo.
+        # Periode sekarang hanya informasi,
+        # bukan filter summary
         "periode": periode,
 
         # =================================================
-        # SALDO GLOBAL
+        # COMPATIBILITY LANGSUNG
+        #
+        # Supaya HTML yang membaca:
+        # data.saldo
+        # data.masuk
+        # data.keluar
+        #
+        # tetap bekerja.
         # =================================================
 
         "saldo": int(saldo),
 
-        "masuk": int(total_masuk),
+        "masuk": int(
+            total_masuk
+        ),
 
-        "keluar": int(total_keluar),
+        "keluar": int(
+            total_keluar
+        ),
 
-        "saving": int(saving),
+        "saving": int(
+            saving
+        ),
 
         "saving_persen": saving_persen,
 
@@ -3600,36 +3704,76 @@ def transaksi_summary():
         ),
 
         # =================================================
-        # HARI INI
+        # SUMMARY
         # =================================================
 
-        "transaksi_hari_ini": int(
-            transaksi_hari_ini
-        ),
+        "summary": {
 
-        "masuk_hari_ini": int(
-            masuk_hari_ini
-        ),
+            "pemasukan": int(
+                total_masuk
+            ),
 
-        "keluar_hari_ini": int(
-            keluar_hari_ini
-        ),
+            "pengeluaran": int(
+                total_keluar
+            ),
 
-        "saving_hari_ini": int(
-            saving_hari_ini
-        ),
+            "saldo": int(
+                saldo
+            ),
 
-        # =================================================
-        # TRANSAKSI
-        # =================================================
+            "saving": int(
+                saving
+            ),
 
-        "rows": transaksi_terbaru,
+            "saving_persen": saving_persen,
+
+            "jumlah_transaksi": int(
+                jumlah_transaksi
+            ),
+
+            "transaksi_hari_ini": int(
+                transaksi_hari_ini
+            ),
+
+            "masuk_hari_ini": int(
+                masuk_hari_ini
+            ),
+
+            "keluar_hari_ini": int(
+                keluar_hari_ini
+            ),
+
+            "saving_hari_ini": int(
+                saving_hari_ini
+            )
+
+        },
 
         # =================================================
         # BUDGET
         # =================================================
 
         "budget": budget_data,
+
+        # =================================================
+        # HUTANG PIUTANG
+        # =================================================
+
+        "hutang_piutang": {
+
+            "total_hutang": int(
+                total_hutang
+            ),
+
+            "total_piutang": int(
+                total_piutang
+            ),
+
+            "net_balance": int(
+                net_balance
+            )
+
+        },
 
         # =================================================
         # TARGET
@@ -3658,24 +3802,10 @@ def transaksi_summary():
         },
 
         # =================================================
-        # HUTANG PIUTANG
+        # TRANSAKSI TERBARU
         # =================================================
 
-        "hutang_piutang": {
-
-            "total_hutang": int(
-                total_hutang
-            ),
-
-            "total_piutang": int(
-                total_piutang
-            ),
-
-            "net_balance": int(
-                net_balance
-            )
-
-        },
+        "transaksi_terbaru": transaksi_terbaru,
 
         # =================================================
         # TREND
@@ -3687,13 +3817,7 @@ def transaksi_summary():
 
             "value": trend_value
 
-        },
-
-        # =================================================
-        # AI
-        # =================================================
-
-        "insight": insight
+        }
 
     })
 
