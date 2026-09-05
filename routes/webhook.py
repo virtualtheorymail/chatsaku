@@ -10212,13 +10212,13 @@ _ChatSaku • Teman mengatur keuanganmu_"""
             # DASHBOARD
             # ====================================================
 
-            if link:
+    #         if link:
 
-                pesan += f"""
+    #             pesan += f"""
 
-    Kalau ingin melihat catatan keuangan lebih lengkap:
-    🌐 {link}
-    """
+    # Kalau ingin melihat catatan keuangan lebih lengkap:
+    # 🌐 {link}
+    # """
 
 
             # ====================================================
