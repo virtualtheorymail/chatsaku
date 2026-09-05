@@ -2989,6 +2989,10 @@ def get_logged_in_user():
 @jwt_required()
 def transaksi_summary():
 
+    # =====================================================
+    # USER LOGIN
+    # =====================================================
+
     user = get_logged_in_user()
 
     if not user:
@@ -2999,10 +3003,23 @@ def transaksi_summary():
 
     nomor_wa = user.nomor_whatsapp
 
-    bulan = request.args.get("bulan", "").strip()
+    # =====================================================
+    # VERIFY MONTHLY SUMMARY
+    # =====================================================
+
+    verify_monthly_summary(nomor_wa)
+
+    # =====================================================
+    # PARAMETER BULAN
+    # =====================================================
+
+    bulan = request.args.get(
+        "bulan",
+        ""
+    ).strip()
 
     if not bulan:
-        bulan = datetime.now().strftime("%Y-%m")
+        bulan = periode_sekarang()
 
     # =====================================================
     # VALIDASI BULAN
@@ -3024,6 +3041,10 @@ def transaksi_summary():
             "success": False,
             "message": "Format bulan harus YYYY-MM."
         }), 400
+
+    # =====================================================
+    # RANGE BULAN
+    # =====================================================
 
     awal_bulan = datetime(
         tahun,
@@ -3048,57 +3069,542 @@ def transaksi_summary():
         )
 
     # =====================================================
-    # FILTER DASAR
+    # QUERY TRANSAKSI
     # =====================================================
 
-    base_filter = [
+    query = Transaksi.query.filter(
         Transaksi.nomor_wa == nomor_wa,
         Transaksi.tanggal >= awal_bulan,
         Transaksi.tanggal < akhir_bulan
-    ]
+    )
+
+    all_data = query.order_by(
+        Transaksi.tanggal.desc()
+    ).all()
 
     # =====================================================
     # TOTAL PEMASUKAN
     # =====================================================
 
-    total_masuk = db.session.query(
-        func.coalesce(
-            func.sum(Transaksi.nominal),
-            0
-        )
-    ).filter(
-        *base_filter,
-        Transaksi.tipe == "MASUK"
-    ).scalar()
+    total_masuk = sum(
+        x.nominal or 0
+        for x in all_data
+        if x.tipe == "MASUK"
+    )
 
     # =====================================================
     # TOTAL PENGELUARAN
     # =====================================================
 
-    total_keluar = db.session.query(
-        func.coalesce(
-            func.sum(Transaksi.nominal),
-            0
+    total_keluar = sum(
+        x.nominal or 0
+        for x in all_data
+        if x.tipe == "KELUAR"
+    )
+
+    # =====================================================
+    # SALDO
+    # =====================================================
+
+    saldo = (
+        total_masuk
+        - total_keluar
+    )
+
+    # =====================================================
+    # SAVING
+    # =====================================================
+
+    saving = saldo
+
+    saving_persen = 0
+
+    if total_masuk > 0:
+
+        saving_persen = round(
+            (saving / total_masuk) * 100,
+            1
         )
-    ).filter(
-        *base_filter,
-        Transaksi.tipe == "KELUAR"
-    ).scalar()
 
     # =====================================================
     # JUMLAH TRANSAKSI
     # =====================================================
 
-    jumlah = db.session.query(
-        func.count(Transaksi.id)
-    ).filter(
-        *base_filter
-    ).scalar()
+    jumlah_transaksi = len(
+        all_data
+    )
 
-    total_masuk = int(total_masuk or 0)
-    total_keluar = int(total_keluar or 0)
+    # =====================================================
+    # TRANSAKSI TERBARU
+    # =====================================================
 
-    saldo = total_masuk - total_keluar
+    transaksi_terbaru = []
+
+    for trx in all_data[:10]:
+
+        transaksi_terbaru.append({
+
+            "jenis": (
+                trx.tipe.lower()
+                if trx.tipe
+                else ""
+            ),
+
+            "keterangan": (
+                trx.keterangan
+                or ""
+            ),
+
+            "kategori": (
+                trx.kategori
+                or "-"
+            ),
+
+            "tanggal": (
+                trx.tanggal.strftime("%d %b")
+                if trx.tanggal
+                else "-"
+            ),
+
+            "jam": (
+                trx.tanggal.strftime("%H:%M")
+                if trx.tanggal
+                else "-"
+            ),
+
+            "nominal": (
+                trx.nominal or 0
+            )
+
+        })
+
+    # =====================================================
+    # TRANSAKSI HARI INI
+    # =====================================================
+
+    today = sekarang().date()
+
+    trx_today = [
+
+        x for x in all_data
+
+        if x.tanggal
+        and x.tanggal.date() == today
+
+    ]
+
+    transaksi_hari_ini = len(
+        trx_today
+    )
+
+    masuk_hari_ini = sum(
+
+        x.nominal or 0
+
+        for x in trx_today
+
+        if x.tipe == "MASUK"
+
+    )
+
+    keluar_hari_ini = sum(
+
+        x.nominal or 0
+
+        for x in trx_today
+
+        if x.tipe == "KELUAR"
+
+    )
+
+    saving_hari_ini = (
+        masuk_hari_ini
+        - keluar_hari_ini
+    )
+
+    # =====================================================
+    # BUDGET
+    # =====================================================
+
+    budget_list = Budget.query.filter_by(
+        nomor_wa=nomor_wa,
+        periode=bulan
+    ).all()
+
+    budget_data = []
+
+    for b in budget_list:
+
+        terpakai = db.session.query(
+
+            db.func.coalesce(
+                db.func.sum(
+                    Transaksi.nominal
+                ),
+                0
+            )
+
+        ).filter(
+
+            Transaksi.nomor_wa == nomor_wa,
+
+            Transaksi.tipe == "KELUAR",
+
+            Transaksi.kategori == b.kategori,
+
+            Transaksi.tanggal >= awal_bulan,
+
+            Transaksi.tanggal < akhir_bulan
+
+        ).scalar()
+
+        terpakai = int(
+            terpakai or 0
+        )
+
+        budget_nominal = int(
+            b.nominal or 0
+        )
+
+        sisa = (
+            budget_nominal
+            - terpakai
+        )
+
+        persen = 0
+
+        if budget_nominal > 0:
+
+            persen = round(
+                (terpakai / budget_nominal) * 100
+            )
+
+        budget_data.append({
+
+            "kategori": b.kategori,
+
+            "budget": budget_nominal,
+
+            "terpakai": terpakai,
+
+            "sisa": sisa,
+
+            "persen": persen
+
+        })
+
+    # =====================================================
+    # HUTANG
+    # =====================================================
+
+    hutang_list = HutangPiutang.query.filter(
+
+        HutangPiutang.nomor_wa == nomor_wa,
+
+        HutangPiutang.tipe == "HUTANG",
+
+        HutangPiutang.status != "LUNAS"
+
+    ).order_by(
+
+        HutangPiutang.tanggal.desc()
+
+    ).all()
+
+    # =====================================================
+    # PIUTANG
+    # =====================================================
+
+    piutang_list = HutangPiutang.query.filter(
+
+        HutangPiutang.nomor_wa == nomor_wa,
+
+        HutangPiutang.tipe == "PIUTANG",
+
+        HutangPiutang.status != "LUNAS"
+
+    ).order_by(
+
+        HutangPiutang.tanggal.desc()
+
+    ).all()
+
+    total_hutang = sum(
+
+        x.nominal or 0
+
+        for x in hutang_list
+
+    )
+
+    total_piutang = sum(
+
+        x.nominal or 0
+
+        for x in piutang_list
+
+    )
+
+    net_balance = (
+        total_piutang
+        - total_hutang
+    )
+
+    # =====================================================
+    # TARGET TABUNGAN
+    # =====================================================
+
+    target_pembelian = TargetPembelian.query.filter(
+
+        TargetPembelian.nomor_wa == nomor_wa,
+
+        TargetPembelian.aktif == True
+
+    ).order_by(
+
+        TargetPembelian.deadline.asc()
+
+    ).first()
+
+    target_data = None
+
+    if target_pembelian:
+
+        progress = 0
+
+        target = (
+            target_pembelian.target
+            or 0
+        )
+
+        terkumpul = (
+            target_pembelian.terkumpul
+            or 0
+        )
+
+        if target > 0:
+
+            progress = round(
+                (terkumpul / target) * 100,
+                1
+            )
+
+        progress = min(
+            progress,
+            100
+        )
+
+        sisa = max(
+            target - terkumpul,
+            0
+        )
+
+        sisa_hari = (
+
+            target_pembelian.deadline
+            - sekarang().date()
+
+        ).days
+
+        target_data = {
+
+            "id": target_pembelian.id,
+
+            "nama": target_pembelian.nama,
+
+            "target": target,
+
+            "terkumpul": terkumpul,
+
+            "sisa": sisa,
+
+            "progress": progress,
+
+            "deadline": (
+                target_pembelian.deadline.strftime(
+                    "%Y-%m-%d"
+                )
+                if target_pembelian.deadline
+                else None
+            ),
+
+            "sisa_hari": sisa_hari,
+
+            "selesai": progress >= 100
+
+        }
+
+    # =====================================================
+    # REMINDER
+    # =====================================================
+
+    reminders = Reminder.query.filter_by(
+
+        nomor_wa=nomor_wa,
+
+        aktif=True
+
+    ).order_by(
+
+        Reminder.tanggal.asc()
+
+    ).all()
+
+    reminder_count = len(
+        reminders
+    )
+
+    reminder_today = 0
+    reminder_week = 0
+    reminder_month = 0
+    reminder_overdue = 0
+
+    # =====================================================
+    # REMINDER LIST
+    # =====================================================
+
+    reminder_list = []
+
+    today = sekarang().date()
+
+    for r in reminders:
+
+        tanggal = date(
+            today.year,
+            today.month,
+            r.tanggal
+        )
+
+        if tanggal < today:
+
+            if today.month == 12:
+
+                tanggal = date(
+                    today.year + 1,
+                    1,
+                    r.tanggal
+                )
+
+            else:
+
+                tanggal = date(
+                    today.year,
+                    today.month + 1,
+                    r.tanggal
+                )
+
+        selisih = (
+            tanggal - today
+        ).days
+
+        if selisih < 0:
+
+            reminder_overdue += 1
+
+        elif selisih == 0:
+
+            reminder_today += 1
+
+        elif selisih <= 7:
+
+            reminder_week += 1
+
+        reminder_month += 1
+
+        if selisih < 0:
+
+            status = (
+                f"Terlambat {abs(selisih)} hari"
+            )
+
+            warna = "danger"
+
+        elif selisih == 0:
+
+            status = "Hari ini"
+
+            warna = "warning"
+
+        elif selisih == 1:
+
+            status = "Besok"
+
+            warna = "warning"
+
+        else:
+
+            status = (
+                f"{selisih} hari lagi"
+            )
+
+            warna = "success"
+
+        reminder_list.append({
+
+            "hari": tanggal.strftime("%d"),
+
+            "bulan": tanggal.strftime("%b").upper(),
+
+            "judul": r.nama,
+
+            "kategori": getattr(
+                r,
+                "kategori",
+                "-"
+            ),
+
+            "catatan": getattr(
+                r,
+                "catatan",
+                ""
+            ),
+
+            "nominal": (
+                r.nominal or 0
+            ),
+
+            "status": status,
+
+            "status_color": warna
+
+        })
+
+    # =====================================================
+    # TREND
+    # =====================================================
+
+    trend_label = []
+    trend_value = []
+
+    for trx in reversed(all_data):
+
+        tanggal = trx.tanggal.strftime(
+            "%d %b"
+        )
+
+        if tanggal not in trend_label:
+
+            trend_label.append(
+                tanggal
+            )
+
+            trend_value.append(
+                trx.nominal or 0
+            )
+
+        else:
+
+            index = trend_label.index(
+                tanggal
+            )
+
+            trend_value[index] += (
+                trx.nominal or 0
+            )
+
+    # =====================================================
+    # RESPONSE
+    # =====================================================
 
     return jsonify({
 
@@ -3108,15 +3614,89 @@ def transaksi_summary():
 
         "summary": {
 
-            "pemasukan": total_masuk,
+            "pemasukan": int(
+                total_masuk
+            ),
 
-            "pengeluaran": total_keluar,
+            "pengeluaran": int(
+                total_keluar
+            ),
 
-            "saldo": saldo,
+            "saldo": int(
+                saldo
+            ),
+
+            "saving": int(
+                saving
+            ),
+
+            "saving_persen": saving_persen,
 
             "jumlah_transaksi": int(
-                jumlah or 0
+                jumlah_transaksi
+            ),
+
+            "transaksi_hari_ini": int(
+                transaksi_hari_ini
+            ),
+
+            "masuk_hari_ini": int(
+                masuk_hari_ini
+            ),
+
+            "keluar_hari_ini": int(
+                keluar_hari_ini
+            ),
+
+            "saving_hari_ini": int(
+                saving_hari_ini
             )
+
+        },
+
+        "budget": budget_data,
+
+        "hutang_piutang": {
+
+            "total_hutang": int(
+                total_hutang
+            ),
+
+            "total_piutang": int(
+                total_piutang
+            ),
+
+            "net_balance": int(
+                net_balance
+            )
+
+        },
+
+        "target": target_data,
+
+        "reminder": {
+
+            "count": reminder_count,
+
+            "today": reminder_today,
+
+            "week": reminder_week,
+
+            "month": reminder_month,
+
+            "overdue": reminder_overdue,
+
+            "list": reminder_list
+
+        },
+
+        "transaksi_terbaru": transaksi_terbaru,
+
+        "trend": {
+
+            "label": trend_label,
+
+            "value": trend_value
 
         }
 
