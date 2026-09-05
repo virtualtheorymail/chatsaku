@@ -71,24 +71,52 @@ class Transaksi(db.Model):
 
     __tablename__ = "transaksi"
 
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(
+        db.Integer,
+        primary_key=True
+    )
 
     tanggal = db.Column(
         db.DateTime(timezone=True),
-        default=now_jakarta
+        default=now_jakarta,
+        index=True
     )
 
-    tipe = db.Column(db.String(20))
+    tipe = db.Column(
+        db.String(20),
+        index=True
+    )
 
-    nominal = db.Column(db.Integer)
+    nominal = db.Column(
+        db.BigInteger,
+        nullable=False
+    )
 
-    kategori = db.Column(db.String(50))
+    kategori = db.Column(
+        db.String(50),
+        index=True
+    )
 
-    subkategori = db.Column(db.String(100))
+    subkategori = db.Column(
+        db.String(100)
+    )
 
-    keterangan = db.Column(db.String(255))
+    keterangan = db.Column(
+        db.String(255)
+    )
 
-    nomor_wa = db.Column(db.String(30))
+    nomor_wa = db.Column(
+        db.String(30),
+        index=True
+    )
+
+    __table_args__ = (
+        db.Index(
+            "idx_transaksi_user_tanggal",
+            "nomor_wa",
+            "tanggal"
+        ),
+    )
 
 class Budget(db.Model):
 

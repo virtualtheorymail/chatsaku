@@ -2931,6 +2931,664 @@ def kirim_template_waba(phone, nama, invoice):
 
 
     return response.json()
+
+# =========================
+# DASHBOARD
+# =========================
+
+@app.route("/api/transaksi/summary", methods=["GET"])
+@jwt_required()
+def transaksi_summary():
+
+    user = get_logged_in_user()
+
+    if not user:
+        return jsonify({
+            "success": False,
+            "message": "User tidak ditemukan."
+        }), 401
+
+    nomor_wa = user.nomor_whatsapp
+
+    bulan = request.args.get("bulan")
+
+    if not bulan:
+        bulan = datetime.now().strftime("%Y-%m")
+
+    try:
+        tahun, bulan_num = map(int, bulan.split("-"))
+
+        if bulan_num < 1 or bulan_num > 12:
+            raise ValueError
+
+    except ValueError:
+        return jsonify({
+            "success": False,
+            "message": "Format bulan harus YYYY-MM."
+        }), 400
+
+    awal_bulan = datetime(
+        tahun,
+        bulan_num,
+        1
+    )
+
+    if bulan_num == 12:
+        akhir_bulan = datetime(
+            tahun + 1,
+            1,
+            1
+        )
+    else:
+        akhir_bulan = datetime(
+            tahun,
+            bulan_num + 1,
+            1
+        )
+
+    base_filter = [
+        Transaksi.nomor_wa == nomor_wa,
+        Transaksi.tanggal >= awal_bulan,
+        Transaksi.tanggal < akhir_bulan
+    ]
+
+    total_masuk = db.session.query(
+        func.coalesce(
+            func.sum(Transaksi.nominal),
+            0
+        )
+    ).filter(
+        *base_filter,
+        Transaksi.tipe == "MASUK"
+    ).scalar()
+
+    total_keluar = db.session.query(
+        func.coalesce(
+            func.sum(Transaksi.nominal),
+            0
+        )
+    ).filter(
+        *base_filter,
+        Transaksi.tipe == "KELUAR"
+    ).scalar()
+
+    jumlah = db.session.query(
+        func.count(Transaksi.id)
+    ).filter(
+        *base_filter
+    ).scalar()
+
+    saldo = total_masuk - total_keluar
+
+    return jsonify({
+        "success": True,
+        "periode": bulan,
+        "summary": {
+            "pemasukan": int(total_masuk or 0),
+            "pengeluaran": int(total_keluar or 0),
+            "saldo": int(saldo or 0),
+            "jumlah_transaksi": int(jumlah or 0)
+        }
+    })
+
+@app.route("/api/transaksi", methods=["GET"])
+@jwt_required()
+def get_transaksi():
+
+    user = get_logged_in_user()
+
+    if not user:
+        return jsonify({
+            "success": False,
+            "message": "User tidak ditemukan."
+        }), 401
+
+    nomor_wa = user.nomor_whatsapp
+
+    page = request.args.get(
+        "page",
+        1,
+        type=int
+    )
+
+    limit = request.args.get(
+        "limit",
+        20,
+        type=int
+    )
+
+    search = request.args.get(
+        "search",
+        "",
+        type=str
+    ).strip()
+
+    tipe = request.args.get(
+        "tipe",
+        "",
+        type=str
+    ).strip().upper()
+
+    bulan = request.args.get(
+        "bulan",
+        "",
+        type=str
+    ).strip()
+
+    if page < 1:
+        page = 1
+
+    if limit < 1:
+        limit = 20
+
+    if limit > 100:
+        limit = 100
+
+    query = Transaksi.query.filter(
+        Transaksi.nomor_wa == nomor_wa
+    )
+
+    # =========================
+    # FILTER TIPE
+    # =========================
+
+    if tipe in ["MASUK", "KELUAR"]:
+        query = query.filter(
+            Transaksi.tipe == tipe
+        )
+
+    # =========================
+    # FILTER BULAN
+    # =========================
+
+    if bulan:
+
+        try:
+
+            tahun, bulan_num = map(
+                int,
+                bulan.split("-")
+            )
+
+            awal_bulan = datetime(
+                tahun,
+                bulan_num,
+                1
+            )
+
+            if bulan_num == 12:
+
+                akhir_bulan = datetime(
+                    tahun + 1,
+                    1,
+                    1
+                )
+
+            else:
+
+                akhir_bulan = datetime(
+                    tahun,
+                    bulan_num + 1,
+                    1
+                )
+
+            query = query.filter(
+                Transaksi.tanggal >= awal_bulan,
+                Transaksi.tanggal < akhir_bulan
+            )
+
+        except ValueError:
+
+            return jsonify({
+                "success": False,
+                "message": "Format bulan harus YYYY-MM."
+            }), 400
+
+    # =========================
+    # SEARCH
+    # =========================
+
+    if search:
+
+        pattern = f"%{search}%"
+
+        query = query.filter(
+            or_(
+                Transaksi.keterangan.ilike(pattern),
+                Transaksi.kategori.ilike(pattern),
+                Transaksi.subkategori.ilike(pattern)
+            )
+        )
+
+    # =========================
+    # ORDER
+    # =========================
+
+    query = query.order_by(
+        Transaksi.tanggal.desc(),
+        Transaksi.id.desc()
+    )
+
+    # =========================
+    # PAGINATION
+    # =========================
+
+    pagination = query.paginate(
+        page=page,
+        per_page=limit,
+        error_out=False
+    )
+
+    data = []
+
+    for t in pagination.items:
+
+        data.append({
+            "id": t.id,
+
+            "tanggal": (
+                t.tanggal.isoformat()
+                if t.tanggal
+                else None
+            ),
+
+            "tanggal_display": (
+                t.tanggal.strftime("%d/%m/%Y %H:%M")
+                if t.tanggal
+                else "-"
+            ),
+
+            "tipe": t.tipe,
+
+            "nominal": int(
+                t.nominal or 0
+            ),
+
+            "kategori": t.kategori or "",
+
+            "subkategori": t.subkategori or "",
+
+            "keterangan": t.keterangan or ""
+        })
+
+    return jsonify({
+
+        "success": True,
+
+        "data": data,
+
+        "pagination": {
+            "page": pagination.page,
+            "limit": pagination.per_page,
+            "total": pagination.total,
+            "pages": pagination.pages
+        }
+
+    })
+
+@app.route("/api/transaksi", methods=["POST"])
+@jwt_required()
+def create_transaksi():
+
+    user = get_logged_in_user()
+
+    if not user:
+        return jsonify({
+            "success": False,
+            "message": "User tidak ditemukan."
+        }), 401
+
+    nomor_wa = user.nomor_whatsapp
+
+    data = request.get_json(silent=True) or {}
+
+    tipe = str(
+        data.get("tipe", "")
+    ).strip().upper()
+
+    kategori = str(
+        data.get("kategori", "")
+    ).strip()
+
+    subkategori = str(
+        data.get("subkategori", "")
+    ).strip()
+
+    keterangan = str(
+        data.get("keterangan", "")
+    ).strip()
+
+    nominal = data.get("nominal")
+
+    tanggal = data.get("tanggal")
+
+    # =========================
+    # VALIDASI TIPE
+    # =========================
+
+    if tipe not in ["MASUK", "KELUAR"]:
+
+        return jsonify({
+            "success": False,
+            "message": "Tipe transaksi harus MASUK atau KELUAR."
+        }), 400
+
+    # =========================
+    # VALIDASI NOMINAL
+    # =========================
+
+    try:
+
+        nominal = int(nominal)
+
+    except (
+        ValueError,
+        TypeError
+    ):
+
+        return jsonify({
+            "success": False,
+            "message": "Nominal harus berupa angka."
+        }), 400
+
+    if nominal <= 0:
+
+        return jsonify({
+            "success": False,
+            "message": "Nominal harus lebih dari 0."
+        }), 400
+
+    if len(kategori) > 50:
+
+        return jsonify({
+            "success": False,
+            "message": "Kategori maksimal 50 karakter."
+        }), 400
+
+    if len(subkategori) > 100:
+
+        return jsonify({
+            "success": False,
+            "message": "Subkategori maksimal 100 karakter."
+        }), 400
+
+    if len(keterangan) > 255:
+
+        return jsonify({
+            "success": False,
+            "message": "Keterangan maksimal 255 karakter."
+        }), 400
+
+    # =========================
+    # TANGGAL
+    # =========================
+
+    tanggal_obj = datetime.now()
+
+    if tanggal:
+
+        try:
+
+            tanggal_obj = datetime.fromisoformat(
+                tanggal
+            )
+
+        except ValueError:
+
+            return jsonify({
+                "success": False,
+                "message": "Format tanggal tidak valid."
+            }), 400
+
+    # =========================
+    # CREATE
+    # =========================
+
+    transaksi = Transaksi(
+
+        tanggal=tanggal_obj,
+
+        tipe=tipe,
+
+        nominal=nominal,
+
+        kategori=kategori or None,
+
+        subkategori=subkategori or None,
+
+        keterangan=keterangan or None,
+
+        nomor_wa=nomor_wa
+
+    )
+
+    db.session.add(transaksi)
+
+    db.session.commit()
+
+    return jsonify({
+
+        "success": True,
+
+        "message": "Transaksi berhasil ditambahkan.",
+
+        "data": {
+
+            "id": transaksi.id,
+
+            "tanggal": transaksi.tanggal.isoformat(),
+
+            "tipe": transaksi.tipe,
+
+            "nominal": transaksi.nominal,
+
+            "kategori": transaksi.kategori,
+
+            "subkategori": transaksi.subkategori,
+
+            "keterangan": transaksi.keterangan
+
+        }
+
+    }), 201
+
+@app.route("/api/transaksi/<int:transaksi_id>", methods=["PUT"])
+@jwt_required()
+def update_transaksi(transaksi_id):
+
+    user = get_logged_in_user()
+
+    if not user:
+        return jsonify({
+            "success": False,
+            "message": "User tidak ditemukan."
+        }), 401
+
+    nomor_wa = user.nomor_whatsapp
+
+    transaksi = Transaksi.query.filter_by(
+        id=transaksi_id,
+        nomor_wa=nomor_wa
+    ).first()
+
+    if not transaksi:
+
+        return jsonify({
+            "success": False,
+            "message": "Transaksi tidak ditemukan."
+        }), 404
+
+    data = request.get_json(silent=True) or {}
+
+    tipe = str(
+        data.get("tipe", transaksi.tipe)
+    ).strip().upper()
+
+    kategori = str(
+        data.get(
+            "kategori",
+            transaksi.kategori or ""
+        )
+    ).strip()
+
+    subkategori = str(
+        data.get(
+            "subkategori",
+            transaksi.subkategori or ""
+        )
+    ).strip()
+
+    keterangan = str(
+        data.get(
+            "keterangan",
+            transaksi.keterangan or ""
+        )
+    ).strip()
+
+    nominal = data.get(
+        "nominal",
+        transaksi.nominal
+    )
+
+    tanggal = data.get("tanggal")
+
+    # =========================
+    # VALIDASI
+    # =========================
+
+    if tipe not in ["MASUK", "KELUAR"]:
+
+        return jsonify({
+            "success": False,
+            "message": "Tipe transaksi tidak valid."
+        }), 400
+
+    try:
+
+        nominal = int(nominal)
+
+    except (
+        ValueError,
+        TypeError
+    ):
+
+        return jsonify({
+            "success": False,
+            "message": "Nominal harus berupa angka."
+        }), 400
+
+    if nominal <= 0:
+
+        return jsonify({
+            "success": False,
+            "message": "Nominal harus lebih dari 0."
+        }), 400
+
+    # =========================
+    # UPDATE TANGGAL
+    # =========================
+
+    if tanggal:
+
+        try:
+
+            transaksi.tanggal = datetime.fromisoformat(
+                tanggal
+            )
+
+        except ValueError:
+
+            return jsonify({
+                "success": False,
+                "message": "Format tanggal tidak valid."
+            }), 400
+
+    # =========================
+    # UPDATE DATA
+    # =========================
+
+    transaksi.tipe = tipe
+
+    transaksi.nominal = nominal
+
+    transaksi.kategori = (
+        kategori or None
+    )
+
+    transaksi.subkategori = (
+        subkategori or None
+    )
+
+    transaksi.keterangan = (
+        keterangan or None
+    )
+
+    db.session.commit()
+
+    return jsonify({
+
+        "success": True,
+
+        "message": "Transaksi berhasil diperbarui.",
+
+        "data": {
+
+            "id": transaksi.id,
+
+            "tanggal": transaksi.tanggal.isoformat(),
+
+            "tipe": transaksi.tipe,
+
+            "nominal": transaksi.nominal,
+
+            "kategori": transaksi.kategori,
+
+            "subkategori": transaksi.subkategori,
+
+            "keterangan": transaksi.keterangan
+
+        }
+
+    })
+
+@app.route("/api/transaksi/<int:transaksi_id>", methods=["DELETE"])
+@jwt_required()
+def delete_transaksi(transaksi_id):
+
+    user = get_logged_in_user()
+
+    if not user:
+        return jsonify({
+            "success": False,
+            "message": "User tidak ditemukan."
+        }), 401
+
+    nomor_wa = user.nomor_whatsapp
+
+    transaksi = Transaksi.query.filter_by(
+        id=transaksi_id,
+        nomor_wa=nomor_wa
+    ).first()
+
+    if not transaksi:
+
+        return jsonify({
+            "success": False,
+            "message": "Transaksi tidak ditemukan."
+        }), 404
+
+    db.session.delete(transaksi)
+
+    db.session.commit()
+
+    return jsonify({
+
+        "success": True,
+
+        "message": "Transaksi berhasil dihapus."
+
+    })
+
 # =========================
 # TEST
 # =========================
