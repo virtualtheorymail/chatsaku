@@ -9599,12 +9599,11 @@ _ChatSaku • Teman mengatur keuanganmu_"""
     # NLP NATURAL LANGUAGE
     # ============================================================
 
-    hasil_masuk = None
-
-
     # ============================================================
     # 1. DETEKSI PEMASUKAN NATURAL LANGUAGE
     # ============================================================
+
+    hasil_masuk = None
 
     try:
 
@@ -9630,10 +9629,6 @@ _ChatSaku • Teman mengatur keuanganmu_"""
 
     if hasil_masuk:
 
-        # --------------------------------------------------------
-        # HASIL NLP MENJADI HASIL UTAMA
-        # --------------------------------------------------------
-
         data = hasil_masuk
 
         intent = "masuk"
@@ -9642,11 +9637,6 @@ _ChatSaku • Teman mengatur keuanganmu_"""
             "action",
             "create"
         )
-
-
-        # --------------------------------------------------------
-        # DEBUG
-        # --------------------------------------------------------
 
         print("========================================")
         print("💰 PEMASUKAN NLP TERDETEKSI")
@@ -9672,7 +9662,6 @@ _ChatSaku • Teman mengatur keuanganmu_"""
             # ====================================================
 
             if not isinstance(data, dict):
-
                 data = {}
 
 
@@ -9695,13 +9684,11 @@ _ChatSaku • Teman mengatur keuanganmu_"""
             # AMBIL NOMINAL
             # ====================================================
 
-            nominal = data.get(
-                "nominal"
-            )
+            nominal = data.get("nominal")
 
 
             # ====================================================
-            # NORMALISASI NOMINAL DARI DATA
+            # NORMALISASI NOMINAL
             # ====================================================
 
             try:
@@ -9727,38 +9714,54 @@ _ChatSaku • Teman mengatur keuanganmu_"""
             # ====================================================
             # FALLBACK NOMINAL ANGKA
             #
-            # 2000
-            # 2000000
-            # 2.000.000
-            # Rp 2000000
+            # PENTING:
+            #
+            # (?<!\w)
+            # angka tidak boleh didahului huruf
+            #
+            # (?!\w)
+            # angka tidak boleh diikuti huruf
+            #
+            # Jadi:
+            #
+            # 75000       -> DITANGKAP
+            # 2000000     -> DITANGKAP
+            # Rp 2000000  -> DITANGKAP
+            # hx7         -> TIDAK DITANGKAP
+            # rt7         -> TIDAK DITANGKAP
+            # user123     -> TIDAK DITANGKAP
             # ====================================================
 
             if nominal <= 0:
 
                 angka = re.findall(
-                    r'(?:rp\s*)?[\d.,]+',
+                    r'(?<!\w)'
+                    r'(?:rp\.?\s*)?'
+                    r'\d[\d.,]*'
+                    r'(?!\w)',
                     message,
                     re.IGNORECASE
                 )
 
                 if angka:
 
-                    try:
+                    for kandidat in angka:
 
-                        kandidat = angka[-1]
+                        try:
 
-                        nominal = normalize_nominal(
-                            kandidat
-                        )
+                            nilai = normalize_nominal(
+                                kandidat
+                            )
 
-                    except Exception as e:
+                            if nilai and nilai > 0:
 
-                        print(
-                            "❌ ERROR NORMALIZE NOMINAL:",
-                            repr(e)
-                        )
+                                nominal = nilai
 
-                        nominal = 0
+                                break
+
+                        except Exception:
+
+                            continue
 
 
             # ====================================================
@@ -9774,8 +9777,12 @@ _ChatSaku • Teman mengatur keuanganmu_"""
             if nominal <= 0:
 
                 pola_uang = re.search(
-                    r'(\d+(?:[.,]\d+)?)\s*'
-                    r'(juta|jt|ribu|rb|miliar|milyar)',
+                    r'(?<!\w)'
+                    r'(?:rp\.?\s*)?'
+                    r'(\d+(?:[.,]\d+)?)'
+                    r'\s*'
+                    r'(juta|jt|ribu|rb|miliar|milyar)'
+                    r'(?!\w)',
                     message.lower(),
                     re.IGNORECASE
                 )
@@ -9869,8 +9876,7 @@ _ChatSaku • Teman mengatur keuanganmu_"""
             # ====================================================
             # KETERANGAN
             #
-            # SELALU AMBIL DARI PESAN ASLI
-            # supaya tidak tergantung hasil parse_message()
+            # SELALU MULAI DARI PESAN ASLI
             # ====================================================
 
             keterangan = str(
@@ -9881,13 +9887,9 @@ _ChatSaku • Teman mengatur keuanganmu_"""
             # ====================================================
             # HAPUS KATA PEMASUKAN DI AWAL
             #
-            # masuk 4000 sumbangan
+            # masuk 75000 dari oli hx7
             # ↓
-            # 4000 sumbangan
-            #
-            # masuk 2000000 dari projek website
-            # ↓
-            # 2000000 dari projek website
+            # 75000 dari oli hx7
             # ====================================================
 
             keterangan = re.sub(
@@ -9899,21 +9901,27 @@ _ChatSaku • Teman mengatur keuanganmu_"""
                 r'uang\s+masuk|'
                 r'masuk|'
                 r'pemasukan|'
-                r'pendapatan'
+                r'pendapatan|'
+                r'gaji|'
+                r'gajian|'
+                r'bonus|'
+                r'sumbangan|'
+                r'donasi|'
+                r'honor|'
+                r'fee|'
+                r'komisi|'
+                r'tunjangan'
                 r')'
                 r'\s*',
                 '',
                 keterangan,
+                count=1,
                 flags=re.IGNORECASE
             ).strip()
 
 
             # ====================================================
             # HAPUS "SAYA DAPAT", "AKU DAPAT", DLL
-            #
-            # saya dapat 500000 dari jualan
-            # ↓
-            # 500000 dari jualan
             # ====================================================
 
             keterangan = re.sub(
@@ -9921,7 +9929,8 @@ _ChatSaku • Teman mengatur keuanganmu_"""
                 r'(?:'
                 r'saya|'
                 r'aku|'
-                r'kami'
+                r'kami|'
+                r'kita'
                 r')?'
                 r'\s*'
                 r'(?:'
@@ -9942,33 +9951,7 @@ _ChatSaku • Teman mengatur keuanganmu_"""
                 r'\s*',
                 '',
                 keterangan,
-                flags=re.IGNORECASE
-            ).strip()
-
-
-            # ====================================================
-            # HAPUS "SAYA DAPAT UANG"
-            # ====================================================
-
-            keterangan = re.sub(
-                r'^\s*'
-                r'(?:'
-                r'saya|'
-                r'aku|'
-                r'kami'
-                r')?'
-                r'\s*'
-                r'(?:'
-                r'dapat|'
-                r'dapet|'
-                r'menerima|'
-                r'terima'
-                r')'
-                r'\s+'
-                r'(?:uang|duit)'
-                r'\s*',
-                '',
-                keterangan,
+                count=1,
                 flags=re.IGNORECASE
             ).strip()
 
@@ -9976,13 +9959,22 @@ _ChatSaku • Teman mengatur keuanganmu_"""
             # ====================================================
             # HAPUS NOMINAL + SATUAN
             #
+            # AMAN UNTUK:
+            #
             # 2 juta
             # 500 ribu
             # 1 miliar
+            #
+            # TIDAK AKAN MENGHAPUS:
+            #
+            # hx7
+            # rt7
+            # proyek7
             # ====================================================
 
             keterangan = re.sub(
-                r'(?:rp\s*)?'
+                r'(?<!\w)'
+                r'(?:rp\.?\s*)?'
                 r'\d+(?:[.,]\d+)?'
                 r'\s*'
                 r'(?:'
@@ -9992,9 +9984,11 @@ _ChatSaku • Teman mengatur keuanganmu_"""
                 r'rb|'
                 r'miliar|'
                 r'milyar'
-                r')',
+                r')'
+                r'(?!\w)',
                 '',
                 keterangan,
+                count=1,
                 flags=re.IGNORECASE
             ).strip()
 
@@ -10002,16 +9996,24 @@ _ChatSaku • Teman mengatur keuanganmu_"""
             # ====================================================
             # HAPUS NOMINAL ANGKA BIASA
             #
-            # 4000
-            # 2000000
-            # 2.000.000
+            # INI BAGIAN PALING PENTING
+            #
+            # 75000  -> HILANG
+            # 200000 -> HILANG
+            #
+            # hx7    -> TETAP hx7
+            # rt7    -> TETAP rt7
+            # user123 -> TETAP user123
             # ====================================================
 
             keterangan = re.sub(
-                r'(?:rp\s*)?'
-                r'\d[\d.,]*',
+                r'(?<!\w)'
+                r'(?:rp\.?\s*)?'
+                r'\d[\d.,]*'
+                r'(?!\w)',
                 '',
                 keterangan,
+                count=1,
                 flags=re.IGNORECASE
             ).strip()
 
@@ -10019,9 +10021,9 @@ _ChatSaku • Teman mengatur keuanganmu_"""
             # ====================================================
             # HAPUS KATA PENGHUBUNG DI AWAL
             #
-            # dari projek website
+            # dari oli hx7
             # ↓
-            # projek website
+            # oli hx7
             # ====================================================
 
             keterangan = re.sub(
@@ -10035,6 +10037,7 @@ _ChatSaku • Teman mengatur keuanganmu_"""
                 r'\s+',
                 '',
                 keterangan,
+                count=1,
                 flags=re.IGNORECASE
             ).strip()
 
@@ -10047,6 +10050,7 @@ _ChatSaku • Teman mengatur keuanganmu_"""
                 r'^\s*(?:dari|sebesar|senilai)\s*$',
                 '',
                 keterangan,
+                count=1,
                 flags=re.IGNORECASE
             ).strip()
 
@@ -10089,7 +10093,7 @@ _ChatSaku • Teman mengatur keuanganmu_"""
             print("SENDER     :", sender)
             print("OWNER      :", nomor)
             print("NOMINAL    :", nominal)
-            print("KETERANGAN :", keterangan)
+            print("KETERANGAN :", repr(keterangan))
             print("========================================")
 
 
