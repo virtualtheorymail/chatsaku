@@ -2458,192 +2458,94 @@ def deteksi_target_nlp(message, data=None):
 # ============================================================
 
 def deteksi_pemasukan_nlp(message, data=None):
+    import re
 
     if not message:
         return None
 
-    text = str(message).lower().strip()
-
     if data is None:
         data = {}
 
-    # ========================================================
-    # POLA PEMASUKAN
-    # ========================================================
+    original_message = message.strip()
+    text = original_message.lower().strip()
+
+    # =========================================================
+    # 1. POLA PEMASUKAN
+    # =========================================================
 
     pola_masuk_local = [
-
-        # ----------------------------------------------------
-        # MASUK
-        # ----------------------------------------------------
-
         "masuk",
         "uang masuk",
-        "ada uang masuk",
-        "uang sudah masuk",
-        "uang telah masuk",
-
-        # ----------------------------------------------------
-        # DAPAT
-        # ----------------------------------------------------
-
+        "uang diterima",
         "saya dapat",
         "aku dapat",
         "kami dapat",
-
         "saya dapet",
         "aku dapet",
         "kami dapet",
-
         "dapat uang",
-        "dapat duit",
-        "dapat pemasukan",
-        "dapat transfer",
-        "dapat kiriman",
-
         "dapet uang",
-        "dapet duit",
-        "dapet transfer",
-        "dapet kiriman",
-
-        # ----------------------------------------------------
-        # TERIMA
-        # ----------------------------------------------------
-
-        "saya menerima",
-        "aku menerima",
-        "kami menerima",
-
         "menerima",
-        "menerima uang",
-        "menerima duit",
-        "menerima transfer",
-        "menerima pembayaran",
-
         "terima",
-        "terima uang",
-        "terima duit",
-        "terima transfer",
-        "terima pembayaran",
-
-        # ----------------------------------------------------
-        # DIBERI / DIBAYAR
-        # ----------------------------------------------------
-
+        "diterima",
         "diberi uang",
-        "diberi duit",
-        "dikasih uang",
-        "dikasih duit",
-
-        "dibayar",
-        "sudah dibayar",
-        "telah dibayar",
-
-        # ----------------------------------------------------
-        # GAJI
-        # ----------------------------------------------------
-
+        "dapat transfer",
+        "terima transfer",
+        "transfer masuk",
+        "kiriman masuk",
+        "dikirim",
         "gaji",
         "gajian",
-        "gaji masuk",
-
-        # ----------------------------------------------------
-        # BONUS
-        # ----------------------------------------------------
-
         "bonus",
-        "dapat bonus",
-        "dapet bonus",
-        "terima bonus",
-
-        # ----------------------------------------------------
-        # PEMASUKAN
-        # ----------------------------------------------------
-
+        "tunjangan",
+        "honor",
+        "fee",
+        "komisi",
         "pemasukan",
         "pendapatan",
-
-        # ----------------------------------------------------
-        # SUMBANGAN
-        # ----------------------------------------------------
-
         "sumbangan",
         "donasi",
-
-        # ----------------------------------------------------
-        # PENJUALAN
-        # ----------------------------------------------------
-
-        "hasil jual",
         "hasil jualan",
         "hasil penjualan",
-
         "hasil usaha",
-        "hasil dagang",
-
-        # ----------------------------------------------------
-        # PROYEK / KERJA
-        # ----------------------------------------------------
-
         "hasil kerja",
         "hasil proyek",
-        "hasil projek",
-
-        # ----------------------------------------------------
-        # PEMBAYARAN
-        # ----------------------------------------------------
-
+        "hasil project",
         "pembayaran diterima",
-        "bayaran masuk"
+        "pembayaran masuk",
+        "bayaran masuk",
+        "uang hasil",
     ]
 
-    # ========================================================
-    # CEK INDIKASI PEMASUKAN
-    # ========================================================
+    # =========================================================
+    # 2. DETEKSI APAKAH INI PEMASUKAN
+    # =========================================================
 
-    terdeteksi_masuk = any(
-        pola in text
-        for pola in pola_masuk_local
-    )
+    terdeteksi_masuk = False
 
-    # ========================================================
-    # JIKA PARSER UTAMA SUDAH MENGENALI PEMASUKAN
-    # ========================================================
+    for pola in pola_masuk_local:
+        if pola in text:
+            terdeteksi_masuk = True
+            break
 
+    # Kalau parser sebelumnya sudah memberikan intent masuk
     if data.get("intent") == "masuk":
-
         terdeteksi_masuk = True
 
-    # ========================================================
-    # BUKAN PEMASUKAN
-    # ========================================================
-
     if not terdeteksi_masuk:
-
         return None
 
-    # ========================================================
-    # EKSTRAK NOMINAL
-    # ========================================================
+    # =========================================================
+    # 3. EKSTRAK NOMINAL DENGAN SATUAN
+    #    Contoh:
+    #    2 juta
+    #    2jt
+    #    500 ribu
+    #    500rb
+    #    1 miliar
+    # =========================================================
 
     nominal = 0
-
-    # ========================================================
-    # 1. NOMINAL DENGAN SATUAN
-    #
-    # 2 juta
-    # 2 jt
-    # 500 ribu
-    # 500 rb
-    # 1 miliar
-    #
-    # \b digunakan agar angka dalam:
-    #
-    # rt7
-    # user123
-    #
-    # tidak dianggap sebagai nominal.
-    # ========================================================
 
     pola_uang = re.search(
         r'(?<!\w)'
@@ -2657,105 +2559,54 @@ def deteksi_pemasukan_nlp(message, data=None):
     )
 
     if pola_uang:
-
-        angka_text = pola_uang.group(1)
-
+        angka = pola_uang.group(1)
         satuan = pola_uang.group(2).lower()
 
         try:
+            angka_bersih = angka.replace(",", ".")
 
-            # ------------------------------------------------
-            # Normalisasi angka desimal
-            #
-            # 2,5 juta
-            # 2.5 juta
-            # ------------------------------------------------
+            nilai = float(angka_bersih)
 
-            angka_text = angka_text.replace(",", ".")
+            if satuan in ("ribu", "rb"):
+                nilai *= 1_000
 
-            angka_float = float(angka_text)
+            elif satuan in ("juta", "jt"):
+                nilai *= 1_000_000
 
-            if satuan in (
-                "ribu",
-                "rb"
-            ):
+            elif satuan in ("miliar", "milyar"):
+                nilai *= 1_000_000_000
 
-                nominal = int(
-                    angka_float * 1000
-                )
+            nominal = int(nilai)
 
-            elif satuan in (
-                "juta",
-                "jt"
-            ):
-
-                nominal = int(
-                    angka_float * 1000000
-                )
-
-            elif satuan in (
-                "miliar",
-                "milyar"
-            ):
-
-                nominal = int(
-                    angka_float * 1000000000
-                )
-
-            print(
-                "💰 NOMINAL SATUAN:",
-                angka_text,
-                satuan,
-                "=>",
-                nominal
-            )
-
-        except Exception as e:
-
-            print(
-                "❌ ERROR PARSING NOMINAL SATUAN:",
-                repr(e)
-            )
-
+        except (ValueError, TypeError):
             nominal = 0
 
-    # ========================================================
-    # 2. NOMINAL ANGKA BIASA
+    # =========================================================
+    # 4. NOMINAL SETELAH KATA PEMASUKAN
     #
     # Contoh:
-    #
-    # masuk 200000
-    # masuk 2.000.000
-    # masuk Rp2000000
+    # masuk 75000 dari oli hx7
+    # masuk 200000 dari pak rt7
+    # gaji 5000000
+    # bonus 1000000
+    # sumbangan 4000
     #
     # PENTING:
-    # Ambil angka yang benar-benar berdiri sendiri.
-    #
-    # rt7
-    #
-    # tidak akan dianggap nominal.
-    # ========================================================
+    # \b / (?<!\w) / (?!\w)
+    # mencegah angka dalam kata seperti hx7 dianggap nominal.
+    # =========================================================
 
-    if nominal <= 0:
-
-        # ----------------------------------------------------
-        # PRIORITAS:
-        # Cari angka setelah kata pemicu pemasukan.
-        #
-        # masuk 200000 dari pak rt7
-        #       ^^^^^^
-        #
-        # bukan angka 7 di rt7.
-        # ----------------------------------------------------
+    if not nominal or nominal <= 0:
 
         pola_nominal_utama = re.search(
-            r'\b'
-            r'(?:masuk|pemasukan|pendapatan|gaji|gajian|'
-            r'bonus|sumbangan|donasi)'
+            r'(?<!\w)'
+            r'(?:masuk|pemasukan|pendapatan|'
+            r'gaji|gajian|bonus|sumbangan|donasi|'
+            r'honor|fee|komisi|tunjangan)'
             r'\s+'
             r'(?:rp\.?\s*)?'
             r'(\d[\d.,]*)'
-            r'\b',
+            r'(?!\w)',
             text,
             re.IGNORECASE
         )
@@ -2765,37 +2616,28 @@ def deteksi_pemasukan_nlp(message, data=None):
             kandidat = pola_nominal_utama.group(1)
 
             try:
+                nominal = normalize_nominal(kandidat)
 
-                nominal = normalize_nominal(
-                    kandidat
-                )
-
-                print(
-                    "💰 NOMINAL DARI POLA UTAMA:",
-                    kandidat,
-                    "=>",
-                    nominal
-                )
-
-            except Exception as e:
-
-                print(
-                    "❌ ERROR NORMALIZE NOMINAL UTAMA:",
-                    repr(e)
-                )
-
+            except Exception:
                 nominal = 0
 
-    # ========================================================
-    # 3. FALLBACK NOMINAL
+    # =========================================================
+    # 5. FALLBACK NOMINAL
     #
-    # Cari angka yang berdiri sendiri.
+    # Contoh:
+    # saya dapat 500000 dari budi
+    # saya dapat 200000 dari projek website
     #
-    # JANGAN ambil angka[-1]
-    # karena bisa mengambil angka dari rt7.
-    # ========================================================
+    # Ambil ANGKA PERTAMA yang berdiri sendiri.
+    #
+    # Tidak akan menangkap:
+    # hx7
+    # rt7
+    # user123
+    # proyek7
+    # =========================================================
 
-    if nominal <= 0:
+    if not nominal or nominal <= 0:
 
         angka = re.findall(
             r'(?<!\w)'
@@ -2808,174 +2650,148 @@ def deteksi_pemasukan_nlp(message, data=None):
 
         if angka:
 
-            # ------------------------------------------------
-            # Ambil kandidat pertama yang valid
-            # ------------------------------------------------
-
             for kandidat in angka:
 
                 try:
+                    nilai = normalize_nominal(kandidat)
 
-                    nilai = normalize_nominal(
-                        kandidat
-                    )
-
-                    if nilai > 0:
-
+                    if nilai and nilai > 0:
                         nominal = nilai
-
-                        print(
-                            "💰 NOMINAL FALLBACK:",
-                            kandidat,
-                            "=>",
-                            nominal
-                        )
-
                         break
 
-                except Exception as e:
+                except Exception:
+                    continue
 
-                    print(
-                        "⚠️ GAGAL NORMALIZE:",
-                        kandidat,
-                        repr(e)
-                    )
+    # =========================================================
+    # 6. KETERANGAN
+    # =========================================================
 
-    # ========================================================
-    # JIKA NOMINAL TIDAK ADA
-    # ========================================================
+    keterangan = original_message.strip()
 
-    if nominal <= 0:
+    # ---------------------------------------------------------
+    # Hapus trigger pemasukan di awal
+    # ---------------------------------------------------------
 
-        print("=" * 60)
-        print("⚠️ PEMASUKAN TERDETEKSI")
-        print("⚠️ NOMINAL TIDAK DITEMUKAN")
-        print("TEXT :", message)
-        print("=" * 60)
-
-        return {
-            "intent": "masuk",
-            "action": "create",
-            "nominal": 0,
-            "keterangan": message.strip()
-        }
-
-    # ========================================================
-    # KETERANGAN
-    #
-    # Gunakan MESSAGE ASLI
-    # ========================================================
-
-    keterangan = str(
-        message
-    ).strip()
-
-    # ========================================================
-    # HAPUS PEMICU PEMASUKAN DI AWAL
-    #
-    # masuk 4000 sumbangan
-    # =>
-    # 4000 sumbangan
-    #
-    # masuk 200000 dari pak rt7
-    # =>
-    # 200000 dari pak rt7
-    # ========================================================
-
-    keterangan = re.sub(
+    pola_trigger_awal = (
         r'^\s*'
         r'(?:'
-        r'ada\s+uang\s+masuk|'
-        r'uang\s+sudah\s+masuk|'
-        r'uang\s+telah\s+masuk|'
-        r'uang\s+masuk|'
         r'masuk|'
         r'pemasukan|'
         r'pendapatan|'
-        r'gaji\s+masuk|'
         r'gaji|'
         r'gajian|'
         r'bonus|'
+        r'tunjangan|'
+        r'honor|'
+        r'fee|'
+        r'komisi|'
         r'sumbangan|'
-        r'donasi'
+        r'donasi|'
+        r'uang masuk|'
+        r'uang diterima|'
+        r'transfer masuk|'
+        r'kiriman masuk|'
+        r'pembayaran masuk|'
+        r'bayaran masuk'
         r')'
-        r'\s*',
+        r'\b'
+    )
+
+    keterangan = re.sub(
+        pola_trigger_awal,
         '',
         keterangan,
+        count=1,
         flags=re.IGNORECASE
     ).strip()
 
-    # ========================================================
-    # HAPUS:
-    #
-    # saya dapat
-    # aku dapat
-    # kami dapat
-    # saya menerima
-    # aku menerima
-    # terima
-    # dapet
-    # ========================================================
+    # =========================================================
+    # 7. HAPUS "SAYA DAPAT", "AKU DAPAT", DLL
+    # =========================================================
+
+    keterangan = re.sub(
+        r'^\s*'
+        r'(?:saya|aku|kami|kita)'
+        r'\s+'
+        r'(?:dapat|dapet|menerima|terima)'
+        r'(?:\s+'
+        r'(?:uang|duit|transfer|pembayaran|kiriman)'
+        r')?'
+        r'\b',
+        '',
+        keterangan,
+        count=1,
+        flags=re.IGNORECASE
+    ).strip()
+
+    # =========================================================
+    # 8. HAPUS "DAPAT UANG", "TERIMA TRANSFER", DLL
+    # =========================================================
 
     keterangan = re.sub(
         r'^\s*'
         r'(?:'
-        r'saya|'
-        r'aku|'
-        r'kami'
-        r')?'
-        r'\s*'
-        r'(?:'
-        r'dapat|'
-        r'dapet|'
-        r'menerima|'
-        r'terima'
+        r'dapat uang|'
+        r'dapet uang|'
+        r'menerima uang|'
+        r'terima uang|'
+        r'dapat transfer|'
+        r'terima transfer|'
+        r'transfer masuk|'
+        r'kiriman masuk|'
+        r'dikirim'
         r')'
-        r'(?:'
-        r'\s+(?:uang|duit|transfer|pembayaran|kiriman|bonus)'
-        r')?'
-        r'\s*',
+        r'\b',
         '',
         keterangan,
+        count=1,
         flags=re.IGNORECASE
     ).strip()
 
-    # ========================================================
-    # HAPUS NOMINAL + SATUAN
+    # =========================================================
+    # 9. HAPUS NOMINAL DENGAN SATUAN
     #
+    # Contoh:
     # 2 juta
     # 500 ribu
-    # 1 miliar
-    # ========================================================
+    # Rp 2 juta
+    #
+    # Tidak mengganggu hx7 / rt7
+    # =========================================================
 
     keterangan = re.sub(
         r'(?<!\w)'
         r'(?:rp\.?\s*)?'
         r'\d+(?:[.,]\d+)?'
         r'\s*'
-        r'(?:'
-        r'juta|jt|'
-        r'ribu|rb|'
-        r'miliar|milyar'
-        r')'
+        r'(?:juta|jt|ribu|rb|miliar|milyar)'
         r'(?!\w)',
         '',
         keterangan,
+        count=1,
         flags=re.IGNORECASE
     ).strip()
 
-    # ========================================================
-    # HAPUS NOMINAL ANGKA BIASA
-    #
-    # 200000
-    # 2.000.000
-    # Rp200000
+    # =========================================================
+    # 10. HAPUS NOMINAL ANGKA BIASA
     #
     # PENTING:
-    # hanya angka yang berdiri sendiri.
     #
-    # rt7 tidak ikut terhapus.
-    # ========================================================
+    # (?<!\w)
+    # angka tidak boleh didahului huruf
+    #
+    # (?!\w)
+    # angka tidak boleh diikuti huruf
+    #
+    # Jadi:
+    #
+    # 75000       -> dihapus
+    # 200000      -> dihapus
+    # hx7         -> TIDAK dihapus
+    # rt7         -> TIDAK dihapus
+    # proyek7     -> TIDAK dihapus
+    # user123     -> TIDAK dihapus
+    # =========================================================
 
     keterangan = re.sub(
         r'(?<!\w)'
@@ -2984,38 +2800,34 @@ def deteksi_pemasukan_nlp(message, data=None):
         r'(?!\w)',
         '',
         keterangan,
+        count=1,
         flags=re.IGNORECASE
     ).strip()
 
-    # ========================================================
-    # HAPUS KATA PENGHUBUNG
+    # =========================================================
+    # 11. HAPUS KATA PENGHUBUNG DI DEPAN
     #
-    # dari projek website
-    # =>
-    # projek website
-    #
+    # dari budi
     # sebesar 500000
-    # =>
-    # ''
-    # ========================================================
+    # senilai 500000
+    # untuk proyek
+    #
+    # menjadi:
+    # budi
+    # proyek
+    # =========================================================
 
     keterangan = re.sub(
-        r'^\s*'
-        r'(?:'
-        r'dari|'
-        r'sebesar|'
-        r'senilai|'
-        r'untuk'
-        r')'
-        r'\s+',
+        r'^\s*(?:dari|sebesar|senilai|untuk)\s+',
         '',
         keterangan,
+        count=1,
         flags=re.IGNORECASE
     ).strip()
 
-    # ========================================================
-    # BERSIHKAN SPASI
-    # ========================================================
+    # =========================================================
+    # 12. BERSIHKAN SPASI
+    # =========================================================
 
     keterangan = re.sub(
         r'\s+',
@@ -3023,43 +2835,34 @@ def deteksi_pemasukan_nlp(message, data=None):
         keterangan
     ).strip()
 
-    # ========================================================
-    # FALLBACK KETERANGAN
-    # ========================================================
+    # =========================================================
+    # 13. DEFAULT KETERANGAN
+    # =========================================================
 
     if not keterangan:
-
         keterangan = "Pemasukan"
 
-    # ========================================================
-    # HASIL
-    # ========================================================
+    # =========================================================
+    # 14. DEBUG
+    # =========================================================
 
-    hasil = {
+    print("=" * 60)
+    print("📥 DETEKSI PEMASUKAN NLP")
+    print("MESSAGE    :", original_message)
+    print("NOMINAL    :", nominal)
+    print("KETERANGAN :", keterangan)
+    print("=" * 60)
 
+    # =========================================================
+    # 15. RETURN
+    # =========================================================
+
+    return {
         "intent": "masuk",
-
         "action": "create",
-
         "nominal": nominal,
-
         "keterangan": keterangan
     }
-
-    # ========================================================
-    # DEBUG
-    # ========================================================
-
-    print("=" * 60)
-    print("💰 DETEKSI PEMASUKAN NLP")
-    print("TEXT       :", message)
-    print("INTENT     :", hasil["intent"])
-    print("ACTION     :", hasil["action"])
-    print("NOMINAL    :", hasil["nominal"])
-    print("KETERANGAN :", hasil["keterangan"])
-    print("=" * 60)
-
-    return hasil
 
 # ============================================================
 # DETEKSI HUTANG NLP
