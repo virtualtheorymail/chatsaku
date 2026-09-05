@@ -10415,38 +10415,103 @@ _ChatSaku • Teman mengatur keuanganmu_"""
             # ==========================================================
             # FALLBACK NOMINAL DARI PESAN ASLI
             # ==========================================================
-            #
-            # Contoh:
-            # beli baso dengan arip 30000
-            # beli bakso 20.000
-            # bayar listrik Rp150.000
-            # keluar 25000 grab
-            #
-            # ==========================================================
 
             if not nominal or nominal <= 0:
 
-                angka = re.findall(
-                    r'(?:Rp\s*)?[\d.,]+',
+                # ======================================================
+                # PRIORITAS 1
+                # Cari nominal yang berada setelah kata transaksi
+                #
+                # Contoh:
+                # keluar 200000 dari pak rt7
+                #          ^^^^^^
+                #
+                # beli bakso 20000
+                #             ^^^^^
+                #
+                # bayar listrik Rp150.000
+                #               ^^^^^^^^
+                # ======================================================
+
+                pola_nominal_utama = re.search(
+                    r'\b(?:keluar|pengeluaran|bayar|beli|belanja|transfer)'
+                    r'\s+(?:rp\.?\s*)?'
+                    r'(\d[\d.,]*)'
+                    r'\b',
                     message,
                     re.IGNORECASE
                 )
 
-                if angka:
+                if pola_nominal_utama:
 
-                    kandidat = angka[-1]
+                    kandidat = pola_nominal_utama.group(1)
 
                     try:
-                        nominal = normalize_nominal(kandidat)
+
+                        nominal = normalize_nominal(
+                            kandidat
+                        )
+
+                        print(
+                            "💰 NOMINAL DITEMUKAN DARI POLA UTAMA:",
+                            kandidat,
+                            "=>",
+                            nominal
+                        )
 
                     except Exception as e:
 
                         print(
-                            "⚠️ GAGAL NORMALIZE NOMINAL:",
+                            "⚠️ GAGAL NORMALIZE NOMINAL UTAMA:",
                             repr(e)
                         )
 
                         nominal = 0
+
+                # ======================================================
+                # PRIORITAS 2
+                # Jika pola utama tidak ditemukan,
+                # cari angka yang berdiri sendiri.
+                #
+                # PENTING:
+                # \b membuat angka dalam "rt7" tidak dianggap nominal.
+                # ======================================================
+
+                if not nominal or nominal <= 0:
+
+                    angka = re.findall(
+                        r'\b(?:Rp\.?\s*)?\d[\d.,]*\b',
+                        message,
+                        re.IGNORECASE
+                    )
+
+                    if angka:
+
+                        # Ambil kandidat pertama,
+                        # bukan angka terakhir.
+                        kandidat = angka[0]
+
+                        try:
+
+                            nominal = normalize_nominal(
+                                kandidat
+                            )
+
+                            print(
+                                "💰 NOMINAL FALLBACK:",
+                                kandidat,
+                                "=>",
+                                nominal
+                            )
+
+                        except Exception as e:
+
+                            print(
+                                "⚠️ GAGAL NORMALIZE NOMINAL:",
+                                repr(e)
+                            )
+
+                            nominal = 0
 
             # ==========================================================
             # PASTIKAN NOMINAL INTEGER
