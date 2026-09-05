@@ -10963,10 +10963,6 @@ _ChatSaku • Teman mengatur keuanganmu_"""
 
                 pesan += f"""
 
-    ━━━━━━━━━━━━━━━━━━
-    🤖 *AI INSIGHT*
-    ━━━━━━━━━━━━━━━━━━
-
     {ai_insight_text}
     """
 
