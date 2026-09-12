@@ -11701,15 +11701,16 @@ _ChatSaku Finance Assistant_"""
 
                 kirim_wa(
                     sender,
-                    f"""❌ *Kategori Budget Belum Ditemukan.*
+                    f"""Hmm, aku belum menemukan kategori budget yang kamu maksud 😊
 
-    Kategori yang tersedia:
+Coba pilih salah satu kategori ini ya:
 
-    {daftar}
+{daftar}
 
-    Contoh:
+Contohnya:
+👉 budget makanan 500000
 
-    💰 budget makanan 500000"""
+Kalau sudah, aku bantu atur budgetnya 💚"""
                 )
 
                 return jsonify({
