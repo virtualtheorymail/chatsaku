@@ -15,10 +15,25 @@ from models import (
 # =========================================================
 
 def rupiah(nominal):
+
     try:
         return f"Rp {int(nominal):,.0f}"
+
     except Exception:
         return "Rp 0"
+
+
+# =========================================================
+# HELPER NOMINAL
+# =========================================================
+
+def nominal_transaksi(trx):
+
+    try:
+        return int(trx.nominal or 0)
+
+    except Exception:
+        return 0
 
 
 # =========================================================
@@ -26,12 +41,6 @@ def rupiah(nominal):
 # =========================================================
 
 def tanggal_transaksi(trx):
-    """
-    Mengubah tanggal transaksi menjadi object date.
-    Mendukung:
-    - datetime
-    - date
-    """
 
     try:
 
@@ -48,137 +57,45 @@ def tanggal_transaksi(trx):
 
 
 # =========================================================
-# MAIN AI INSIGHT ROUTER
+# HELPER NAMA HARI
 # =========================================================
 
-def generate_ai_insight(
+def nama_hari(tanggal):
+
+    daftar_hari = [
+        "Senin",
+        "Selasa",
+        "Rabu",
+        "Kamis",
+        "Jumat",
+        "Sabtu",
+        "Minggu"
+    ]
+
+    try:
+
+        return daftar_hari[
+            tanggal.weekday()
+        ]
+
+    except Exception:
+
+        return "-"
+
+
+# =========================================================
+# BUILD FINANCE REFERENCE
+#
+# Reference ini berisi data mentah + statistik
+# yang dapat digunakan oleh AI Insight.
+# =========================================================
+
+def build_finance_reference(
     nomor,
-    transaksi_baru=None,
-    event=None
-):
-
-    # =====================================================
-    # IMPORT LOKAL
-    #
-    # Jangan pindahkan ke bagian atas file.
-    # Ini untuk mencegah circular import dengan app.py
-    # =====================================================
-
-    from app import transaksi_user, periode_sekarang
-
-    # =====================================================
-    # PERIODE
-    # =====================================================
-
-    periode = periode_sekarang()
-
-    hari_ini = date.today()
-
-    # =====================================================
-    # AMBIL TRANSAKSI USER
-    # =====================================================
-
-    all_data = transaksi_user(nomor).all()
-
-    # =====================================================
-    # ROUTING EVENT
-    # =====================================================
-
-    # -----------------------------------------------------
-    # TRANSAKSI KELUAR
-    # -----------------------------------------------------
-
-    if str(event or "").upper() == "KELUAR":
-
-        return generate_insight_keluar(
-            nomor=nomor,
-            transaksi_baru=transaksi_baru,
-            periode=periode,
-            hari_ini=hari_ini,
-            all_data=all_data
-        )
-
-    # -----------------------------------------------------
-    # FULL INSIGHT
-    #
-    # Dipakai untuk:
-    #
-    # insight
-    #
-    # maupun:
-    #
-    # generate_ai_insight(nomor)
-    # -----------------------------------------------------
-
-    return generate_full_insight(
-        nomor=nomor,
-        periode=periode,
-        hari_ini=hari_ini,
-        all_data=all_data
-    )
-
-
-# =========================================================
-# =========================================================
-# MODE KELUAR
-# =========================================================
-# =========================================================
-
-# =========================================================
-# MODE KELUAR - SINGLE LINE AI INSIGHT
-# =========================================================
-
-def generate_insight_keluar(
-    nomor,
-    transaksi_baru,
     periode,
     hari_ini,
     all_data
 ):
-
-    # =====================================================
-    # VALIDASI
-    # =====================================================
-
-    if not transaksi_baru:
-        return [
-            "🧠 Belum ada transaksi pengeluaran baru untuk dianalisis."
-        ]
-
-    # =====================================================
-    # DATA TRANSAKSI BARU
-    # =====================================================
-
-    nominal_baru = int(
-        transaksi_baru.nominal or 0
-    )
-
-    kategori_baru = (
-        transaksi_baru.kategori
-        or "Lainnya"
-    )
-
-    subkategori_baru = (
-        transaksi_baru.subkategori
-        or ""
-    )
-
-    keterangan_baru = (
-        transaksi_baru.keterangan
-        or "pengeluaran"
-    ).strip()
-
-    kategori_key = str(
-        kategori_baru
-    ).lower().strip()
-
-    subkategori_key = str(
-        subkategori_baru
-    ).lower().strip()
-
-    kategori_title = str(
-        kategori_baru
-    ).title()
 
     # =====================================================
     # TRANSAKSI BULAN INI
@@ -197,346 +114,635 @@ def generate_insight_keluar(
             tanggal.year == hari_ini.year
             and tanggal.month == hari_ini.month
         ):
+
             transaksi_bulan_ini.append(trx)
 
     # =====================================================
-    # TOTAL PENGELUARAN BULAN INI
+    # PISAH TRANSAKSI
     # =====================================================
 
-    total_keluar = sum(
-        int(x.nominal or 0)
-        for x in transaksi_bulan_ini
-        if str(x.tipe or "").upper() == "KELUAR"
-    )
+    transaksi_masuk = [
+        trx
+        for trx in transaksi_bulan_ini
+        if str(trx.tipe or "").upper() == "MASUK"
+    ]
+
+    transaksi_keluar = [
+        trx
+        for trx in transaksi_bulan_ini
+        if str(trx.tipe or "").upper() == "KELUAR"
+    ]
 
     # =====================================================
-    # TOTAL PEMASUKAN BULAN INI
+    # TOTAL
     # =====================================================
 
     total_masuk = sum(
-        int(x.nominal or 0)
-        for x in transaksi_bulan_ini
-        if str(x.tipe or "").upper() == "MASUK"
+        nominal_transaksi(x)
+        for x in transaksi_masuk
+    )
+
+    total_keluar = sum(
+        nominal_transaksi(x)
+        for x in transaksi_keluar
+    )
+
+    saldo = (
+        total_masuk -
+        total_keluar
+    )
+
+    jumlah_masuk = len(
+        transaksi_masuk
+    )
+
+    jumlah_keluar = len(
+        transaksi_keluar
+    )
+
+    jumlah_transaksi = (
+        jumlah_masuk +
+        jumlah_keluar
     )
 
     # =====================================================
-    # TOTAL KATEGORI
+    # RATA-RATA TRANSAKSI
     # =====================================================
 
-    total_kategori = 0
-    jumlah_kategori = 0
+    rata_masuk = (
 
-    for trx in transaksi_bulan_ini:
+        total_masuk /
+        jumlah_masuk
 
-        if str(trx.tipe or "").upper() != "KELUAR":
-            continue
+        if jumlah_masuk > 0
 
-        kategori_trx = str(
-            trx.kategori or ""
-        ).lower().strip()
+        else 0
+    )
 
-        if kategori_trx == kategori_key:
+    rata_keluar = (
 
-            total_kategori += int(
-                trx.nominal or 0
-            )
+        total_keluar /
+        jumlah_keluar
 
-            jumlah_kategori += 1
+        if jumlah_keluar > 0
+
+        else 0
+    )
+
+    # =====================================================
+    # TRANSAKSI TERBESAR
+    # =====================================================
+
+    transaksi_keluar_terbesar = None
+
+    if transaksi_keluar:
+
+        transaksi_keluar_terbesar = max(
+            transaksi_keluar,
+            key=nominal_transaksi
+        )
+
+    transaksi_masuk_terbesar = None
+
+    if transaksi_masuk:
+
+        transaksi_masuk_terbesar = max(
+            transaksi_masuk,
+            key=nominal_transaksi
+        )
+
+    # =====================================================
+    # TRANSAKSI TERKECIL
+    # =====================================================
+
+    transaksi_keluar_terkecil = None
+
+    if transaksi_keluar:
+
+        transaksi_keluar_terkecil = min(
+            transaksi_keluar,
+            key=nominal_transaksi
+        )
+
+    # =====================================================
+    # KATEGORI
+    # =====================================================
+
+    kategori_data = defaultdict(
+        lambda: {
+            "total": 0,
+            "jumlah": 0
+        }
+    )
 
     # =====================================================
     # SUBKATEGORI
     # =====================================================
 
-    jumlah_subkategori = 0
-    total_subkategori = 0
-
-    if subkategori_key:
-
-        for trx in transaksi_bulan_ini:
-
-            if str(trx.tipe or "").upper() != "KELUAR":
-                continue
-
-            subkategori_trx = str(
-                trx.subkategori or ""
-            ).lower().strip()
-
-            if subkategori_trx == subkategori_key:
-
-                jumlah_subkategori += 1
-
-                total_subkategori += int(
-                    trx.nominal or 0
-                )
+    subkategori_data = defaultdict(
+        lambda: {
+            "total": 0,
+            "jumlah": 0
+        }
+    )
 
     # =====================================================
-    # CARI BUDGET
+    # SUMBER PEMASUKAN
     # =====================================================
 
-    budget = Budget.query.filter_by(
-        nomor_wa=nomor,
-        kategori=kategori_baru,
-        periode=periode
-    ).first()
+    sumber_pemasukan = defaultdict(
+        lambda: {
+            "total": 0,
+            "jumlah": 0
+        }
+    )
 
     # =====================================================
-    # PRIORITAS 1
-    # BUDGET TERLAMPAUI
+    # HARIAN
     # =====================================================
 
-    if budget:
+    harian = defaultdict(
+        lambda: {
+            "masuk": 0,
+            "keluar": 0,
+            "jumlah": 0
+        }
+    )
 
-        nominal_budget = int(
-            budget.nominal or 0
+    # =====================================================
+    # HARI DALAM MINGGU
+    # =====================================================
+
+    hari_mingguan = defaultdict(
+        lambda: {
+            "masuk": 0,
+            "keluar": 0,
+            "jumlah": 0
+        }
+    )
+
+    # =====================================================
+    # DATA TRANSAKSI
+    # =====================================================
+
+    transaksi_reference = []
+
+    for trx in transaksi_bulan_ini:
+
+        nominal = nominal_transaksi(
+            trx
         )
 
-        if nominal_budget > 0:
-
-            persen = (
-                total_kategori /
-                nominal_budget
-            ) * 100
-
-            sisa = (
-                nominal_budget -
-                total_kategori
-            )
-
-            if persen >= 100:
-
-                return [
-                    f"🚨 Pengeluaran {rupiah(nominal_baru)} untuk "
-                    f"{keterangan_baru.lower()} membuat budget "
-                    f"{kategori_title} terlampaui {rupiah(abs(sisa))}."
-                ]
-
-            # =================================================
-            # PRIORITAS 2
-            # BUDGET 90%
-            # =================================================
-
-            if persen >= 90:
-
-                return [
-                    f"⚠️ Pengeluaran ini membuat budget "
-                    f"{kategori_title} sudah terpakai {persen:.0f}%, "
-                    f"tersisa {rupiah(sisa)}."
-                ]
-
-            # =================================================
-            # PRIORITAS 3
-            # BUDGET 75%
-            # =================================================
-
-            if persen >= 75:
-
-                return [
-                    f"🟡 Pengeluaran {rupiah(nominal_baru)} menambah "
-                    f"pemakaian budget {kategori_title} menjadi "
-                    f"{persen:.0f}%; masih tersisa {rupiah(sisa)}."
-                ]
-
-    # =====================================================
-    # PRIORITAS 4
-    # PENGELUARAN BERULANG
-    # =====================================================
-
-    if jumlah_subkategori >= 3:
-
-        return [
-            f"🔁 Pengeluaran {keterangan_baru.lower()} sudah "
-            f"{jumlah_subkategori} kali bulan ini dengan total "
-            f"{rupiah(total_subkategori)}."
-        ]
-
-    if jumlah_kategori >= 5:
-
-        return [
-            f"📊 Kategori {kategori_title} sudah {jumlah_kategori} "
-            f"kali digunakan bulan ini dengan total "
-            f"{rupiah(total_kategori)}."
-        ]
-
-    # =====================================================
-    # PRIORITAS 5
-    # PENGELUARAN BESAR
-    # =====================================================
-
-    if nominal_baru >= 500000:
-
-        if total_masuk > 0:
-
-            persen_pemasukan = (
-                nominal_baru /
-                total_masuk
-            ) * 100
-
-            if persen_pemasukan >= 20:
-
-                return [
-                    f"⚠️ Pengeluaran {rupiah(nominal_baru)} untuk "
-                    f"{keterangan_baru.lower()} cukup besar, sekitar "
-                    f"{persen_pemasukan:.0f}% dari pemasukan bulan ini."
-                ]
-
-        return [
-            f"⚠️ Pengeluaran {rupiah(nominal_baru)} untuk "
-            f"{keterangan_baru.lower()} cukup besar, pastikan "
-            f"masih sesuai rencana."
-        ]
-
-    # =====================================================
-    # PRIORITAS 6
-    # KONTEKS KATEGORI
-    # =====================================================
-
-    if total_keluar > 0:
-
-        persen_total = (
-            total_kategori /
-            total_keluar
-        ) * 100
-
-        if persen_total >= 40 and jumlah_kategori >= 2:
-
-            return [
-                f"📊 Pengeluaran {kategori_title} mulai cukup dominan, "
-                f"mencapai {persen_total:.0f}% dari total pengeluaran "
-                f"bulan ini."
-            ]
-
-    # =====================================================
-    # PRIORITAS 7
-    # PENGELUARAN KECIL TAPI BERULANG
-    # =====================================================
-
-    if nominal_baru <= 50000 and jumlah_kategori >= 2:
-
-        return [
-            f"💡 Pengeluaran kecil seperti {keterangan_baru.lower()} "
-            f"mulai muncul beberapa kali bulan ini; kalau terus "
-            f"berulang, totalnya bisa cukup terasa."
-        ]
-
-    # =====================================================
-    # FALLBACK
-    # =====================================================
-
-    return [
-        f"💡 Pengeluaran {rupiah(nominal_baru)} untuk "
-        f"{keterangan_baru.lower()} sudah dicatat."
-    ]
-
-
-# =========================================================
-# =========================================================
-# FULL INSIGHT
-# =========================================================
-# =========================================================
-
-def generate_full_insight(
-    nomor,
-    periode,
-    hari_ini,
-    all_data
-):
-
-    insight = []
-
-    # =====================================================
-    # DATA BULAN INI
-    # =====================================================
-
-    transaksi_bulan_ini = []
-
-    for trx in all_data:
-
-        tanggal = tanggal_transaksi(trx)
+        tanggal = tanggal_transaksi(
+            trx
+        )
 
         if not tanggal:
             continue
 
+        tipe = str(
+            trx.tipe or ""
+        ).upper()
+
+        kategori = str(
+            trx.kategori or "Lainnya"
+        ).strip()
+
+        subkategori = str(
+            trx.subkategori or "Lainnya"
+        ).strip()
+
+        keterangan = str(
+            trx.keterangan or ""
+        ).strip()
+
+        # =================================================
+        # REFERENCE TRANSAKSI
+        # =================================================
+
+        transaksi_reference.append({
+
+            "tanggal":
+                str(tanggal),
+
+            "hari":
+                nama_hari(tanggal),
+
+            "tipe":
+                tipe,
+
+            "nominal":
+                nominal,
+
+            "kategori":
+                kategori,
+
+            "subkategori":
+                subkategori,
+
+            "keterangan":
+                keterangan
+
+        })
+
+        # =================================================
+        # HARIAN
+        # =================================================
+
+        harian[
+            tanggal.day
+        ]["jumlah"] += 1
+
+        # =================================================
+        # HARI MINGGUAN
+        # =================================================
+
+        hari_nama = nama_hari(
+            tanggal
+        )
+
+        hari_mingguan[
+            hari_nama
+        ]["jumlah"] += 1
+
+        # =================================================
+        # PEMASUKAN
+        # =================================================
+
+        if tipe == "MASUK":
+
+            harian[
+                tanggal.day
+            ]["masuk"] += nominal
+
+            hari_mingguan[
+                hari_nama
+            ]["masuk"] += nominal
+
+            sumber = (
+
+                trx.kategori
+                or trx.subkategori
+                or trx.keterangan
+                or "Lainnya"
+
+            )
+
+            sumber = str(
+                sumber
+            ).strip()
+
+            sumber_pemasukan[
+                sumber
+            ]["total"] += nominal
+
+            sumber_pemasukan[
+                sumber
+            ]["jumlah"] += 1
+
+        # =================================================
+        # PENGELUARAN
+        # =================================================
+
+        elif tipe == "KELUAR":
+
+            harian[
+                tanggal.day
+            ]["keluar"] += nominal
+
+            hari_mingguan[
+                hari_nama
+            ]["keluar"] += nominal
+
+            kategori_data[
+                kategori
+            ]["total"] += nominal
+
+            kategori_data[
+                kategori
+            ]["jumlah"] += 1
+
+            subkategori_data[
+                subkategori
+            ]["total"] += nominal
+
+            subkategori_data[
+                subkategori
+            ]["jumlah"] += 1
+
+    # =====================================================
+    # KATEGORI REFERENCE
+    # =====================================================
+
+    kategori_reference = []
+
+    for nama, data in kategori_data.items():
+
+        total = data["total"]
+
+        jumlah = data["jumlah"]
+
+        persen = (
+
+            total /
+            total_keluar *
+            100
+
+            if total_keluar > 0
+
+            else 0
+        )
+
+        rata = (
+
+            total /
+            jumlah
+
+            if jumlah > 0
+
+            else 0
+        )
+
+        kategori_reference.append({
+
+            "nama":
+                nama,
+
+            "total":
+                total,
+
+            "jumlah_transaksi":
+                jumlah,
+
+            "persentase":
+                round(persen, 2),
+
+            "rata_rata":
+                round(rata)
+
+        })
+
+    kategori_reference.sort(
+        key=lambda x: x["total"],
+        reverse=True
+    )
+
+    # =====================================================
+    # SUBKATEGORI REFERENCE
+    # =====================================================
+
+    subkategori_reference = []
+
+    for nama, data in subkategori_data.items():
+
+        total = data["total"]
+
+        jumlah = data["jumlah"]
+
+        persen = (
+
+            total /
+            total_keluar *
+            100
+
+            if total_keluar > 0
+
+            else 0
+        )
+
+        rata = (
+
+            total /
+            jumlah
+
+            if jumlah > 0
+
+            else 0
+        )
+
+        subkategori_reference.append({
+
+            "nama":
+                nama,
+
+            "total":
+                total,
+
+            "jumlah_transaksi":
+                jumlah,
+
+            "persentase":
+                round(persen, 2),
+
+            "rata_rata":
+                round(rata)
+
+        })
+
+    subkategori_reference.sort(
+        key=lambda x: x["total"],
+        reverse=True
+    )
+
+    # =====================================================
+    # PEMASUKAN REFERENCE
+    # =====================================================
+
+    pemasukan_reference = []
+
+    for nama, data in sumber_pemasukan.items():
+
+        persen = (
+
+            data["total"] /
+            total_masuk *
+            100
+
+            if total_masuk > 0
+
+            else 0
+        )
+
+        pemasukan_reference.append({
+
+            "sumber":
+                nama,
+
+            "total":
+                data["total"],
+
+            "jumlah":
+                data["jumlah"],
+
+            "persentase":
+                round(persen, 2)
+
+        })
+
+    pemasukan_reference.sort(
+        key=lambda x: x["total"],
+        reverse=True
+    )
+
+    # =====================================================
+    # HARI TERBOROS
+    # =====================================================
+
+    hari_terboros = None
+
+    if harian:
+
+        hari_terboros = max(
+            harian.items(),
+            key=lambda x: x[1]["keluar"]
+        )
+
+    # =====================================================
+    # HARI TERMURAH
+    # =====================================================
+
+    hari_termurah = None
+
+    hari_dengan_pengeluaran = {
+
+        hari: data
+
+        for hari, data in harian.items()
+
+        if data["keluar"] > 0
+
+    }
+
+    if hari_dengan_pengeluaran:
+
+        hari_termurah = min(
+            hari_dengan_pengeluaran.items(),
+            key=lambda x: x[1]["keluar"]
+        )
+
+    # =====================================================
+    # HARI MINGGUAN TERBOROS
+    # =====================================================
+
+    hari_mingguan_terboros = None
+
+    if hari_mingguan:
+
+        hari_mingguan_terboros = max(
+            hari_mingguan.items(),
+            key=lambda x: x[1]["keluar"]
+        )
+
+    # =====================================================
+    # RATA-RATA PENGELUARAN PER HARI
+    # =====================================================
+
+    hari_yang_ada_pengeluaran = [
+
+        x
+
+        for x in harian.values()
+
+        if x["keluar"] > 0
+
+    ]
+
+    rata_keluar_hari = (
+
+        total_keluar /
+        len(hari_yang_ada_pengeluaran)
+
+        if hari_yang_ada_pengeluaran
+
+        else 0
+    )
+
+    # =====================================================
+    # RATA-RATA SEMUA HARI BERJALAN
+    # =====================================================
+
+    rata_keluar_hari_berjalan = (
+
+        total_keluar /
+        hari_ini.day
+
+        if hari_ini.day > 0
+
+        else 0
+    )
+
+    # =====================================================
+    # TRANSAKSI KECIL
+    # =====================================================
+
+    transaksi_kecil = [
+
+        trx
+
+        for trx in transaksi_keluar
+
+        if nominal_transaksi(trx) <= 50000
+
+    ]
+
+    total_transaksi_kecil = sum(
+
+        nominal_transaksi(x)
+
+        for x in transaksi_kecil
+
+    )
+
+    # =====================================================
+    # TRANSAKSI BESAR
+    # =====================================================
+
+    transaksi_besar = [
+
+        trx
+
+        for trx in transaksi_keluar
+
+        if nominal_transaksi(trx) >= 500000
+
+    ]
+
+    total_transaksi_besar = sum(
+
+        nominal_transaksi(x)
+
+        for x in transaksi_besar
+
+    )
+
+    # =====================================================
+    # TRANSAKSI MENENGAH
+    # =====================================================
+
+    transaksi_menengah = [
+
+        trx
+
+        for trx in transaksi_keluar
+
         if (
-            tanggal.year == hari_ini.year
-            and tanggal.month == hari_ini.month
-        ):
+            50000 <
+            nominal_transaksi(trx) <
+            500000
+        )
 
-            transaksi_bulan_ini.append(trx)
+    ]
 
-    # =====================================================
-    # TOTAL PEMASUKAN
-    # =====================================================
+    total_transaksi_menengah = sum(
 
-    total_masuk = sum(
-        x.nominal or 0
-        for x in transaksi_bulan_ini
-        if str(x.tipe or "").upper() == "MASUK"
+        nominal_transaksi(x)
+
+        for x in transaksi_menengah
+
     )
 
     # =====================================================
-    # TOTAL PENGELUARAN
-    # =====================================================
-
-    total_keluar = sum(
-        x.nominal or 0
-        for x in transaksi_bulan_ini
-        if str(x.tipe or "").upper() == "KELUAR"
-    )
-
-    # =====================================================
-    # SALDO
-    # =====================================================
-
-    saldo = total_masuk - total_keluar
-
-    # =====================================================
-    # DATA KATEGORI
-    # =====================================================
-
-    kategori = defaultdict(int)
-
-    jumlah_transaksi_kategori = defaultdict(int)
-
-    for trx in transaksi_bulan_ini:
-
-        if str(trx.tipe or "").upper() != "KELUAR":
-            continue
-
-        nama_kategori = (
-            trx.kategori
-            or "Lainnya"
-        )
-
-        kategori[nama_kategori] += (
-            trx.nominal or 0
-        )
-
-        jumlah_transaksi_kategori[
-            nama_kategori
-        ] += 1
-
-    # =====================================================
-    # DATA SUBKATEGORI
-    # =====================================================
-
-    subkategori = defaultdict(int)
-
-    for trx in transaksi_bulan_ini:
-
-        if str(trx.tipe or "").upper() != "KELUAR":
-            continue
-
-        nama_subkategori = (
-            trx.subkategori
-            or "Lainnya"
-        )
-
-        subkategori[nama_subkategori] += (
-            trx.nominal or 0
-        )
-
-    # =====================================================
-    # HARI BERJALAN
+    # PERSENTASE BULAN BERJALAN
     # =====================================================
 
     jumlah_hari = monthrange(
@@ -544,84 +750,1521 @@ def generate_full_insight(
         hari_ini.month
     )[1]
 
-    hari_berjalan = hari_ini.day
+    persentase_bulan = (
+
+        hari_ini.day /
+        jumlah_hari *
+        100
+
+    )
 
     # =====================================================
-    # RINGKASAN UTAMA
+    # PROYEKSI
     # =====================================================
 
-    if total_masuk == 0 and total_keluar == 0:
+    proyeksi_bulan = (
 
-        insight.append(
-            "🧠 Belum ada cukup transaksi untuk "
-            "membaca kondisi keuangan kamu bulan ini."
+        rata_keluar_hari_berjalan *
+        jumlah_hari
+
+    )
+
+    # =====================================================
+    # CASHFLOW RATIO
+    # =====================================================
+
+    rasio_pengeluaran = (
+
+        total_keluar /
+        total_masuk *
+        100
+
+        if total_masuk > 0
+
+        else None
+
+    )
+
+    rasio_saldo = (
+
+        saldo /
+        total_masuk *
+        100
+
+        if total_masuk > 0
+
+        else None
+
+    )
+
+    # =====================================================
+    # BUDGET
+    # =====================================================
+
+    budgets = Budget.query.filter_by(
+        nomor_wa=nomor,
+        periode=periode
+    ).all()
+
+    budget_reference = []
+
+    for budget in budgets:
+
+        nominal_budget = int(
+            budget.nominal or 0
         )
 
-    else:
+        terpakai = kategori_data.get(
+            budget.kategori,
+            {}
+        ).get(
+            "total",
+            0
+        )
 
-        insight.append(
-            f"🧠 Bulan ini kamu sudah mencatat "
-            f"pemasukan {rupiah(total_masuk)} "
-            f"dan pengeluaran {rupiah(total_keluar)}."
+        persen = (
+
+            terpakai /
+            nominal_budget *
+            100
+
+            if nominal_budget > 0
+
+            else 0
+        )
+
+        sisa = (
+
+            nominal_budget -
+            terpakai
+
+        )
+
+        budget_reference.append({
+
+            "kategori":
+                budget.kategori,
+
+            "budget":
+                nominal_budget,
+
+            "terpakai":
+                terpakai,
+
+            "sisa":
+                sisa,
+
+            "persentase":
+                round(persen, 2),
+
+            "status":
+
+                "TERLAMPAUI"
+                if persen >= 100
+
+                else "KRITIS"
+                if persen >= 90
+
+                else "WASPADA"
+                if persen >= 75
+
+                else "AMAN"
+
+        })
+
+    budget_reference.sort(
+        key=lambda x: x["persentase"],
+        reverse=True
+    )
+
+    # =====================================================
+    # REMINDER
+    # =====================================================
+
+    reminders = Reminder.query.filter_by(
+        nomor_wa=nomor
+    ).all()
+
+    reminder_reference = []
+
+    for reminder in reminders:
+
+        try:
+
+            if isinstance(
+                reminder.tanggal,
+                int
+            ):
+
+                selisih = (
+
+                    reminder.tanggal -
+                    hari_ini.day
+
+                )
+
+            else:
+
+                tanggal_reminder = (
+                    reminder.tanggal
+                )
+
+                if hasattr(
+                    tanggal_reminder,
+                    "date"
+                ):
+
+                    tanggal_reminder = (
+                        tanggal_reminder.date()
+                    )
+
+                selisih = (
+
+                    tanggal_reminder -
+                    hari_ini
+
+                ).days
+
+            reminder_reference.append({
+
+                "nama":
+                    reminder.nama,
+
+                "selisih_hari":
+                    selisih
+
+            })
+
+        except Exception:
+
+            continue
+
+    reminder_reference.sort(
+        key=lambda x: x["selisih_hari"]
+    )
+
+    # =====================================================
+    # TARGET
+    # =====================================================
+
+    targets = TargetPembelian.query.filter_by(
+        nomor_wa=nomor,
+        aktif=True
+    ).all()
+
+    target_reference = []
+
+    for target in targets:
+
+        try:
+
+            nominal_target = int(
+                target.target or 0
+            )
+
+            terkumpul = int(
+                target.terkumpul or 0
+            )
+
+            if nominal_target <= 0:
+                continue
+
+            progress = (
+
+                terkumpul /
+                nominal_target *
+                100
+
+            )
+
+            sisa = max(
+
+                nominal_target -
+                terkumpul,
+
+                0
+
+            )
+
+            deadline = target.deadline
+
+            if hasattr(
+                deadline,
+                "date"
+            ):
+
+                deadline = deadline.date()
+
+            sisa_hari = (
+
+                deadline -
+                hari_ini
+
+            ).days
+
+            target_reference.append({
+
+                "nama":
+                    target.nama,
+
+                "target":
+                    nominal_target,
+
+                "terkumpul":
+                    terkumpul,
+
+                "sisa":
+                    sisa,
+
+                "progress":
+                    round(progress, 2),
+
+                "deadline":
+                    str(deadline),
+
+                "sisa_hari":
+                    sisa_hari,
+
+                "status":
+
+                    "TERCAPAI"
+                    if progress >= 100
+
+                    else "TERLAMBAT"
+                    if sisa_hari < 0
+
+                    else "SEGERA"
+                    if sisa_hari <= 7
+
+                    else "BERJALAN"
+
+            })
+
+        except Exception:
+
+            continue
+
+    # =====================================================
+    # BEHAVIOUR SIGNAL
+    # =====================================================
+
+    behaviour = []
+
+    # -----------------------------------------------------
+    # TRANSAKSI KECIL BERULANG
+    # -----------------------------------------------------
+
+    if (
+        len(transaksi_kecil) >= 5
+        and total_keluar > 0
+    ):
+
+        persen_kecil = (
+
+            total_transaksi_kecil /
+            total_keluar *
+            100
+
+        )
+
+        behaviour.append({
+
+            "type":
+                "transaksi_kecil_berulang",
+
+            "jumlah":
+                len(transaksi_kecil),
+
+            "total":
+                total_transaksi_kecil,
+
+            "persentase":
+                round(persen_kecil, 2)
+
+        })
+
+    # -----------------------------------------------------
+    # TRANSAKSI BESAR
+    # -----------------------------------------------------
+
+    if transaksi_besar:
+
+        behaviour.append({
+
+            "type":
+                "transaksi_besar",
+
+            "jumlah":
+                len(transaksi_besar),
+
+            "total":
+                total_transaksi_besar
+
+        })
+
+    # -----------------------------------------------------
+    # KATEGORI DOMINAN
+    # -----------------------------------------------------
+
+    if kategori_reference:
+
+        kategori_terbesar = (
+            kategori_reference[0]
+        )
+
+        if (
+            kategori_terbesar["persentase"]
+            >= 30
+        ):
+
+            behaviour.append({
+
+                "type":
+                    "kategori_dominan",
+
+                "kategori":
+                    kategori_terbesar["nama"],
+
+                "total":
+                    kategori_terbesar["total"],
+
+                "persentase":
+                    kategori_terbesar["persentase"]
+
+            })
+
+    # -----------------------------------------------------
+    # FREKUENSI KATEGORI
+    # -----------------------------------------------------
+
+    for item in kategori_reference:
+
+        if item["jumlah_transaksi"] >= 5:
+
+            behaviour.append({
+
+                "type":
+                    "kategori_sering",
+
+                "kategori":
+                    item["nama"],
+
+                "jumlah":
+                    item["jumlah_transaksi"],
+
+                "total":
+                    item["total"]
+
+            })
+
+    # -----------------------------------------------------
+    # WEEKEND BOROS
+    # -----------------------------------------------------
+
+    weekend_keluar = (
+
+        hari_mingguan.get(
+            "Sabtu",
+            {}
+        ).get(
+            "keluar",
+            0
+        )
+
+        +
+
+        hari_mingguan.get(
+            "Minggu",
+            {}
+        ).get(
+            "keluar",
+            0
+        )
+
+    )
+
+    weekday_keluar = (
+
+        total_keluar -
+        weekend_keluar
+
+    )
+
+    if (
+        weekend_keluar > 0
+        and total_keluar > 0
+        and weekend_keluar >
+        weekday_keluar / 5 * 2
+    ):
+
+        behaviour.append({
+
+            "type":
+                "weekend_lebih_boros",
+
+            "total_weekend":
+                weekend_keluar,
+
+            "total_weekday":
+                weekday_keluar
+
+        })
+
+    # -----------------------------------------------------
+    # CASHFLOW NEGATIF
+    # -----------------------------------------------------
+
+    if total_keluar > total_masuk:
+
+        behaviour.append({
+
+            "type":
+                "cashflow_negatif",
+
+            "defisit":
+                abs(saldo)
+
+        })
+
+    # -----------------------------------------------------
+    # PENGELUARAN TINGGI
+    # -----------------------------------------------------
+
+    if (
+        rasio_pengeluaran is not None
+        and rasio_pengeluaran >= 80
+    ):
+
+        behaviour.append({
+
+            "type":
+                "pengeluaran_tinggi",
+
+            "persentase":
+                round(
+                    rasio_pengeluaran,
+                    2
+                )
+
+        })
+
+    # =====================================================
+    # HASIL REFERENCE
+    # =====================================================
+
+    return {
+
+        "periode": {
+
+            "tanggal":
+                str(hari_ini),
+
+            "hari":
+                nama_hari(hari_ini),
+
+            "hari_berjalan":
+                hari_ini.day,
+
+            "jumlah_hari":
+                jumlah_hari,
+
+            "persentase_bulan":
+                round(
+                    persentase_bulan,
+                    2
+                )
+
+        },
+
+        "cashflow": {
+
+            "total_masuk":
+                total_masuk,
+
+            "total_keluar":
+                total_keluar,
+
+            "saldo":
+                saldo,
+
+            "rasio_pengeluaran":
+                round(
+                    rasio_pengeluaran,
+                    2
+                )
+                if rasio_pengeluaran
+                is not None
+                else None,
+
+            "rasio_saldo":
+                round(
+                    rasio_saldo,
+                    2
+                )
+                if rasio_saldo
+                is not None
+                else None,
+
+            "rata_rata_masuk":
+                round(rata_masuk),
+
+            "rata_rata_keluar":
+                round(rata_keluar),
+
+            "rata_rata_keluar_per_hari":
+                round(
+                    rata_keluar_hari_berjalan
+                ),
+
+            "rata_rata_hari_ada_pengeluaran":
+                round(
+                    rata_keluar_hari
+                ),
+
+            "proyeksi_bulan":
+                round(
+                    proyeksi_bulan
+                )
+
+        },
+
+        "transaksi": {
+
+            "total":
+                jumlah_transaksi,
+
+            "jumlah_masuk":
+                jumlah_masuk,
+
+            "jumlah_keluar":
+                jumlah_keluar,
+
+            "transaksi_kecil":
+                len(transaksi_kecil),
+
+            "nominal_transaksi_kecil":
+                total_transaksi_kecil,
+
+            "transaksi_menengah":
+                len(transaksi_menengah),
+
+            "nominal_transaksi_menengah":
+                total_transaksi_menengah,
+
+            "transaksi_besar":
+                len(transaksi_besar),
+
+            "nominal_transaksi_besar":
+                total_transaksi_besar
+
+        },
+
+        "transaksi_terbesar": {
+
+            "keluar":
+
+                {
+
+                    "nominal":
+                        nominal_transaksi(
+                            transaksi_keluar_terbesar
+                        )
+                        if transaksi_keluar_terbesar
+                        else 0,
+
+                    "kategori":
+                        getattr(
+                            transaksi_keluar_terbesar,
+                            "kategori",
+                            None
+                        )
+                        if transaksi_keluar_terbesar
+                        else None,
+
+                    "subkategori":
+                        getattr(
+                            transaksi_keluar_terbesar,
+                            "subkategori",
+                            None
+                        )
+                        if transaksi_keluar_terbesar
+                        else None,
+
+                    "keterangan":
+                        getattr(
+                            transaksi_keluar_terbesar,
+                            "keterangan",
+                            None
+                        )
+                        if transaksi_keluar_terbesar
+                        else None
+
+                },
+
+            "masuk":
+
+                {
+
+                    "nominal":
+                        nominal_transaksi(
+                            transaksi_masuk_terbesar
+                        )
+                        if transaksi_masuk_terbesar
+                        else 0,
+
+                    "kategori":
+                        getattr(
+                            transaksi_masuk_terbesar,
+                            "kategori",
+                            None
+                        )
+                        if transaksi_masuk_terbesar
+                        else None,
+
+                    "keterangan":
+                        getattr(
+                            transaksi_masuk_terbesar,
+                            "keterangan",
+                            None
+                        )
+                        if transaksi_masuk_terbesar
+                        else None
+
+                },
+
+            "terkecil":
+
+                {
+
+                    "nominal":
+                        nominal_transaksi(
+                            transaksi_keluar_terkecil
+                        )
+                        if transaksi_keluar_terkecil
+                        else 0,
+
+                    "kategori":
+                        getattr(
+                            transaksi_keluar_terkecil,
+                            "kategori",
+                            None
+                        )
+                        if transaksi_keluar_terkecil
+                        else None
+
+                }
+
+        },
+
+        "kategori":
+            kategori_reference,
+
+        "subkategori":
+            subkategori_reference,
+
+        "sumber_pemasukan":
+            pemasukan_reference,
+
+        "harian": {
+
+            "data":
+                dict(harian),
+
+            "hari_terboros":
+                hari_terboros[0]
+                if hari_terboros
+                else None,
+
+            "nominal_hari_terboros":
+                hari_terboros[1]["keluar"]
+                if hari_terboros
+                else 0,
+
+            "hari_termurah":
+                hari_termurah[0]
+                if hari_termurah
+                else None,
+
+            "nominal_hari_termurah":
+                hari_termurah[1]["keluar"]
+                if hari_termurah
+                else 0,
+
+            "pengeluaran_harian_terbesar":
+                pengeluaran_harian_terbesar(
+                    harian
+                )
+
+        },
+
+        "mingguan": {
+
+            "data":
+                dict(hari_mingguan),
+
+            "hari_terboros":
+                hari_mingguan_terboros[0]
+                if hari_mingguan_terboros
+                else None,
+
+            "nominal":
+                hari_mingguan_terboros[1]["keluar"]
+                if hari_mingguan_terboros
+                else 0
+
+        },
+
+        "budget":
+            budget_reference,
+
+        "reminder":
+            reminder_reference,
+
+        "target":
+            target_reference,
+
+        "behaviour":
+            behaviour,
+
+        "transaksi_detail":
+            transaksi_reference
+
+    }
+
+
+# =========================================================
+# HELPER PENGELUARAN HARIAN TERBESAR
+# =========================================================
+
+def pengeluaran_harian_terbesar(harian):
+
+    if not harian:
+        return None
+
+    try:
+
+        terbesar = max(
+            harian.items(),
+            key=lambda x: x[1]["keluar"]
+        )
+
+        return {
+
+            "tanggal":
+                terbesar[0],
+
+            "nominal":
+                terbesar[1]["keluar"]
+
+        }
+
+    except Exception:
+
+        return None
+
+
+# =========================================================
+# MAIN AI INSIGHT ROUTER
+# =========================================================
+
+def generate_ai_insight(
+    nomor,
+    transaksi_baru=None,
+    event=None
+):
+
+    # =====================================================
+    # IMPORT LOKAL
+    # =====================================================
+
+    from app import transaksi_user, periode_sekarang
+
+    # =====================================================
+    # PERIODE
+    # =====================================================
+
+    periode = periode_sekarang()
+
+    hari_ini = date.today()
+
+    # =====================================================
+    # AMBIL SEMUA TRANSAKSI USER
+    # =====================================================
+
+    all_data = transaksi_user(
+        nomor
+    ).all()
+
+    # =====================================================
+    # BUILD REFERENCE
+    # =====================================================
+
+    reference = build_finance_reference(
+
+        nomor=nomor,
+
+        periode=periode,
+
+        hari_ini=hari_ini,
+
+        all_data=all_data
+
+    )
+
+    # =====================================================
+    # DEBUG REFERENCE
+    # =====================================================
+
+    print("========================================")
+    print("🧠 CHATSAKU AI REFERENCE")
+    print("========================================")
+
+    print(
+        "PERIODE :",
+        reference["periode"]
+    )
+
+    print(
+        "CASHFLOW :",
+        reference["cashflow"]
+    )
+
+    print(
+        "TRANSAKSI :",
+        reference["transaksi"]
+    )
+
+    print(
+        "KATEGORI :",
+        reference["kategori"]
+    )
+
+    print(
+        "SUBKATEGORI :",
+        reference["subkategori"]
+    )
+
+    print(
+        "PEMASUKAN :",
+        reference["sumber_pemasukan"]
+    )
+
+    print(
+        "HARIAN :",
+        reference["harian"]
+    )
+
+    print(
+        "MINGGUAN :",
+        reference["mingguan"]
+    )
+
+    print(
+        "BUDGET :",
+        reference["budget"]
+    )
+
+    print(
+        "REMINDER :",
+        reference["reminder"]
+    )
+
+    print(
+        "TARGET :",
+        reference["target"]
+    )
+
+    print(
+        "BEHAVIOUR :",
+        reference["behaviour"]
+    )
+
+    print("========================================")
+
+    # =====================================================
+    # ROUTING EVENT
+    # =====================================================
+
+    if str(
+        event or ""
+    ).upper() == "KELUAR":
+
+        return generate_insight_keluar(
+
+            nomor=nomor,
+
+            transaksi_baru=transaksi_baru,
+
+            periode=periode,
+
+            hari_ini=hari_ini,
+
+            all_data=all_data,
+
+            reference=reference
+
         )
 
     # =====================================================
-    # KONDISI CASHFLOW
+    # FULL INSIGHT
+    # =====================================================
+
+    return generate_full_insight(
+
+        nomor=nomor,
+
+        periode=periode,
+
+        hari_ini=hari_ini,
+
+        all_data=all_data,
+
+        reference=reference
+
+    )
+
+
+# =========================================================
+# MODE KELUAR
+#
+# Insight pendek setelah user mencatat pengeluaran.
+# =========================================================
+
+def generate_insight_keluar(
+
+    nomor,
+
+    transaksi_baru,
+
+    periode,
+
+    hari_ini,
+
+    all_data,
+
+    reference
+
+):
+
+    # =====================================================
+    # VALIDASI
+    # =====================================================
+
+    if not transaksi_baru:
+
+        return [
+            "🧠 Belum ada transaksi pengeluaran baru "
+            "untuk dianalisis."
+        ]
+
+    # =====================================================
+    # DATA TRANSAKSI BARU
+    # =====================================================
+
+    nominal_baru = nominal_transaksi(
+        transaksi_baru
+    )
+
+    kategori_baru = (
+
+        transaksi_baru.kategori
+        or "Lainnya"
+
+    )
+
+    subkategori_baru = (
+
+        transaksi_baru.subkategori
+        or ""
+
+    )
+
+    keterangan_baru = (
+
+        transaksi_baru.keterangan
+        or "pengeluaran"
+
+    ).strip()
+
+    kategori_key = str(
+        kategori_baru
+    ).lower().strip()
+
+    subkategori_key = str(
+        subkategori_baru
+    ).lower().strip()
+
+    kategori_title = str(
+        kategori_baru
+    ).title()
+
+    # =====================================================
+    # REFERENCE
+    # =====================================================
+
+    cashflow = reference[
+        "cashflow"
+    ]
+
+    kategori_reference = reference[
+        "kategori"
+    ]
+
+    # =====================================================
+    # CARI KATEGORI
+    # =====================================================
+
+    data_kategori = None
+
+    for item in kategori_reference:
+
+        if str(
+            item["nama"]
+        ).lower().strip() == kategori_key:
+
+            data_kategori = item
+
+            break
+
+    # =====================================================
+    # CARI SUBKATEGORI
+    # =====================================================
+
+    data_subkategori = None
+
+    for item in reference[
+        "subkategori"
+    ]:
+
+        if str(
+            item["nama"]
+        ).lower().strip() == subkategori_key:
+
+            data_subkategori = item
+
+            break
+
+    # =====================================================
+    # BUDGET
+    # =====================================================
+
+    budget_data = None
+
+    for item in reference[
+        "budget"
+    ]:
+
+        if str(
+            item["kategori"]
+        ).lower().strip() == kategori_key:
+
+            budget_data = item
+
+            break
+
+    # =====================================================
+    # PRIORITAS 1
+    # BUDGET TERLAMPAUI
+    # =====================================================
+
+    if budget_data:
+
+        persen = budget_data[
+            "persentase"
+        ]
+
+        sisa = budget_data[
+            "sisa"
+        ]
+
+        if persen >= 100:
+
+            return [
+
+                f"🚨 Waduh, pengeluaran "
+                f"{rupiah(nominal_baru)} untuk "
+                f"{keterangan_baru.lower()} membuat "
+                f"budget *{kategori_title}* terlampaui "
+                f"{rupiah(abs(sisa))}."
+
+            ]
+
+        if persen >= 90:
+
+            return [
+
+                f"⚠️ Hati-hati, budget "
+                f"*{kategori_title}* sekarang sudah "
+                f"terpakai {persen:.0f}%. "
+                f"Tinggal {rupiah(max(sisa, 0))} lagi."
+
+            ]
+
+        if persen >= 75:
+
+            return [
+
+                f"🟡 Pengeluaran ini membuat budget "
+                f"*{kategori_title}* sudah terpakai "
+                f"{persen:.0f}%. Masih ada "
+                f"{rupiah(max(sisa, 0))}."
+
+            ]
+
+    # =====================================================
+    # PRIORITAS 2
+    # SUBKATEGORI BERULANG
+    # =====================================================
+
+    if data_subkategori:
+
+        jumlah = data_subkategori[
+            "jumlah_transaksi"
+        ]
+
+        total = data_subkategori[
+            "total"
+        ]
+
+        if jumlah >= 3:
+
+            return [
+
+                f"🔁 Eh, *{subkategori_baru.title()}* "
+                f"sudah muncul {jumlah} kali bulan ini. "
+                f"Totalnya sudah {rupiah(total)}."
+
+            ]
+
+    # =====================================================
+    # PRIORITAS 3
+    # KATEGORI SERING
+    # =====================================================
+
+    if data_kategori:
+
+        jumlah = data_kategori[
+            "jumlah_transaksi"
+        ]
+
+        total = data_kategori[
+            "total"
+        ]
+
+        if jumlah >= 5:
+
+            return [
+
+                f"👀 *{kategori_title}* mulai sering muncul "
+                f"di catatan kamu. Sudah {jumlah} transaksi "
+                f"dengan total {rupiah(total)} bulan ini."
+
+            ]
+
+    # =====================================================
+    # PRIORITAS 4
+    # PENGELUARAN BESAR
+    # =====================================================
+
+    if nominal_baru >= 500000:
+
+        total_masuk = cashflow[
+            "total_masuk"
+        ]
+
+        if total_masuk > 0:
+
+            persen = (
+
+                nominal_baru /
+                total_masuk *
+                100
+
+            )
+
+            if persen >= 20:
+
+                return [
+
+                    f"⚠️ Pengeluaran "
+                    f"{rupiah(nominal_baru)} ini cukup besar, "
+                    f"sekitar {persen:.0f}% dari pemasukan "
+                    f"bulan ini."
+
+                ]
+
+        return [
+
+            f"⚠️ Pengeluaran "
+            f"{rupiah(nominal_baru)} untuk "
+            f"{keterangan_baru.lower()} cukup besar. "
+            f"Pastikan memang sesuai rencana ya."
+
+        ]
+
+    # =====================================================
+    # PRIORITAS 5
+    # KATEGORI DOMINAN
+    # =====================================================
+
+    if data_kategori:
+
+        persen = data_kategori[
+            "persentase"
+        ]
+
+        if (
+            persen >= 40
+            and data_kategori[
+                "jumlah_transaksi"
+            ] >= 2
+        ):
+
+            return [
+
+                f"📊 Pengeluaran *{kategori_title}* "
+                f"mulai cukup dominan. Sekarang sekitar "
+                f"{persen:.0f}% dari seluruh pengeluaran "
+                f"bulan ini."
+
+            ]
+
+    # =====================================================
+    # PRIORITAS 6
+    # PENGELUARAN KECIL BERULANG
+    # =====================================================
+
+    if (
+        nominal_baru <= 50000
+        and data_kategori
+        and data_kategori[
+            "jumlah_transaksi"
+        ] >= 2
+    ):
+
+        return [
+
+            f"💡 Nominalnya memang kecil, tapi "
+            f"*{kategori_title}* sudah beberapa kali "
+            f"muncul bulan ini. Kalau terus berulang, "
+            f"totalnya bisa terasa juga."
+
+        ]
+
+    # =====================================================
+    # PRIORITAS 7
+    # CASHFLOW
+    # =====================================================
+
+    total_masuk = cashflow[
+        "total_masuk"
+    ]
+
+    total_keluar = cashflow[
+        "total_keluar"
+    ]
+
+    if total_masuk > 0:
+
+        rasio = (
+
+            total_keluar /
+            total_masuk *
+            100
+
+        )
+
+        if rasio >= 90:
+
+            return [
+
+                f"⚠️ Setelah pengeluaran ini, "
+                f"sekitar {rasio:.0f}% pemasukan kamu "
+                f"sudah terpakai bulan ini. "
+
+            ]
+
+    # =====================================================
+    # FALLBACK
+    # =====================================================
+
+    return [
+
+        f"💚 Oke, pengeluaran "
+        f"{rupiah(nominal_baru)} untuk "
+        f"{keterangan_baru.lower()} sudah dicatat."
+
+    ]
+
+
+# =========================================================
+# FULL INSIGHT
+# =========================================================
+
+def generate_full_insight(
+
+    nomor,
+
+    periode,
+
+    hari_ini,
+
+    all_data,
+
+    reference
+
+):
+
+    insight = []
+
+    # =====================================================
+    # AMBIL REFERENCE
+    # =====================================================
+
+    cashflow = reference[
+        "cashflow"
+    ]
+
+    transaksi = reference[
+        "transaksi"
+    ]
+
+    kategori = reference[
+        "kategori"
+    ]
+
+    behaviour = reference[
+        "behaviour"
+    ]
+
+    budgets = reference[
+        "budget"
+    ]
+
+    reminders = reference[
+        "reminder"
+    ]
+
+    targets = reference[
+        "target"
+    ]
+
+    # =====================================================
+    # TOTAL
+    # =====================================================
+
+    total_masuk = cashflow[
+        "total_masuk"
+    ]
+
+    total_keluar = cashflow[
+        "total_keluar"
+    ]
+
+    saldo = cashflow[
+        "saldo"
+    ]
+
+    # =====================================================
+    # DATA KOSONG
+    # =====================================================
+
+    if (
+        total_masuk == 0
+        and total_keluar == 0
+    ):
+
+        return [
+
+            "🧠 Belum ada cukup transaksi "
+            "untuk membaca kondisi keuangan "
+            "kamu bulan ini."
+
+        ]
+
+    # =====================================================
+    # RINGKASAN
+    # =====================================================
+
+    insight.append(
+
+        f"🧠 Bulan ini kamu sudah mencatat "
+        f"pemasukan {rupiah(total_masuk)} "
+        f"dan pengeluaran {rupiah(total_keluar)}."
+
+    )
+
+    # =====================================================
+    # CASHFLOW
     # =====================================================
 
     if total_masuk > 0:
 
-        rasio_pengeluaran = (
-            total_keluar /
-            total_masuk
-        ) * 100
+        rasio = (
+            cashflow[
+                "rasio_pengeluaran"
+            ]
+            or 0
+        )
 
         if total_keluar > total_masuk:
 
             insight.append(
-                "⚠️ Saat ini pengeluaran kamu lebih besar "
-                "daripada pemasukan. Sebaiknya tahan dulu "
-                "pengeluaran yang tidak terlalu penting."
+
+                "⚠️ Pengeluaran kamu saat ini "
+                "sudah lebih besar daripada pemasukan. "
+                "Coba tahan dulu pengeluaran yang "
+                "masih bisa ditunda."
+
             )
 
-        elif rasio_pengeluaran >= 90:
+        elif rasio >= 90:
 
             insight.append(
-                "⚠️ Sebagian besar pemasukan kamu sudah "
-                "terpakai. Coba sisakan ruang untuk kebutuhan "
-                "mendadak atau tabungan."
+
+                "⚠️ Hampir seluruh pemasukan kamu "
+                "sudah terpakai bulan ini. Ruang untuk "
+                "kebutuhan mendadak mulai tipis."
+
             )
 
-        elif rasio_pengeluaran >= 70:
+        elif rasio >= 70:
 
             insight.append(
-                "🟡 Pengeluaran kamu sudah cukup besar, "
-                "sekitar {:.0f}% dari pemasukan.".format(
-                    rasio_pengeluaran
-                )
+
+                f"🟡 Pengeluaran kamu sudah mencapai "
+                f"sekitar {rasio:.0f}% dari pemasukan."
+
             )
 
-        elif rasio_pengeluaran >= 50:
+        elif rasio >= 50:
 
             insight.append(
-                "🟢 Kondisi cashflow kamu masih cukup baik. "
-                "Pengeluaran masih berada di bawah pemasukan."
+
+                "🟢 Cashflow kamu masih cukup baik. "
+                "Pengeluaran masih berada di bawah "
+                "pemasukan."
+
             )
 
         else:
 
             insight.append(
-                "🟢 Cashflow kamu terlihat cukup sehat. "
-                "Masih ada ruang untuk menabung atau "
-                "mencapai target keuangan."
+
+                "🟢 Sejauh ini cashflow kamu terlihat "
+                "cukup sehat dan masih punya ruang "
+                "untuk menabung."
+
             )
 
     elif total_keluar > 0:
 
         insight.append(
+
             "⚠️ Kamu sudah mencatat pengeluaran, "
-            "tetapi belum ada pemasukan yang tercatat "
-            "bulan ini."
+            "tetapi belum ada pemasukan yang "
+            "tercatat bulan ini."
+
         )
 
     # =====================================================
@@ -631,132 +2274,178 @@ def generate_full_insight(
     if saldo > 0:
 
         insight.append(
+
             f"💰 Setelah transaksi bulan ini, "
             f"saldo bersih tercatat sekitar "
             f"{rupiah(saldo)}."
+
         )
 
     elif saldo < 0:
 
         insight.append(
+
             f"🚨 Pengeluaran saat ini lebih besar "
-            f"sebesar {rupiah(abs(saldo))} "
-            f"dibanding pemasukan bulan ini."
-        )
+            f"{rupiah(abs(saldo))} dibanding pemasukan."
 
-    else:
-
-        insight.append(
-            "ℹ️ Pemasukan dan pengeluaran bulan ini "
-            "berada di posisi yang sama."
         )
 
     # =====================================================
     # KATEGORI TERBESAR
     # =====================================================
 
-    if kategori and total_keluar > 0:
+    if kategori:
 
-        terbesar = max(
-            kategori,
-            key=kategori.get
-        )
-
-        nominal_terbesar = kategori[
-            terbesar
-        ]
-
-        persen_kategori = (
-            nominal_terbesar /
-            total_keluar
-        ) * 100
+        terbesar = kategori[0]
 
         insight.append(
-            f"🍽️ Pengeluaran terbesar kamu ada di kategori "
-            f"*{str(terbesar).title()}*, sekitar "
-            f"{rupiah(nominal_terbesar)} "
-            f"atau {persen_kategori:.0f}% "
-            f"dari seluruh pengeluaran bulan ini."
+
+            f"👀 Yang paling banyak mengambil uang "
+            f"kamu saat ini adalah *{str(terbesar['nama']).title()}*, "
+            f"sebesar {rupiah(terbesar['total'])} "
+            f"atau {terbesar['persentase']:.0f}% "
+            f"dari seluruh pengeluaran."
+
         )
 
-        # =================================================
-        # SARAN KATEGORI
-        # =================================================
+    # =====================================================
+    # SUBKATEGORI TERBESAR
+    # =====================================================
 
-        kategori_lower = str(
-            terbesar
-        ).lower()
+    subkategori = reference[
+        "subkategori"
+    ]
 
-        if any(
-            x in kategori_lower
-            for x in [
-                "makan",
-                "makanan",
-                "kuliner",
-                "jajan"
-            ]
+    if subkategori:
+
+        terbesar_sub = subkategori[0]
+
+        if (
+            terbesar_sub[
+                "jumlah_transaksi"
+            ] >= 2
         ):
 
             insight.append(
-                "💡 Kalau ingin mulai berhemat, "
-                "pengeluaran makanan bisa jadi tempat pertama "
-                "yang diperhatikan. Coba tentukan batas harian "
-                "agar pengeluaran lebih mudah dikontrol."
-            )
 
-        elif any(
-            x in kategori_lower
-            for x in [
-                "transport",
-                "bensin",
-                "kendaraan",
-                "parkir"
-            ]
-        ):
+                f"🔎 Lebih detail lagi, "
+                f"*{str(terbesar_sub['nama']).title()}* "
+                f"sudah menghabiskan "
+                f"{rupiah(terbesar_sub['total'])} "
+                f"dalam {terbesar_sub['jumlah_transaksi']} "
+                f"transaksi."
 
-            insight.append(
-                "💡 Pengeluaran transportasi cukup dominan. "
-                "Coba perhatikan perjalanan yang sebenarnya "
-                "bisa digabung atau dikurangi."
-            )
-
-        elif any(
-            x in kategori_lower
-            for x in [
-                "belanja",
-                "shopping",
-                "kebutuhan"
-            ]
-        ):
-
-            insight.append(
-                "💡 Untuk kategori ini, coba bedakan "
-                "antara kebutuhan dan keinginan sebelum "
-                "melakukan pembelian."
             )
 
     # =====================================================
-    # KATEGORI YANG SERING TRANSAKSI
+    # BEHAVIOUR
     # =====================================================
 
-    kategori_sering = sorted(
-        jumlah_transaksi_kategori.items(),
-        key=lambda x: x[1],
-        reverse=True
+    behaviour_ditampilkan = 0
+
+    for item in behaviour:
+
+        if behaviour_ditampilkan >= 3:
+            break
+
+        tipe = item.get(
+            "type"
+        )
+
+        # -------------------------------------------------
+        # TRANSAKSI KECIL
+        # -------------------------------------------------
+
+        if tipe == "transaksi_kecil_berulang":
+
+            insight.append(
+
+                f"💡 Ada {item['jumlah']} transaksi kecil "
+                f"dengan total {rupiah(item['total'])}. "
+                f"Nominal kecil yang sering berulang "
+                f"kadang justru paling sulit terasa."
+
+            )
+
+            behaviour_ditampilkan += 1
+
+        # -------------------------------------------------
+        # KATEGORI DOMINAN
+        # -------------------------------------------------
+
+        elif tipe == "kategori_dominan":
+
+            insight.append(
+
+                f"📊 *{str(item['kategori']).title()}* "
+                f"cukup dominan dalam pola pengeluaran kamu, "
+                f"mencapai {item['persentase']:.0f}%."
+
+            )
+
+            behaviour_ditampilkan += 1
+
+        # -------------------------------------------------
+        # WEEKEND
+        # -------------------------------------------------
+
+        elif tipe == "weekend_lebih_boros":
+
+            insight.append(
+
+                f"🗓️ Menariknya, pengeluaran akhir pekan "
+                f"cukup besar dibanding hari biasa. "
+                f"Mungkin ada pola pengeluaran tertentu "
+                f"yang muncul saat weekend."
+
+            )
+
+            behaviour_ditampilkan += 1
+
+        # -------------------------------------------------
+        # CASHFLOW NEGATIF
+        # -------------------------------------------------
+
+        elif tipe == "cashflow_negatif":
+
+            insight.append(
+
+                f"⚠️ Saat ini pengeluaran sudah lebih besar "
+                f"{rupiah(item['defisit'])} dibanding pemasukan."
+
+            )
+
+            behaviour_ditampilkan += 1
+
+    # =====================================================
+    # HARI TERBOROS
+    # =====================================================
+
+    hari_terboros = reference[
+        "harian"
+    ].get(
+        "hari_terboros"
     )
 
-    if kategori_sering:
+    nominal_hari_terboros = reference[
+        "harian"
+    ].get(
+        "nominal_hari_terboros",
+        0
+    )
 
-        nama_kategori, jumlah = kategori_sering[0]
+    if (
+        hari_terboros
+        and nominal_hari_terboros > 0
+    ):
 
-        if jumlah >= 5:
+        insight.append(
 
-            insight.append(
-                f"🔁 Kategori "
-                f"*{str(nama_kategori).title()}* "
-                f"sudah memiliki {jumlah} transaksi "
-                f"bulan ini."
-            )
+            f"📅 Hari paling banyak mengeluarkan uang "
+            f"sejauh ini adalah tanggal *{hari_terboros}*, "
+            f"sekitar {rupiah(nominal_hari_terboros)}."
+
+        )
 
     # =====================================================
     # BUDGET
@@ -764,61 +2453,43 @@ def generate_full_insight(
 
     budget_perlu_diperhatikan = []
 
-    budgets = Budget.query.filter_by(
-        nomor_wa=nomor,
-        periode=periode
-    ).all()
-
     for budget in budgets:
 
-        terpakai = kategori.get(
-            budget.kategori,
-            0
-        )
+        persen = budget[
+            "persentase"
+        ]
 
-        if budget.nominal <= 0:
-            continue
-
-        persen = (
-            terpakai /
-            budget.nominal
-        ) * 100
-
-        sisa_budget = (
-            budget.nominal -
-            terpakai
-        )
+        sisa = budget[
+            "sisa"
+        ]
 
         if persen >= 100:
 
             budget_perlu_diperhatikan.append(
-                f"🚨 Budget "
-                f"*{budget.kategori.title()}* "
-                f"sudah terlampaui sebesar "
-                f"{rupiah(abs(sisa_budget))}."
+
+                f"🚨 Budget *{str(budget['kategori']).title()}* "
+                f"sudah terlampaui "
+                f"{rupiah(abs(sisa))}."
+
             )
 
         elif persen >= 90:
 
             budget_perlu_diperhatikan.append(
-                f"⚠️ Budget "
-                f"*{budget.kategori.title()}* "
-                f"tinggal sekitar "
-                f"{rupiah(max(sisa_budget, 0))} lagi."
+
+                f"⚠️ Budget *{str(budget['kategori']).title()}* "
+                f"tinggal {rupiah(max(sisa, 0))}."
+
             )
 
         elif persen >= 75:
 
             budget_perlu_diperhatikan.append(
-                f"🟡 Budget "
-                f"*{budget.kategori.title()}* "
-                f"sudah terpakai "
-                f"{persen:.0f}%."
-            )
 
-    # =====================================================
-    # TAMPILKAN BUDGET
-    # =====================================================
+                f"🟡 Budget *{str(budget['kategori']).title()}* "
+                f"sudah terpakai {persen:.0f}%."
+
+            )
 
     if budget_perlu_diperhatikan:
 
@@ -833,296 +2504,229 @@ def generate_full_insight(
     elif budgets:
 
         insight.append(
-            "🎯 Budget kamu saat ini masih "
-            "dalam batas yang relatif aman."
+
+            "🎯 Budget kamu bulan ini "
+            "masih berada dalam batas aman."
+
         )
 
     else:
 
         insight.append(
-            "🎯 Kamu belum memiliki budget bulan ini. "
-            "Membuat budget per kategori bisa membantu "
-            "mengontrol pengeluaran."
+
+            "🎯 Kamu belum punya budget bulan ini. "
+            "Budget sederhana per kategori bisa "
+            "membantu kamu melihat batas pengeluaran."
+
         )
 
     # =====================================================
-    # PROYEKSI PENGELUARAN
+    # PROYEKSI
     # =====================================================
+
+    proyeksi = cashflow[
+        "proyeksi_bulan"
+    ]
+
+    hari_berjalan = reference[
+        "periode"
+    ][
+        "hari_berjalan"
+    ]
+
+    jumlah_hari = reference[
+        "periode"
+    ][
+        "jumlah_hari"
+    ]
 
     if (
         total_keluar > 0
-        and hari_berjalan > 0
+        and hari_berjalan < jumlah_hari
     ):
 
-        rata_harian = (
-            total_keluar /
-            hari_berjalan
+        insight.append(
+
+            f"📈 Kalau pola pengeluaran sekarang "
+            f"terus berjalan, total bulan ini berpotensi "
+            f"mencapai sekitar {rupiah(proyeksi)}."
+
         )
-
-        proyeksi_bulan = (
-            rata_harian *
-            jumlah_hari
-        )
-
-        if jumlah_hari > hari_berjalan:
-
-            insight.append(
-                f"📈 Dengan rata-rata pengeluaran "
-                f"{rupiah(rata_harian)} per hari, "
-                f"pengeluaran bulan ini berpotensi "
-                f"mencapai sekitar "
-                f"{rupiah(proyeksi_bulan)} "
-                f"jika pola ini berlanjut."
-            )
-
-    # =====================================================
-    # SARAN TABUNGAN
-    # =====================================================
-
-    if total_masuk > total_keluar and saldo > 0:
-
-        rasio_sisa = (
-            saldo /
-            total_masuk
-        ) * 100
-
-        if rasio_sisa >= 30:
-
-            insight.append(
-                "💡 Kamu masih punya ruang yang cukup bagus "
-                "untuk menyisihkan sebagian uang ke tabungan."
-            )
-
-        elif rasio_sisa >= 10:
-
-            insight.append(
-                "💡 Ada sisa uang yang bisa mulai "
-                "dialihkan ke tabungan meskipun jumlahnya kecil."
-            )
 
     # =====================================================
     # REMINDER
     # =====================================================
 
-    reminders = Reminder.query.filter_by(
-        nomor_wa=nomor
-    ).all()
+    reminder_dekat = [
 
-    reminder_dekat = []
+        r
 
-    for r in reminders:
+        for r in reminders
 
-        try:
+        if 0 <= r[
+            "selisih_hari"
+        ] <= 3
 
-            # ---------------------------------------------
-            # Jika r.tanggal adalah integer day-of-month
-            # ---------------------------------------------
-
-            if isinstance(
-                r.tanggal,
-                int
-            ):
-
-                selisih = (
-                    r.tanggal -
-                    hari_ini.day
-                )
-
-            # ---------------------------------------------
-            # Jika r.tanggal adalah date/datetime
-            # ---------------------------------------------
-
-            else:
-
-                tanggal_reminder = r.tanggal
-
-                if hasattr(
-                    tanggal_reminder,
-                    "date"
-                ):
-
-                    tanggal_reminder = (
-                        tanggal_reminder.date()
-                    )
-
-                selisih = (
-                    tanggal_reminder -
-                    hari_ini
-                ).days
-
-        except Exception:
-
-            continue
-
-        if selisih == 0:
-
-            reminder_dekat.append(
-                f"📅 *{r.nama}* "
-                f"jatuh tempo hari ini."
-            )
-
-        elif 0 < selisih <= 3:
-
-            reminder_dekat.append(
-                f"⏰ *{r.nama}* "
-                f"jatuh tempo "
-                f"{selisih} hari lagi."
-            )
+    ]
 
     if reminder_dekat:
 
         insight.append(
-            "🔔 *Pengingat terdekat:*"
+            "🔔 *Ada yang perlu diingat:*"
         )
 
-        insight.extend(
-            reminder_dekat[:3]
-        )
+        for reminder in reminder_dekat[:3]:
+
+            selisih = reminder[
+                "selisih_hari"
+            ]
+
+            if selisih == 0:
+
+                insight.append(
+
+                    f"📅 *{reminder['nama']}* "
+                    f"jatuh tempo hari ini."
+
+                )
+
+            else:
+
+                insight.append(
+
+                    f"⏰ *{reminder['nama']}* "
+                    f"jatuh tempo {selisih} hari lagi."
+
+                )
 
     # =====================================================
-    # TARGET TABUNGAN
+    # TARGET
     # =====================================================
 
-    targets = TargetPembelian.query.filter_by(
-        nomor_wa=nomor,
-        aktif=True
-    ).all()
-
-    target_diperhatikan = []
+    target_perlu_diperhatikan = []
 
     for target in targets:
 
-        if not target.target or target.target <= 0:
-            continue
+        progress = target[
+            "progress"
+        ]
 
-        progress = (
-            target.terkumpul /
-            target.target
-        ) * 100
+        sisa = target[
+            "sisa"
+        ]
 
-        sisa = max(
-            target.target -
-            target.terkumpul,
-            0
-        )
-
-        try:
-
-            deadline = target.deadline
-
-            if hasattr(
-                deadline,
-                "date"
-            ):
-
-                deadline = deadline.date()
-
-            sisa_hari = (
-                deadline -
-                hari_ini
-            ).days
-
-        except Exception:
-
-            sisa_hari = None
+        sisa_hari = target[
+            "sisa_hari"
+        ]
 
         if progress >= 100:
 
-            target_diperhatikan.append(
-                f"🎉 Target "
-                f"*{target.nama}* "
+            target_perlu_diperhatikan.append(
+
+                f"🎉 Target *{target['nama']}* "
                 f"sudah tercapai."
+
             )
 
-        elif (
-            sisa_hari is not None
-            and sisa_hari < 0
-        ):
+        elif sisa_hari < 0:
 
-            target_diperhatikan.append(
-                f"⌛ Target "
-                f"*{target.nama}* "
+            target_perlu_diperhatikan.append(
+
+                f"⌛ Target *{target['nama']}* "
                 f"melewati deadline dan masih kurang "
                 f"{rupiah(sisa)}."
+
             )
 
-        elif (
-            sisa_hari is not None
-            and sisa_hari <= 7
-        ):
+        elif sisa_hari <= 7:
 
-            target_diperhatikan.append(
-                f"⏰ Target "
-                f"*{target.nama}* tinggal "
-                f"{sisa_hari} hari lagi dan masih kurang "
-                f"{rupiah(sisa)}."
+            target_perlu_diperhatikan.append(
+
+                f"⏰ Target *{target['nama']}* "
+                f"tinggal {sisa_hari} hari lagi dan "
+                f"masih kurang {rupiah(sisa)}."
+
             )
 
         elif progress >= 75:
 
-            target_diperhatikan.append(
-                f"💪 Target "
-                f"*{target.nama}* sudah mencapai "
-                f"{progress:.0f}%. "
-                f"Tinggal sedikit lagi!"
+            target_perlu_diperhatikan.append(
+
+                f"💪 Target *{target['nama']}* "
+                f"sudah mencapai {progress:.0f}%. "
+                f"Tinggal sedikit lagi."
+
             )
 
-        else:
-
-            target_diperhatikan.append(
-                f"🎯 Target "
-                f"*{target.nama}* baru mencapai "
-                f"{progress:.0f}%. "
-                f"Masih perlu "
-                f"{rupiah(sisa)}."
-            )
-
-    if target_diperhatikan:
+    if target_perlu_diperhatikan:
 
         insight.append(
-            "🎯 *Perkembangan target kamu:*"
+            "🎯 *Perkembangan target:*"
         )
 
         insight.extend(
-            target_diperhatikan[:3]
+            target_perlu_diperhatikan[:3]
         )
 
     # =====================================================
     # SARAN AKHIR
     # =====================================================
 
-    if total_masuk > 0 and total_keluar > 0:
+    if (
+        total_masuk > 0
+        and total_keluar > 0
+    ):
 
-        if total_keluar < total_masuk:
+        if saldo > 0:
 
             sisa_persen = (
-                saldo /
-                total_masuk
-            ) * 100
 
-            if sisa_persen >= 20:
+                saldo /
+                total_masuk *
+                100
+
+            )
+
+            if sisa_persen >= 30:
 
                 insight.append(
-                    "✨ *Saran saya:* kondisi kamu cukup baik. "
-                    "Kalau bisa, pertahankan pola ini dan sisihkan "
-                    "sebagian saldo untuk tabungan atau dana darurat."
+
+                    "✨ *Kalau melihat pola sekarang:* "
+                    "kamu masih punya ruang yang cukup "
+                    "untuk menabung atau memperkuat "
+                    "dana cadangan."
+
+                )
+
+            elif sisa_persen >= 10:
+
+                insight.append(
+
+                    "💡 Masih ada sedikit ruang dari "
+                    "pemasukan kamu. Kalau ingin mulai "
+                    "menabung, tidak harus besar—yang "
+                    "penting konsisten."
+
                 )
 
             else:
 
                 insight.append(
-                    "💡 *Saran saya:* coba kurangi beberapa "
-                    "pengeluaran kecil yang tidak terlalu penting. "
-                    "Sedikit penghematan setiap hari bisa terasa "
-                    "besar di akhir bulan."
+
+                    "💡 Sisa pemasukan kamu mulai tipis. "
+                    "Coba perhatikan pengeluaran kecil "
+                    "yang paling sering muncul."
+
                 )
 
         else:
 
             insight.append(
-                "💡 *Saran saya:* untuk sementara prioritaskan "
-                "kebutuhan utama dan kurangi pengeluaran "
-                "yang bisa ditunda."
+
+                "💡 Untuk sementara, prioritaskan "
+                "kebutuhan utama dan tahan pengeluaran "
+                "yang masih bisa ditunda."
+
             )
 
     # =====================================================
@@ -1132,8 +2736,10 @@ def generate_full_insight(
     if not insight:
 
         insight.append(
+
             "🧠 Belum cukup data untuk memberikan "
             "analisis keuangan."
+
         )
 
     return insight
