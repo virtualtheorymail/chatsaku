@@ -11376,7 +11376,6 @@ _ChatSaku • Teman mengatur keuanganmu_"""
             if ai_insight_text:
 
                 pesan += f"""
-
     {ai_insight_text}
     """
 
@@ -11385,10 +11384,8 @@ _ChatSaku • Teman mengatur keuanganmu_"""
             # ==========================================================
 
             pesan += f"""
-
     {budget_text}
     """
-
             # ==========================================================
             # TAMBAHKAN SALDO
             # ==========================================================
