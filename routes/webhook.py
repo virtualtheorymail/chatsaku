@@ -6042,10 +6042,11 @@ https://www.chatsaku.com
                 )
 
             text = (
-                f"👥 *DAFTAR USER CHATSAKU*\n"
-                f"━━━━━━━━━━━━━━\n\n"
-                f"Total User : {len(users)}\n\n"
+                f"👋 *Daftar User ChatSaku*\n\n"
+                f"Ada *{len(users)} user* yang terdaftar saat ini.\n\n"
+                f"Berikut datanya:"
             )
+
 
             for i, u in enumerate(
                 users,
