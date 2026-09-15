@@ -4064,6 +4064,93 @@ def deteksi_user_nlp(
         }
 
     # ========================================================
+    # TAMBAH / PERPANJANG MASA AKTIF
+    #
+    # Contoh:
+    #
+    # tambah masa aktif 628123456789 30
+    # perpanjang 628123456789 30
+    # tambah aktif 628123456789 30
+    # perpanjang masa aktif 628123456789 30
+    #
+    # ========================================================
+
+    pola_masa_aktif = [
+        "tambah masa aktif",
+        "tambah masa",
+        "tambah aktif",
+        "perpanjang masa aktif",
+        "perpanjang",
+        "perpanjang aktif"
+    ]
+
+    for pola in pola_masa_aktif:
+
+        if text.startswith(pola):
+
+            data = text[
+                len(pola):
+            ].strip()
+
+            parts = data.split()
+
+            # Minimal:
+            # nomor durasi
+
+            if len(parts) < 2:
+
+                return {
+                    "intent": "tambah_masa_aktif",
+                    "nomor": None,
+                    "durasi": None,
+                    "error": "format"
+                }
+
+            nomor = parts[0]
+
+            durasi = parts[1]
+
+            # ==================================================
+            # VALIDASI DURASI
+            # ==================================================
+
+            try:
+
+                durasi_int = int(durasi)
+
+            except (
+                TypeError,
+                ValueError
+            ):
+
+                return {
+                    "intent": "tambah_masa_aktif",
+                    "nomor": nomor,
+                    "durasi": None,
+                    "error": "durasi"
+                }
+
+            if durasi_int <= 0:
+
+                return {
+                    "intent": "tambah_masa_aktif",
+                    "nomor": nomor,
+                    "durasi": None,
+                    "error": "durasi"
+                }
+
+            print("🔄 TAMBAH MASA AKTIF TERDETEKSI")
+            print("NOMOR  :", nomor)
+            print("DURASI :", durasi_int)
+
+            return {
+                "intent": "tambah_masa_aktif",
+                "nomor": nomor,
+                "durasi": durasi_int,
+                "error": None
+            }
+
+    # ========================================================
     # TAMBAH USER
     # ========================================================
 
@@ -5747,6 +5834,9 @@ https://www.chatsaku.com
 
             cmd = "aktif"
 
+        elif intent == "tambah_masa_aktif":
+
+            cmd = "tambah_masa_aktif"
 
         elif intent == "nonaktif":
 
@@ -5800,6 +5890,8 @@ https://www.chatsaku.com
         or cmd.startswith("paket ")
 
         or cmd.startswith("aktif ")
+
+        or cmd.startswith("tambah_masa_aktif")
 
         or cmd.startswith("nonaktif ")
 
@@ -6710,6 +6802,291 @@ https://www.chatsaku.com
 
     🟢 *Status*
     Aktif"""
+        )
+
+        return jsonify(
+            status=True
+        )
+
+    # ============================================================
+    # TAMBAH MASA AKTIF
+    #
+    # Contoh:
+    #
+    # tambah masa aktif 628123456789 30
+    # perpanjang 628123456789 30
+    #
+    # ============================================================
+
+    if intent == "tambah_masa_aktif":
+
+        # ========================================================
+        # HANYA ADMIN
+        # ========================================================
+
+        if not is_admin(sender):
+
+            return jsonify(
+                status=True
+            )
+
+        # ========================================================
+        # AMBIL DATA NLP
+        # ========================================================
+
+        nomor = nlp.get(
+            "nomor"
+        )
+
+        durasi = nlp.get(
+            "durasi"
+        )
+
+        print("========================================")
+        print("🔄 TAMBAH MASA AKTIF")
+        print("SENDER :", sender)
+        print("NOMOR  :", nomor)
+        print("DURASI :", durasi)
+        print("========================================")
+
+        # ========================================================
+        # CEK NOMOR
+        # ========================================================
+
+        if not nomor:
+
+            kirim_wa(
+                sender,
+                """❌ Nomor user belum ditemukan.
+
+Contoh:
+
+tambah masa aktif 628123456789 30
+
+atau:
+
+perpanjang 628123456789 30"""
+            )
+
+            return jsonify(
+                status=True
+            )
+
+        # ========================================================
+        # CEK DURASI
+        # ========================================================
+
+        if not durasi:
+
+            kirim_wa(
+                sender,
+                f"""❌ Lama masa aktif belum ditemukan.
+
+Contoh:
+
+tambah masa aktif {nomor} 30
+
+Artinya masa aktif user akan ditambahkan 30 hari."""
+            )
+
+            return jsonify(
+                status=True
+            )
+
+        # ========================================================
+        # KONVERSI DURASI
+        # ========================================================
+
+        try:
+
+            durasi = int(durasi)
+
+        except (
+            TypeError,
+            ValueError
+        ):
+
+            kirim_wa(
+                sender,
+                """❌ Lama masa aktif harus berupa angka.
+
+Contoh:
+
+tambah masa aktif 628123456789 30"""
+            )
+
+            return jsonify(
+                status=True
+            )
+
+        # ========================================================
+        # VALIDASI DURASI
+        # ========================================================
+
+        if durasi <= 0:
+
+            kirim_wa(
+                sender,
+                "❌ Lama masa aktif harus lebih dari 0 hari."
+            )
+
+            return jsonify(
+                status=True
+            )
+
+        # ========================================================
+        # NORMALISASI NOMOR
+        # ========================================================
+
+        nomor = normalize_wa(
+            nomor
+        )
+
+        # ========================================================
+        # CARI USER
+        # ========================================================
+
+        user = User.query.filter_by(
+            nomor_wa=nomor
+        ).first()
+
+        if not user:
+
+            kirim_wa(
+                sender,
+                "❌ User tidak ditemukan."
+            )
+
+            return jsonify(
+                status=True
+            )
+
+        # ========================================================
+        # HITUNG TANGGAL
+        # ========================================================
+
+        from datetime import date, timedelta
+
+        hari_ini = date.today()
+
+        tanggal_lama = (
+            user.akhir_langganan
+        )
+
+        # ========================================================
+        # JIKA MASIH AKTIF
+        #
+        # Tambahkan dari tanggal expired yang sekarang
+        #
+        # Contoh:
+        # 20 September + 30 hari
+        # = 20 Oktober
+        #
+        # ========================================================
+
+        if (
+            user.akhir_langganan
+            and user.akhir_langganan >= hari_ini
+        ):
+
+            tanggal_dasar = (
+                user.akhir_langganan
+            )
+
+        # ========================================================
+        # JIKA SUDAH EXPIRED
+        #
+        # Mulai lagi dari hari ini
+        #
+        # ========================================================
+
+        else:
+
+            tanggal_dasar = (
+                hari_ini
+            )
+
+        tanggal_akhir_baru = (
+            tanggal_dasar
+            + timedelta(
+                days=durasi
+            )
+        )
+
+        # ========================================================
+        # UPDATE USER
+        # ========================================================
+
+        user.aktif = True
+
+        user.akhir_langganan = (
+            tanggal_akhir_baru
+        )
+
+        # Kalau belum pernah punya
+        # tanggal mulai langganan
+        if not user.mulai_langganan:
+
+            user.mulai_langganan = (
+                hari_ini
+            )
+
+        db.session.commit()
+
+        # ========================================================
+        # FORMAT TANGGAL
+        # ========================================================
+
+        tanggal_lama_text = (
+
+            tanggal_lama.strftime(
+                "%d-%m-%Y"
+            )
+
+            if tanggal_lama
+
+            else "-"
+        )
+
+        tanggal_baru_text = (
+
+            user.akhir_langganan.strftime(
+                "%d-%m-%Y"
+            )
+
+            if user.akhir_langganan
+
+            else "-"
+        )
+
+        # ========================================================
+        # BALASAN
+        # ========================================================
+
+        kirim_wa(
+            sender,
+            f"""💚 *Masa aktif berhasil ditambahkan.*
+
+👤 *Nama*
+{user.nama}
+
+📱 *Nomor*
+{user.nomor_wa}
+
+🎁 *Paket*
+{user.paket}
+
+📅 *Sebelumnya*
+{tanggal_lama_text}
+
+➕ *Ditambahkan*
+{durasi} hari
+
+⏳ *Aktif sampai*
+{tanggal_baru_text}
+
+🟢 *Status*
+Aktif"""
         )
 
         return jsonify(
