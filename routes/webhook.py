@@ -12529,29 +12529,22 @@ Kalau mau melihat budget yang sudah kamu buat, tinggal ketik:
 
             kirim_wa(
                 sender,
-                f"""✅ *Hutang Berhasil Dicatat*
+                f"""💚 Oke, hutangnya sudah aku catat ya.
 
-    ━━━━━━━━━━━━━━━━━━
+👤 Kepada: *{nama.title()}*
+💰 Nominal: *Rp {nominal:,.0f}*
+📝 Keterangan: {keterangan or "-"}
 
-    👤 *Kepada*
-    {nama.title()}
+⏳ Status: *Belum lunas*
 
-    💰 *Nominal*
-    Rp {nominal:,.0f}
+Nanti kalau sudah dibayar, kamu tinggal bilang:
+👉 *bayar hutang {nama}*
 
-    📝 *Keterangan*
-    {keterangan or "-"}
+Mau melihat semua hutang kamu?
+👉 *list hutang*
 
-    📌 *Status*
-    ⏳ BELUM LUNAS
+_Supaya nggak lupa, biar ChatSaku yang bantu mencatatnya. 💚_"""
 
-    ━━━━━━━━━━━━━━━━━━
-
-    Untuk melihat hutang:
-
-    *list hutang*
-
-    _ChatSaku Finance Assistant_"""
             )
 
             return jsonify({
