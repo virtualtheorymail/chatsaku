@@ -6044,7 +6044,6 @@ https://www.chatsaku.com
             text = (
                 f"👋 *Daftar User ChatSaku*\n\n"
                 f"Ada *{len(users)} user* yang terdaftar saat ini.\n\n"
-                f"Berikut datanya:\n\n"
             )
 
 
