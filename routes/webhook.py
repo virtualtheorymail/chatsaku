@@ -7396,8 +7396,8 @@ Aktif"""
                     status=True
                 )
 
-            pesan = "🔔 *DAFTAR REMINDER*\n"
-            pesan += "━━━━━━━━━━━━━━━━━━\n\n"
+            pesan = "💚 *Ini reminder kamu* 👋\n\n"
+            pesan += "Biar nggak ada yang kelewat, ini yang perlu kamu ingat:\n\n"
 
             total = 0
 
@@ -7406,33 +7406,31 @@ Aktif"""
                 1
             ):
 
-                nilai = (
-                    r.nominal or 0
-                )
+                nilai = r.nominal or 0
 
                 total += nilai
 
                 pesan += (
-                    f"*{i}. {r.nama.title()}*\n"
-                    f"📅 Tanggal : {r.tanggal}\n"
-                    f"💰 Nominal : Rp {nilai:,.0f}\n\n"
+                    f"{i}️⃣ *{r.nama.title()}*\n"
+                    f"   📅 Jatuh tempo: {r.tanggal}\n"
+                    f"   💰 Sekitar Rp {nilai:,.0f}\n\n"
                 )
 
             pesan += "━━━━━━━━━━━━━━━━━━\n"
             pesan += (
-                f"💵 *Total Tagihan*\n"
-                f"Rp {total:,.0f}"
+                f"💰 *Kalau semuanya dibayar, sekitar*\n"
+                f"*Rp {total:,.0f}*\n"
             )
 
             if is_viewer(sender):
 
                 pesan += (
-                    "\n\n👁 *Mode Viewer*\n"
-                    "Data Reminder milik Owner."
+                    "\n👁 _Kamu sedang melihat reminder milik Owner._\n"
                 )
 
             pesan += (
-                "\n\n_ChatSaku Finance Assistant_"
+                "\nSemoga nggak ada yang kelewat ya 😊\n\n"
+                "💚 _ChatSaku • Biar urusan uang nggak terlupa_"
             )
 
             kirim_wa(
