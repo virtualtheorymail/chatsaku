@@ -1229,28 +1229,20 @@ def deteksi_reminder_nlp(message, data=None):
 
             kirim_wa(
                 sender,
-                f"""🔔 *Reminder {status_text}*
+                f"""💚 *Hai! Mau ngingetin nih* 👋
 
-    ━━━━━━━━━━━━━━━━━━
+Ada yang perlu kamu perhatikan:
 
-    📄 *Tagihan*
-    {nama.title()}
+📄 *{nama.title()}*
+📅 Jatuh tempo: *{tanggal}*
+💰 Sekitar: *Rp {nominal:,.0f}*
 
-    📅 *Jatuh Tempo*
-    Tanggal {tanggal}
+Jangan sampai kelewat ya 😊
 
-    💰 *Estimasi*
-    Rp {nominal:,.0f}
+Ketik *reminder* kalau mau lihat pengingat lainnya.
 
-    ━━━━━━━━━━━━━━━━━━
-
-    Ketik:
-
-    *reminder*
-
-    untuk melihat seluruh reminder.
-
-    _ChatSaku Finance Assistant_"""
+💚 _ChatSaku • Biar urusan uang nggak terlupa_
+"""
             )
 
             return jsonify({

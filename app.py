@@ -2065,11 +2065,11 @@ def kirim_reminder_harian():
                     # BUAT PESAN
                     # ==================================
 
-                    pesan = f"""🔔 *Reminder ChatSaku*
+                    pesan = f"""💚 *Hai {user.nama}* 👋
 
-Halo *{user.nama}* 👋
+Mau ngingetin sebentar 😊
 
-Hari ini ada beberapa pengingat:
+Hari ini ada beberapa hal yang perlu kamu ingat:
 
 """
 
@@ -2087,17 +2087,17 @@ Hari ini ada beberapa pengingat:
                         total += nominal
 
                         pesan += (
-                            f"{index}️⃣ "
-                            f"📌 *{reminder.nama}*\n"
+                            f"{index}️⃣ *{reminder.nama}*\n"
                             f"   💰 Rp {nominal:,.0f}\n\n"
                         )
 
                     pesan += (
                         "━━━━━━━━━━━━━━━━━━\n"
-                        f"💰 *Total: Rp {total:,.0f}*\n"
+                        f"💰 Kalau semuanya dibayar hari ini, "
+                        f"totalnya sekitar *Rp {total:,.0f}*\n"
                         "━━━━━━━━━━━━━━━━━━\n\n"
-                        "Jangan sampai ada yang terlewat ya 😊\n\n"
-                        "💚 _ChatSaku Finance Assistant_"
+                        "Cek dulu satu-satu, siapa tahu ada yang perlu disiapkan 😊\n\n"
+                        "💚 _ChatSaku, biar nggak lupa urusan keuangan._"
                     )
 
                     # ==================================
