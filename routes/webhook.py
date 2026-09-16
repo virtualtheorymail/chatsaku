@@ -7416,7 +7416,6 @@ Aktif"""
                     f"   💰 Sekitar Rp {nilai:,.0f}\n\n"
                 )
 
-            pesan += "━━━━━━━━━━━━━━━━━━\n"
             pesan += (
                 f"💰 *Kalau semuanya dibayar, sekitar*\n"
                 f"*Rp {total:,.0f}*\n"
